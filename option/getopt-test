@@ -1,0 +1,29 @@
+#!/bin/bash
+usage() {
+    echo --help
+}
+OPT_SHORT="A:ChR:s:U"
+OPT_LONG="add:,check,help,remove:,sign:,update"
+if ! OPT_TEMP="$(getopt -q -o $OPT_SHORT -l $OPT_LONG -- "$@")";then
+    echo;usage;exit 1
+fi
+eval set -- "$OPT_TEMP"
+unset OPT_SHORT OPT_LONG OPT_TEMP
+echo all opt is $@
+while true
+do
+    case $1 in
+        -A|--add)  pkg=$2; shift ;;
+        -C|--check)    ck=1    ;;
+        -R|--remove)   pkg=$2; shift ;;
+        -s|--sign) u=$2; shift   ;;
+        -U|--update) upda=1    ;;
+        -h|--help) usage   ;;
+        --)  echo end ;break ;;
+        *)echo unknown $1;exit 1;;
+    esac
+    shift
+done
+echo \$pkg is $pkg
+echo \$check==$ck; echo \$update=$upda
+echo \$user=$u

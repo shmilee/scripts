@@ -1,0 +1,6 @@
+#!/bin/bash
+git clone https://gerrit.wikimedia.org/r/p/mediawiki/core.git mediawiki
+#git clone https://gerrit.wikimedia.org/r/p/mediawiki/extensions.git
+#cd extensions
+#git submodule update --init --recursive
+git clone https://gerrit.wikimedia.org/r/p/mediawiki/extensions/Math.git

@@ -1,0 +1,2 @@
+#!/bin/bash
+dosbox -c 'mount d: ./' -c 'path %path%;d:\tools'

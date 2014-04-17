@@ -1,0 +1,12 @@
+#!/bin/bash
+#将txt小说分按章节切割，txt要用utf-8编码, 标题格式满足"第{一，三十}集",单独一行，前面可有空格，不能有其他字符
+#author：lishengming
+#date:20111212
+novel="$1"
+a=(`grep -E '^\ {0,}第.{1,5}集' $novel -n |cut -d: -f1`)  # 每一集的标题所在行数记入数组a
+a+=($(expr $(wc -l $novel |cut -d ' ' -f1) + 1))  # 总行数加 1
+for (( i = 1;i < ${#a[*]} ;i++ )); do
+    echo 第$i集从 ${a[i-1]}行 到 `expr ${a[i]} - 1`行.
+    sed -n "${a[i-1]},`expr ${a[i]} - 1`p" $novel >第$i集.txt  #循环，第i集放入i.txt里
+done
+echo  The $novel has been cut into `expr ${#a[@]} - 1` parts.

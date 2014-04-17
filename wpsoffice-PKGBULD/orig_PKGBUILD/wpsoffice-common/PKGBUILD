@@ -1,0 +1,25 @@
+# Maintainer: Kingsoft Office <ksoprocn_bug@kingsoft.com>
+# Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
+
+pkgname=wpsoffice-common
+pkgver=1.0
+pkgrel=2
+arch=('i686' 'x86_64')
+groups=('wpsforlinux')
+license=('custom:Kingsoft')
+pkgdesc="Dependencies and license for Kingsoft Office(WPS office)."
+url='http://wps-community.org/'
+source=('LICENSE')
+sha1sums=('fffe33dc4b2bcd1398a96d6b2cd4e107cbef5fd8')
+if [ "$CARCH" = "i686" ]; then
+    depends=('fontconfig' 'glib2' 'libpng12' 'libsm' 'libxext' 'libxrender' 'libcups')
+    #optdepends=('libcups: CUPS printing support')
+elif [ "$CARCH" = "x86_64" ]; then
+    depends=('lib32-fontconfig' 'lib32-glib2' 'lib32-libpng12' 'lib32-libsm' 'lib32-libxext' 'lib32-libxrender' 'lib32-libcups')
+    #optdepends=('lib32-libcups: CUPS printing support')
+fi
+
+package() {
+    cd "$srcdir"
+    install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/wpsoffice/LICENSE
+}

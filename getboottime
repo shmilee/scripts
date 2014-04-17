@@ -1,0 +1,6 @@
+#!/bin/bash
+T1=`date +%s` &&\
+T2=`uptime | awk '{if($4 = "days,")print $3*24*60*60+$5*60*60}'` &&\
+T3=`expr ${T1} - ${T2}` &&\
+T4=`perl -le "print scalar gmtime ${T3}"`
+zenity --info --text="开机日期:\n$T4"

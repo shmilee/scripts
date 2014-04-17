@@ -1,0 +1,32 @@
+#!/bin/sh
+
+while getopts ":f:n:d:" opt; do
+  case $opt in
+    d)
+      day=$OPTARG   #get the value
+      ;;
+    f)
+      file=$OPTARG
+    ;;
+    n)
+      name=$OPTARG
+    ;;
+    \?)
+      echo "How to use: $0 [-d DAY] [-f out] [-n name]" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+echo day $day 
+echo file $file 
+echo name $name
+echo \$@ is $@
+echo $OPTIND
+shift $((OPTIND-1))
+echo after shift\:
+echo \$1 is $1
+echo \$@ is $@

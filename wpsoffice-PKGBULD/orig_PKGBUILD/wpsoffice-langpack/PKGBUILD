@@ -1,0 +1,31 @@
+# Maintainer: Kingsoft Office <ksoprocn_bug@kingsoft.com>
+# Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
+
+pkgbase=wpsoffice-langpack
+pkgname=('wpsoffice-en-US' 'wpsoffice-zh-CN')
+_pkgver=%PKGVER%
+pkgver=${_pkgver}
+pkgrel=1
+arch=('any')
+groups=('wpsforlinux')
+url='http://wps-community.org/'
+license=('custom:Kingsoft')
+depends=('wpsoffice')
+conflicts=('wps-office' 'kingsoft-office')
+provides=('wpsoffice-langpack')
+source=("%SRC_url%/kingsoft-office_${_pkgver}_i386.deb")
+sha1sums=('%SHA1SUMS%')
+
+package_wpsoffice-en-US() {
+    pkgdesc='English (United States) language pack for Kingsoft Office(WPS Office).'
+
+    cd "${srcdir}"
+    tar xv -C "${pkgdir}" --lzma -f data.tar.lzma ./opt/kingsoft/wps-office/office6/mui/en_US/{en_US.png,lang.conf}
+}
+
+package_wpsoffice-zh-CN() {
+    pkgdesc='Chinese (simplified) language pack for Kingsoft Office(WPS Office).'
+
+    cd "${srcdir}"
+    tar xv -C "${pkgdir}" --lzma -f data.tar.lzma ./opt/kingsoft/wps-office/office6/mui/zh_CN --exclude=opt/kingsoft/wps-office/office6/mui/zh_CN/templates
+}

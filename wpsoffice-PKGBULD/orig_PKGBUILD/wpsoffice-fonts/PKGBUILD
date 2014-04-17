@@ -1,0 +1,24 @@
+# Maintainer: Kingsoft Office <ksoprocn_bug@kingsoft.com>
+# Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
+
+pkgname=wpsoffice-fonts
+pkgver=5.20
+_pkgver=%PKGVER%
+pkgrel=3
+pkgdesc="FangZheng fonts separated from Kingsoft Office(WPS Office)."
+url="http://www.foundertype.com/"
+arch=('any')
+groups=('wpsforlinux')
+license=('custom:Kingsoft')
+conflicts=('wps-office' 'kingsoft-office')
+source=("%SRC_url%/kingsoft-office_${_pkgver}_i386.deb")
+sha1sums=('%SHA1SUMS%')
+depends=('fontconfig')
+install=wpsoffice-fonts.install
+
+#PKGEXT='.pkg.tar' ##reduce the time of compression
+
+package() {
+    cd "${srcdir}"
+    tar xv -C "${pkgdir}" --lzma -f data.tar.lzma ./usr/share/fonts
+}

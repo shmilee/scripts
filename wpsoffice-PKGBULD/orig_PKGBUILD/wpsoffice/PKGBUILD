@@ -1,0 +1,57 @@
+# Maintainer: Kingsoft Office <ksoprocn_bug@kingsoft.com>
+# Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
+
+pkgname=wpsoffice
+_pkgname=kingsoft-office
+_pkgver=%PKGVER%
+pkgver=${_pkgver}
+pkgrel=1
+arch=('any')
+groups=('wpsforlinux')
+license=('custom:Kingsoft')
+pkgdesc='Kingsoft Office (WPS Office), including Writer, Presentation and Spreadsheets, is a powerful office productivity suite, which is deeply compatible with all of the latest Microsoft Office file formats.'
+url='http://wps-community.org/'
+conflicts=('wps-office' 'kingsoft-office')
+options=(!strip)
+source=("%SRC_url%/${_pkgname}_${_pkgver}_i386.deb" 'wps-office.xml')
+sha1sums=('%SHA1SUMS%' '6b75f0c844645c4bf9a56e27a4fd78c4ed9e8187')
+depends=('desktop-file-utils' 'shared-mime-info' 'xdg-utils' 'wpsoffice-common=1.0')
+optdepends=('wpsoffice-fonts: FangZheng fonts support'
+            'wpsoffice-langpack: additional language support'
+            'wpsoffice-templates: additional templates support')
+install=wpsoffice.install
+
+#PKGEXT='.pkg.tar' ##reduce the time of compression
+
+_etMT="MimeType=application\/wps-office.et;application\/wps-office.ett;application\/vnd.ms-excel;\
+application\/vnd.openxmlformats-officedocument.spreadsheetml.template;\
+application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet;\
+audio\/webm;application\/xml;text\/html;text\/plain;text\/csv;"
+_wppMT="MimeType=application\/wps-office.dps;application\/wps-office.dpt;application\/vnd.ms-powerpoint;\
+application\/vnd.openxmlformats-officedocument.presentationml.presentation;\
+application\/vnd.openxmlformats-officedocument.presentationml.slideshow;\
+application\/vnd.openxmlformats-officedocument.presentationml.template;"
+_wpsMT="MimeType=application\/wps-office.wps;application\/wps-office.wpt;\
+application\/msword;application\/msword-template;\
+application\/vnd.openxmlformats-officedocument.wordprocessingml.template;\
+application\/vnd.openxmlformats-officedocument.wordprocessingml.document;\
+audio\/webm;text\/plain;text\/html" #application\/rtf
+
+package() {
+    cd "${srcdir}"
+    tar xv --lzma -f data.tar.lzma -C "${pkgdir}" --exclude=usr/share/fonts\
+        --exclude=opt/kingsoft/wps-office/office6/mui/en_US\
+        --exclude=opt/kingsoft/wps-office/office6/mui/zh_CN
+
+    msg2 "editing mime files: wps-office-{et,wpp,wps}.xml ..."
+    rm $pkgdir/usr/share/mime/packages/wps-office-{wps,wpp,et}.xml
+    install -Dm644 wps-office.xml $pkgdir/usr/share/mime/packages/wps-office.xml
+
+    msg2 "editing desktop files: wps-office-{et,wpp,wps}.desktop, with shared-mime-info ..."
+    #_et
+    sed -i "s/^MimeType.*$/$_etMT/" $pkgdir/usr/share/applications/wps-office-et.desktop
+    #_wpp
+    sed -i "s/^MimeType.*$/$_wppMT/" $pkgdir/usr/share/applications/wps-office-wpp.desktop
+    #_wps
+    sed -i "s/^MimeType.*$/$_wpsMT/" $pkgdir/usr/share/applications/wps-office-wps.desktop
+}

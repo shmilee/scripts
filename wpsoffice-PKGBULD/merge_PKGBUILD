@@ -1,0 +1,212 @@
+#!/bin/bash
+
+usage() {
+    cat <<EOF
+Usage: ./merge_PKGBUILDs [-o|-s] [--ver] [--sha1]
+
+Option:
+  -o  get one PKGBUILD in ./wpsforlinux which can build many packages
+  -s  get several PKGBUILDs in ./split_wpsforlinux and each one can build a package,except langpack and templates (default)
+  --ver <version>   version of the deb package, for example "8.1.0.3839~a9"
+  --sha1 <SHA1SUM>  SHA1SUM for the deb package
+EOF
+}
+
+if [ ! -d orig_PKGBUILD ]; then
+    echo "Directory 'orig_PKGBUILD' is lost !"
+    exit 1
+fi
+
+## options
+N=0
+PKGVER=""
+SHA1SUM=""
+OPT_SHORT="os"
+OPT_LONG="ver:,sha1:"
+if ! OPT_TEMP="$(getopt -aq -o $OPT_SHORT -l $OPT_LONG -- "$@")";then
+    usage;exit 1
+fi
+eval set -- "$OPT_TEMP"
+unset OPT_SHORT OPT_LONG OPT_TEMP
+while true; do
+    case $1 in
+        -o)    N+=o ;;
+        -s)    N+=s ;;
+        --ver)  shift; PKGVER=$1  ;;
+        --sha1) shift; SHA1SUM=$1 ;;
+        --)  OPT_IND=0; shift; break ;;
+        *)   usage; exit 1 ;;
+    esac
+    shift
+done
+
+if [ "$N" != "0o" -a "$N" != "0s" -a "$N" != "0" ]; then
+    usage
+    exit 1
+fi
+if [ x"$PKGVER" == x -o x"$SHA1SUM" == x ]; then
+    usage
+    exit 1
+fi
+
+# mui
+LANGS=(en-US zh-CN)
+
+# http://wdl.cache.ijinshan.com/wps/download/Linux/unstable
+SRC_url="http://kdl.cc.ksosoft.com/wps-community"
+
+## begin
+if [ "$N" == "0s" -o  "$N" == "0" ];then # so easy
+    if [ -d ./split_wpsforlinux ]; then
+        read -p "WARNNING: ./split_wpsforlinux will be removed! Continue? [y/n] " ANS
+        [ "$ANS" == y -o "$ANS" == Y ] && rm -r ./split_wpsforlinux
+    fi
+    cp -r -v ./orig_PKGBUILD ./split_wpsforlinux
+    find ./split_wpsforlinux -type f -exec grep -q '%PKGVER%' {} \; -exec sed -i -e "s|%PKGVER%|$PKGVER|g" -e "s|%SHA1SUMS%|$SHA1SUM|g" -e "s|%SRC_url%|${SRC_url}|g" {} \;
+    echo "==> DONE."
+elif [ "$N" == "0o" ];then
+    if [ -d ./wpsforlinux ]; then
+        read -p "WARNNING: ./wpsforlinux will be removed! Continue? [y/n] " ANS
+        [ "$ANS" == y -o "$ANS" == Y ] && rm -r ./wpsforlinux
+    fi
+    
+    mkdir ./wpsforlinux
+    ## one by one
+    # head
+    echo "==> Maintainer ..."
+    cat >./wpsforlinux/PKGBUILD <<EOF
+# Maintainer: Kingsoft Office <ksoprocn_bug@kingsoft.com>
+# Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
+
+EOF
+    # vars ##LICENSE-sha1 attention
+    echo "==> variables ..."
+    cat >>./wpsforlinux/PKGBUILD <<EOF
+pkgbase=wpsforlinux
+pkgname=wpsforlinux
+true && pkgname=('wpsoffice-fonts'
+                 'wpsoffice-common'
+                 'wpsoffice-templates-en-US'
+                 'wpsoffice-templates-zh-CN'
+                 'wpsoffice-en-US'
+                 'wpsoffice-zh-CN'
+                 'wpsoffice')
+_pkgver=$PKGVER
+arch=('any')
+groups=('wpsforlinux')
+license=('custom:Kingsoft')
+conflicts=('wps-office' 'kingsoft-office')
+source=("${SRC_url}/kingsoft-office_\${_pkgver}_i386.deb" 'LICENSE' 'wps-office.xml')
+sha1sums=('$SHA1SUM' 'fffe33dc4b2bcd1398a96d6b2cd4e107cbef5fd8' '6b75f0c844645c4bf9a56e27a4fd78c4ed9e8187')
+#PKGEXT='.pkg.tar' ##reduce the time of compression
+
+EOF
+    # pkg 1 fonts
+    echo "==> pkg function: wpsoffice-fonts ..."
+    cp ./orig_PKGBUILD/wpsoffice-fonts/wpsoffice-fonts.install ./wpsforlinux/wpsoffice-fonts.install
+    source ./orig_PKGBUILD/wpsoffice-fonts/PKGBUILD
+    cat >>./wpsforlinux/PKGBUILD <<EOF
+package_wpsoffice-fonts() {
+    pkgver=$pkgver
+    pkgrel=$pkgrel
+    pkgdesc="$pkgdesc"
+    url="$url"
+    depends=('fontconfig')
+    install=$install
+
+$(typeset -f package|sed '/^package/d;/^{/d;/^}/d')
+}
+
+EOF
+    # pkg 2 common ## depends attention
+    echo "==> pkg function: wpsoffice-common ..."
+    cp ./orig_PKGBUILD/wpsoffice-common/LICENSE ./wpsforlinux/LICENSE
+    source ./orig_PKGBUILD/wpsoffice-common/PKGBUILD
+    cat >>./wpsforlinux/PKGBUILD <<EOF
+package_wpsoffice-common() {
+    pkgver=$pkgver
+    pkgrel=$pkgrel
+    arch=('i686' 'x86_64')
+    pkgdesc="$pkgdesc"
+    url="$url"
+    if [ "\$CARCH" = "i686" ]; then
+        depends=('fontconfig' 'glib2' 'libpng12' 'libsm' 'libxext' 'libxrender' 'libcups')
+        #optdepends=('libcups: CUPS printing support')
+    elif [ "\$CARCH" = "x86_64" ]; then
+        depends=('lib32-fontconfig' 'lib32-glib2' 'lib32-libpng12' 'lib32-libsm' 'lib32-libxext' 'lib32-libxrender' 'lib32-libcups')
+        #optdepends=('lib32-libcups: CUPS printing support')
+    fi
+
+$(typeset -f package|sed '/^package/d;/^{/d;/^}/d')
+}
+
+EOF
+    # arch version
+    cat >>./wpsforlinux/PKGBUILD <<EOF
+pkgver=\${_pkgver}
+pkgrel=$pkgrel
+
+EOF
+    # pkg 3 templates
+    echo "==> pkg function: wpsoffice-templates ..."
+    source ./orig_PKGBUILD/wpsoffice-templates/PKGBUILD
+    for lang in ${LANGS[@]}; do
+        echo "  -> language: $lang"
+        cat >>./wpsforlinux/PKGBUILD <<EOF
+package_wpsoffice-templates-$lang () {
+    arch=('any')
+    url="$url"
+    provides=('wpsoffice-templates')
+$(typeset -f package_wpsoffice-templates-$lang|sed '/^package/d;/^{/d;/^}/d')
+}
+
+EOF
+    done
+    # pkg 4 languages
+    echo "==> pkg function: wpsoffice-langpack ..."
+    source ./orig_PKGBUILD/wpsoffice-langpack/PKGBUILD
+    for lang in ${LANGS[@]}; do
+        echo "  -> language: $lang"
+        cat >>./wpsforlinux/PKGBUILD <<EOF
+package_wpsoffice-$lang () {
+    arch=('any')
+    url="$url"
+    depends=('wpsoffice')
+    provides=('wpsoffice-langpack')
+$(typeset -f package_wpsoffice-$lang|sed '/^package/d;/^{/d;/^}/d')
+}
+
+EOF
+    done
+    # pkg 5 wpsoffice ## depends attention
+    echo "==> pkg function: wpsoffice ..."
+    cp ./orig_PKGBUILD/wpsoffice/wpsoffice.install ./wpsforlinux/wpsoffice.install
+    cp ./orig_PKGBUILD/wpsoffice/wps-office.xml ./wpsforlinux/wps-office.xml
+    source ./orig_PKGBUILD/wpsoffice/PKGBUILD
+    cat >>./wpsforlinux/PKGBUILD <<EOF
+_etMT="$_etMT"
+_wppMT="$_wppMT"
+_wpsMT="$_wpsMT"
+
+EOF
+    cat >>./wpsforlinux/PKGBUILD <<EOF
+package_wpsoffice() {
+    arch=('any')
+    pkgdesc="$pkgdesc"
+    url="$url"
+    options=(!strip)
+    depends=('desktop-file-utils' 'shared-mime-info' 'xdg-utils' 'wpsoffice-common=1.0')
+    optdepends=('wpsoffice-fonts: FangZheng fonts support'
+                'wpsoffice-langpack: additional language support'
+                'wpsoffice-templates: additional templates support')
+    install=$install
+
+$(typeset -f package|sed '/^package/d;/^{/d;/^}/d')
+}
+EOF
+    echo "==> DONE."
+else
+    echo "Where am I ?"
+    usage
+fi
+exit 0

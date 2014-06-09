@@ -1,17 +1,22 @@
 #!/bin/bash
 need_pkg=('awesome'
           'lain-git')
-my_files=('arch-icon.png'
+files=('alsa-bat.lua'
+       'arch-icon.png'
        'favorite.lua'
        'init.sh'
-       'tag-name.lua'
        'new-key.lua'
-       'theme.lua')
+       'separator.lua'
+       'tag-name.lua'
+       'theme.lua'
+       'icons/*.png')
 
 ## theme.lua : copy from /usr/share/awesome/themes/zenburn/
+# theme.dir = os.getenv("HOME") .. "/.config/awesome"
 # theme.wallpaper
 # theme.font
-# theme.awesome_icon = os.getenv("HOME") .. "/.config/awesome/arch-icon.png"
+# Widgets
+# theme.awesome_icon = theme.dir .. "/arch-icon.png"
 
 ## archmenu.lua xdgmenu.lua
 get_menu_file() {
@@ -80,12 +85,12 @@ rm xdgmenu2.lua favorite2.lua
 # xdgmenu2 绑定 modkey + a, favorite2 绑定 modkey + c
 sed -i 's|"w", function () mymainmenu:show() end),|"a", function () xdgmenu2:show() end),\n    awful.key({ modkey,           }, "c", function () myfavorite2:show() end),|' rc.lua
 
-## 5.快捷键加最后: 截屏 suspend
+## 5.快捷键加最后: 截屏 suspend lain-alsabar
 n3=`grep -n '\-\- Menubar$' rc.lua|cut -d: -f1`
 ((n3--))
 sed -i "${n3} r new-key.lua" rc.lua
 
-## 6. wibox
+## 6. lain-wibox
 # 1) add lain library
 sed -i "${n2} i local lain = require(\"lain\")" rc.lua
 # 2) wibox height = 20
@@ -98,5 +103,13 @@ n4=`grep -n '^-- Calendar' rc.lua|cut -d: -f1`
 ((n4++))
 ((n4++))
 sed -i "${n4} a -- Weather\nyawn = lain.widgets.yawn($id,\n{\n    settings = function()\n        yawn_notification_preset.fg = white\n    end\n})\n" rc.lua
-sed -i '/right_layout:add(mytextclock)/i \ \ \ \ right_layout:add(yawn.icon)\n\ \ \ \ right_layout:add(yawn.widget)' rc.lua
+sed -i '/right_layout:add(mytextclock)/i \ \ \ \ right_layout:add(yawn.icon)' rc.lua
 sed -i '/-- Prompt/i \ \ \ \ awful.key({ modkey, "Shift"      }, "w",      function () yawn.show(7) end),\n' rc.lua
+# 5) separator
+n5=`grep -n '^-- {{{ Wibox' rc.lua|cut -d: -f1`
+sed -i "${n5} r separator.lua" rc.lua
+# 6) alsa-temp-bat bar
+n6=`grep -n '^-- Weather' rc.lua|cut -d: -f1`
+((n6--))
+sed -i "${n6} r alsa-temp-bat.lua" rc.lua
+sed -i '/right_layout:add(yawn.icon)/i \ \ \ \ right_layout:add(bar_spr)\n    right_layout:add(baticon)\n    right_layout:add(batwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(tempicon)\n    right_layout:add(tempwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(volicon)\n    right_layout:add(volumewidget)\n    right_layout:add(bar_spr)' rc.lua

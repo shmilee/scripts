@@ -8,6 +8,7 @@
 
 -- {{{ Main
 theme = {}
+theme.dir       = os.getenv("HOME") .. "/.config/awesome"
 theme.wallpaper = "/usr/share/random-desktop/wall/bg20.jpg"
 -- }}}
 
@@ -55,6 +56,18 @@ theme.titlebar_bg_normal = "#3F3F3F"
 --theme.fg_end_widget    = "#FF5656"
 --theme.bg_widget        = "#494B4F"
 --theme.border_widget    = "#3F3F3F"
+theme.widget_bg   = theme.dir .. "/icons/widget_bg.png"
+theme.vol         = theme.dir .. "/icons/vol.png"
+theme.vol_low     = theme.dir .. "/icons/vol_low.png"
+theme.vol_no      = theme.dir .. "/icons/vol_no.png"
+theme.vol_mute    = theme.dir .. "/icons/vol_mute.png"
+theme.ac          = theme.dir .. "/icons/ac.png"
+theme.bat         = theme.dir .. "/icons/bat.png"
+theme.bat_low     = theme.dir .. "/icons/bat_low.png"
+theme.bat_no      = theme.dir .. "/icons/bat_no.png"
+theme.play        = theme.dir .. "/icons/play.png"
+theme.pause       = theme.dir .. "/icons/pause.png"
+theme.widget_temp = theme.dir .. "/icons/temp.png"
 -- }}}
 
 -- {{{ Mouse finder
@@ -79,7 +92,7 @@ theme.taglist_squares_unsel = "/usr/share/awesome/themes/zenburn/taglist/squarez
 
 -- {{{ Misc
 -- theme.awesome_icon           = "/usr/share/awesome/themes/zenburn/awesome-icon.png"
-theme.awesome_icon           = os.getenv("HOME") .. "/.config/awesome/arch-icon.png"
+theme.awesome_icon           = theme.dir .. "/icons/arch-icon.png"
 theme.menu_submenu_icon      = "/usr/share/awesome/themes/default/submenu.png"
 -- }}}
 

@@ -51,9 +51,10 @@ cp /etc/xdg/awesome/rc.lua rc.lua
 ## 1. add theme
 sed -i "s|/usr/share/awesome/themes/default/theme.lua|${HOME}/.config/awesome/theme.lua|" rc.lua
 
-## 2. terminal : xterm & editor : nano --> vim
+## 2. terminal : xterm & editor : nano --> vim &窗口缝隙
 sed -i '/^terminal =/s/xterm/xfce4-terminal/' rc.lua
 sed -i '/^editor =/s/nano/vim/' rc.lua
+sed -i '/keys = clientkeys,/s/,/,size_hints_honor = false,/' rc.lua
 
 ## 3. tags 宫商角徵羽
 n1=`grep -n '1, 2, 3, 4, 5, 6, 7, 8, 9' rc.lua|cut -d: -f1`
@@ -106,7 +107,8 @@ sed -i "${n4} a -- Weather\nyawn = lain.widgets.yawn($id,\n{\n    settings = fun
 sed -i '/right_layout:add(mytextclock)/i \ \ \ \ right_layout:add(yawn.icon)' rc.lua
 sed -i '/-- Prompt/i \ \ \ \ awful.key({ modkey, "Shift"      }, "w",      function () yawn.show(7) end),\n' rc.lua
 # 5) separator
-n5=`grep -n '^-- {{{ Wibox' rc.lua|cut -d: -f1`
+n5=`grep -n '^-- Create a textclock widget' rc.lua|cut -d: -f1`
+((n5--))
 sed -i "${n5} r separator.lua" rc.lua
 # 6) alsa-temp-bat bar
 n6=`grep -n '^-- Weather' rc.lua|cut -d: -f1`

@@ -93,7 +93,7 @@ del_groups() {
         if in_array $group ${KEYS[@]};then  ## 用 KEYS 
             select_del ${cods[@]} # 询问删除
         else
-            select_del -at 5 ${cods[@]} #5秒后自动删除
+            select_del -at 1 ${cods[@]} #5秒后自动删除
         fi
     done
 }
@@ -152,6 +152,7 @@ slim_alx() {
     done
     left_alx=($(ls ./*.alx))
     echo -e "==> 处理alx文件${#alx_name[@]}个，剩余${#left_alx[@]}个, 他们分别是:\n$(list 1 4 ${left_alx[@]})"
+    list 1 1 ${left_alx[@]} >keep.txt
     echo
 }
 
@@ -231,8 +232,8 @@ LANGS=(afrikaans arabic catalan 'chinese' czech danish dutch 'english' french ge
        polish portuguese romanian russian spanish swedish thai turkish vietnamese)
 
 # keys=保留关键字, 询问确认后再删除，而其余的语言默认自动删除
-keys=(en en_GB en_US ja ko zh zh_CN zh_HK zh_TW)
-KEYS=(chinese english Japanese japanese Korean korean)
+keys=(en en_GB en_US zh zh_CN) #  ja ko zh_HK zh_TW)
+KEYS=(chinese english) # Japanese japanese Korean korean)
 
 if ask "第一步, 按照alx文件删除不需要的软件？";then
     slim_alx

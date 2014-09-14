@@ -232,7 +232,7 @@ LANGS=(afrikaans arabic catalan 'chinese' czech danish dutch 'english' french ge
        polish portuguese romanian russian spanish swedish thai turkish vietnamese)
 
 # keys=保留关键字, 询问确认后再删除，而其余的语言默认自动删除
-keys=(en en_GB en_US zh zh_CN) #  ja ko zh_HK zh_TW)
+keys=(en en_GB en_US zh zh_CN zh_HK zh_TW) # ja ko)
 KEYS=(chinese english) # Japanese japanese Korean korean)
 
 if ask "第一步, 按照alx文件删除不需要的软件？";then

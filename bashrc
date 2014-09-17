@@ -56,8 +56,10 @@ alias fbterm_zh='LANG=zh_CN.UTF-8 fbterm'
 alias mrm='mv --verbose -f --backup=numbered --target-directory ~/trash'
 alias ifts="TERM=linux ssh -p 5789 smli@10.22.92.173"     
 #old cluster smli@10.11.11.6
+alias oldifts="TERM=linux ssh -p 10321 smli@10.22.92.172"
 
-scp2ifts () { scp -P 5789 -r $1 smli@10.22.92.173:; }
+scp2ifts () { scp -P 5789 -r $1 smli@10.22.92.173:upload/; }
+scp4ifts () { scp -P 5789 -r smli@10.22.92.173:$1 ./; }
 
 extract() {
     local c e i

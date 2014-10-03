@@ -2,10 +2,18 @@
 # ~/.bashrc
 #
 
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+    . /etc/bashrc
+fi
+if [ -f /etc/bash.bashrc ]; then
+    . /etc/bash.bashrc
+fi
+
+
 # If not running interactively, don't do anything
 shopt -s extglob
 [[ $- != *i* ]] && return
-source /usr/share/doc/pkgfile/command-not-found.bash
 
 # colorful man page
 export PAGER="`which less` -s"
@@ -18,15 +26,17 @@ export LESS_TERMCAP_so=$'\E[01;44;33m'
 export LESS_TERMCAP_ue=$'\E[0m'
 export LESS_TERMCAP_us=$'\E[01;33m'
 
+# PS1
 export PROMPT_COMMAND='PS_result=`RET=$?;[ $RET == 0 ]&&echo -ne "\033[0;32m:) $RET"||echo -ne "\e[0;31m:( $RET"`'
 PS1='(\A) \[\e[0;34m\]\u\[\e[0;0m\]@\[\e[0;33m\]\h\[\e[0;0m\] \w     $PS_result\[\e[0;0m\]\n\$ '
 
 # modified commands
-alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 alias more='less'
+alias c='clear'
 alias df='df -h'
 alias du='du -c -h'
+alias openports='netstat --all --numeric --programs --inet --inet6'
 alias ping='ping -c 5'
 alias which='alias | /usr/bin/which --tty-only --read-alias --show-dot --show-tilde'
 
@@ -49,17 +59,18 @@ alias chown='chown --preserve-root'
 alias chmod='chmod --preserve-root'
 alias chgrp='chgrp --preserve-root'
 
-alias openports='netstat --all --numeric --programs --inet --inet6'
-alias c='clear'
-alias Arch_update='sudo pacman -Syu'
-alias fbterm_zh='LANG=zh_CN.UTF-8 fbterm'
-alias mrm='mv --verbose -f --backup=numbered --target-directory ~/trash'
+# IFTS.ZJU
 alias ifts="TERM=linux ssh -p 5789 smli@10.22.92.173"     
-#old cluster smli@10.11.11.6
 alias oldifts="TERM=linux ssh -p 10321 smli@10.22.92.172"
 
 scp2ifts () { scp -P 5789 -r $1 smli@10.22.92.173:upload/; }
 scp4ifts () { scp -P 5789 -r smli@10.22.92.173:$1 ./; }
+
+# ArchLinux
+source /usr/share/doc/pkgfile/command-not-found.bash
+
+alias Arch_update='sudo pacman -Syu'
+alias fbterm_zh='LANG=zh_CN.UTF-8 fbterm'
 
 extract() {
     local c e i
@@ -90,6 +101,7 @@ extract() {
     done
     return $e
 }
+
 # list "${@:3}", $1 beginning number, $2 the number of items in a row
 list() {
     local n=($(seq -w $1 $((${#@}+$1-3)))) i=0 _f
@@ -159,7 +171,7 @@ else
     }
 # check the log
     0.log() {
-        sudo journalctl
+        sudo journalctl $@
     }
 # show wants
     0.wants() {
@@ -167,6 +179,7 @@ else
     }
 # analyze the system
     0.analyze() {
-        systemd-analyze $1
+        systemd-analyze $@
     }
 fi
+

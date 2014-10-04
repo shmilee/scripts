@@ -27,6 +27,28 @@ source  /public/program/mpi/openmpi/1.4.3/icc_ifort/bin/mpivars.sh
 # LD_LIBRARY_PATH=/public/program/hdf5-1.8.8-linux-x86_64-static/lib:${LD_LIBRARY_PATH}
 # export LD_LIBRARY_PATH
 
+#export SYS=LinuxMPI
+
+#-----------------------------2013-12-25----------------------------------------------#
+export PATH=$PATH:/public/home/users/tgzhang/lib/hdf5-1.8.8/bin
+export PATH=$PATH:/public/home/users/tgzhang/lib/netcdf-4.1.2/bin
+export PATH=$PATH:/public/home/users/tgzhang/lib/adios-1.3.1/bin
+#export PATH=$PATH:/public/home/users/tgzhang/lib/netcdf-4.1.3/bin
+export PATH=$PATH:/public/home/users/tgzhang/matlab/MATLAB/R2012a/bin
+#---------------------------------------------------------------------------------------#
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/public/home/users/tgzhang/lib/zlib-1.2.5/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/public/home/users/tgzhang/lib/mxml-2.7/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/public/home/users/tgzhang/lib/netcdf-4.1.3/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/public/program/lapack-3.4.0
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/public/home/users/tgzhang/lib/NTCC/lib
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/public/program/hdf5-1.8.8-linux-x86_64-static/lib
+#---------------------------------------------------------------------------------------#
+# export PETSC_DIR=/public/home/users/czhao/src/petsc-3.1-p8
+# export PETSC_ARCH=linux-pgi-opt
+export PETSC_DIR=/public/home/users/tgzhang/lib/petsc-3.4.4
+export PETSC_ARCH=linux-gnu-intel
+
+# myapp: git ipython
 LD_LIBRARY_PATH=~/myapp/usr/lib:${LD_LIBRARY_PATH}
 PATH=~/myapp/usr/bin:$PATH
 

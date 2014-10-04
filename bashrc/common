@@ -10,10 +10,10 @@ if [ -f /etc/bash.bashrc ]; then
     . /etc/bash.bashrc
 fi
 
+shopt -s extglob
 
 # If not running interactively, don't do anything
-shopt -s extglob
-[[ $- != *i* ]] && return
+#[[ $- != *i* ]] && return
 
 # colorful man page
 export PAGER="`which less` -s"
@@ -53,7 +53,7 @@ alias lm='la | more'
 # safety features
 alias cp='cp -i'
 alias mv='mv -i'
-alias rm='rm -I'                    # 'rm -i' prompts for every file
+#alias rm='rm -I'                    # 'rm -i' prompts for every file
 alias ln='ln -i'
 alias chown='chown --preserve-root'
 alias chmod='chmod --preserve-root'

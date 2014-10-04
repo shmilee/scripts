@@ -60,7 +60,7 @@ alias chmod='chmod --preserve-root'
 alias chgrp='chgrp --preserve-root'
 
 # IFTS.ZJU
-alias ifts="TERM=linux ssh -p 5789 smli@10.22.92.173"     
+alias ifts="ssh -p 5789 smli@10.22.92.173"     
 alias oldifts="TERM=linux ssh -p 10321 smli@10.22.92.172"
 
 scp2ifts () { scp -P 5789 -r $1 smli@10.22.92.173:upload/; }

@@ -2,8 +2,8 @@
 
 ##当且仅当第一个参数为正数，脚本成功，默认为0
 
-$picpath='/usr/share/random-desktop/png/';     #图片目录
-$bgpath='/usr/share/random-desktop/';     #壁纸目录
+$picpath='/usr/share/random-desktop/picture/';     #图片目录
+$bgpath='/usr/share/random-desktop/wall/';     #壁纸目录
 
 chdir $bgpath;
 my @bgs = glob "bg*";

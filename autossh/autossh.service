@@ -1,0 +1,13 @@
+[Unit]
+Description=AutoSSH service for a reverse tunnel from 222-205-57-208
+# place this in ~/.config/systemd/user/, than enable this.
+# Requires=sshd.service
+After=network.target
+After=sshd.service
+
+[Service]
+Environment="AUTOSSH_GATETIME=0" "AUTOSSH_POLL=60" "AUTOSSH_LOGFILE=%h/.autossh.log"
+ExecStart=/usr/bin/autossh -M 20000 -NR 3690:localhost:22 -o TCPKeepAlive=yes -p 5321 shmilee@222.205.57.208 -i %h/.ssh/id_rsa
+
+[Install]
+WantedBy=default.target

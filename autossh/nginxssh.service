@@ -1,0 +1,13 @@
+[Unit]
+Description=AutoSSH service for local port 80 forwarded to 222-205-57-208:80
+# place this in /etc/systemd/system/, than enable this.
+After=network.target
+Requires=nginx.service
+After=nginx.service
+
+[Service]
+Environment="AUTOSSH_GATETIME=0" "AUTOSSH_POLL=60" "AUTOSSH_LOGFILE=/var/log/nginxssh.log"
+ExecStart=/usr/bin/autossh -M 22000 -NR 222.205.57.208:917:localhost:917 -NR 222.205.57.208:80:localhost:80 -o TCPKeepAlive=yes -p 5321 root@222.205.57.208 -i /home/shmilee/.ssh/id_rsa
+
+[Install]
+WantedBy=multi-user.target

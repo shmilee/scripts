@@ -1,0 +1,48 @@
+% Default to the notebook output style
+((* if not cell_style is defined *))
+    ((* set cell_style = 'style_ipython.tplx' *))
+((* endif *))
+% Inherit from the specified cell style.
+((* extends cell_style *))
+
+%===============================================================================
+% Latex Article
+%===============================================================================
+
+((* block docclass *))\documentclass[12pt,a4paper]{article}((* endblock docclass *))
+((* block packages *))
+    ((( super() )))
+    \usepackage[boldfont,slantfont,CJKchecksingle]{xeCJK} % SUPPORT for CJK
+    \usepackage{indentfirst} % 首段缩进
+    %\setlength{\parindent}{0pt}
+((* endblock packages *))
+((* block definitions *))
+    % Fonts
+    \punctstyle{quanjiao}
+    \defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}    
+    \setCJKmainfont[BoldFont=SimHei,ItalicFont=KaiTi]{SimSun} 
+    \setCJKsansfont[Mapping=tex-text]{KaiTi}
+    \setCJKmonofont{WenQuanYi Micro Hei Mono}
+    \setmainfont{Times New Roman} % 衬线
+    \setmonofont{Monaco} % 等宽
+    \setsansfont{DejaVu Sans} % 无衬线
+    ((( super() )))
+((* endblock definitions *))
+((* block title *))
+    \title{((( resources.metadata.name | escape_latex )))}
+((* endblock title *))
+((* block author *))
+    \author{Shengming Lee, IFTS}
+((* endblock author *))
+((* block margins *))
+    \geometry{verbose,tmargin=1in,bmargin=1in,lmargin=1in,rmargin=1in}
+((* endblock margins *))
+((* block predoc *))
+    ((( super() )))
+    \tableofcontents
+    \newpage
+((* endblock predoc *))
+((* block bibliography *))
+    \bibliographystyle{unsrt}
+    \bibliography{ipython}
+((* endblock bibliography *))

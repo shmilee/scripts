@@ -5,12 +5,18 @@ Usage: nb2pdf [-art|-rep] file.ipynb
 Options:
   -art to article(default)
   -rep to report
+  -clean delete *.pdf *.toc *.tex *.out *.log *.aux *_files
 EOF
 }
 
 TPLX='cjkart'
 _out='Article'
 if echo $1|grep '^-' 2>&1 >/dev/null; then
+    if [ "$1" == '-clean' ]; then
+        rm -v *.pdf *.toc *.tex *.out *.log *.aux
+        rm -rv *_files
+        exit 0
+    fi
     if [ "$1" == '-rep' ]; then
         TPLX='cjkrep'
         _out='Report'

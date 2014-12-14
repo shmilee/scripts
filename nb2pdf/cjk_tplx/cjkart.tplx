@@ -1,0 +1,11 @@
+((= IPython CJK Article =))
+
+((*- extends 'cjk.tplx' -*))
+
+%===============================================================================
+% Latex Article
+%===============================================================================
+
+((* block docclass *))
+\documentclass[12pt,a4paper]{article}
+((* endblock docclass *))

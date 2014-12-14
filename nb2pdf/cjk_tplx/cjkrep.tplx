@@ -1,0 +1,11 @@
+((= IPython CJK Report =))
+
+((*- extends 'cjk.tplx' -*))
+
+%===============================================================================
+% Latex Report
+%===============================================================================
+
+((* block docclass *))
+\documentclass[12pt,a4paper]{report}
+((* endblock docclass *))

@@ -6,10 +6,9 @@
 ((* extends cell_style *))
 
 %===============================================================================
-% Latex Article
+% xeCJK xeLatex
 %===============================================================================
 
-((* block docclass *))\documentclass[12pt,a4paper]{article}((* endblock docclass *))
 ((* block packages *))
     ((( super() )))
     \usepackage[boldfont,slantfont,CJKchecksingle]{xeCJK} % SUPPORT for CJK

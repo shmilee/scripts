@@ -115,3 +115,14 @@ n6=`grep -n '^-- Weather' rc.lua|cut -d: -f1`
 ((n6--))
 sed -i "${n6} r alsa-temp-bat.lua" rc.lua
 sed -i '/right_layout:add(yawn.icon)/i \ \ \ \ right_layout:add(bar_spr)\n    right_layout:add(baticon)\n    right_layout:add(batwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(tempicon)\n    right_layout:add(tempwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(volicon)\n    right_layout:add(volumewidget)\n    right_layout:add(bar_spr)' rc.lua
+
+## 7. revelation
+n7=`grep -n '^local lain' rc.lua|cut -d: -f1`
+((n7++))
+sed -i "${n7} i local revelation=require(\"revelation\")" rc.lua
+n7=`grep -n '^beautiful.init' rc.lua|cut -d: -f1`
+((n7++))
+sed -i "${n7} i revelation.init()" rc.lua
+n7=`grep -n 'awful.key({ modkey,           }, "Escape",' rc.lua|cut -d: -f1`
+((n7++))
+sed -i "${n7} i \ \ \ \ awful.key({ modkey,           }, \"e\",      revelation)," rc.lua

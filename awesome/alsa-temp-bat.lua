@@ -27,6 +27,7 @@ volumewidget:set_bgimage(beautiful.widget_bg)
 -- Coretemp
 tempicon = wibox.widget.imagebox(beautiful.widget_temp)
 tempwidget = lain.widgets.temp({
+    tempfile = "/sys/class/thermal/thermal_zone0/temp",
     settings = function()
         core_temp = tonumber(coretemp_now)
         if core_temp >70 then

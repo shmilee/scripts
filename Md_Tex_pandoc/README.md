@@ -57,3 +57,5 @@ TODO
 * 模板须简化，只为xelatex
 
 pandoc -f rst -t beamer neoclassical-polarization.rst -o neoclassical-polarization.pdf --latex-engine=xelatex -V theme=nirma --template=beamer-cjk.tex
+
+pandoc -N --template=beamer-cjk.tex --latex-engine=xelatex neoclassical-polarization.rst   -t beamer -o a.pdf -V theme=m -V date='\today'

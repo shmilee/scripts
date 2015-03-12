@@ -8,6 +8,7 @@ $bgpath='/usr/share/random-desktop/wall/';     #壁纸目录
 chdir $bgpath;
 my @bgs = glob "bg*";
 $background=$bgpath.$bgs[int rand(@bgs)];     # 随机壁纸
+if($ARGV[1]){$background=$bgpath."bg20.jpg";}
 print "$background\n";
 
 chdir $picpath;

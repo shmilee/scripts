@@ -1,0 +1,19 @@
+#!/bin/sh
+#___INFO__MARK_BEGIN__
+# Welcome to use  EasyCluster V1.6 All Rights Reserved.
+#___INFO__MARK_END__
+#
+Project=ring
+#$ -S /bin/sh
+#$ -N ring
+#$ -j y
+#$ -o ./
+#$ -e ./
+#$ -cwd
+#$ -q short.q
+#$ -pe mpi 8-8
+source ~/.bashrc
+hash -r
+export path=$TMPDIR:$path
+/usr/local/mpi.intel/openmpi1.6.4/bin/mpirun --mca orte_rsh_agent rsh --mca btl openib,self -np $NSLOTS -hostfile $TMPDIR/machines ./myprog
+

@@ -5,7 +5,7 @@ myfavorite = {
     {"监视器 (&M)", function () awful.util.spawn("xterm -e htop") end },
     { "Chrome (&C)", "chromium" },
     { "火狐 (&B)", function () awful.util.spawn("firefox") end, "/usr/share/icons/hicolor/16x16/apps/firefox.png" },    
-    { "BT下载 (&D)", function () awful.util.spawn("deluge") end },
+    { "BT下载 (&D)", function () awful.util.spawn("transmission-gtk") end },
     { "Pidgin (&I)", function () awful.util.spawn("pidgin") end, "/usr/share/icons/hicolor/16x16/apps/pidgin.png" },
     { "Audacious", function () awful.util.spawn("audacious") end },
     { "wps文字 (&W)", function () awful.util.spawn("wps") end },

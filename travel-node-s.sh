@@ -23,9 +23,11 @@ apswd=autopswd.$(mktemp -u|sed 's/.*\.//')
 cat > $apswd <<EOF
 #!/usr/bin/expect
 set timeout 3
-spawn /usr/bin/ssh -o StrictHostKeyChecking=no %%HOST%%
-expect "*password:"
-send "$PASSWD\r"
+spawn /usr/bin/ssh %%HOST%%
+expect {
+"(yes/no)" { send "yes\r"; exp_continue }
+"password:" { send "$PASSWD\r" }
+}
 expect "*$"
 send "echo --add--"
 expect "*$"

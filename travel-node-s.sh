@@ -23,14 +23,12 @@ apswd=autopswd.$(mktemp -u|sed 's/.*\.//')
 cat > $apswd <<EOF
 #!/usr/bin/expect
 set timeout 3
-spawn /usr/bin/ssh %%HOST%%
+spawn /usr/bin/ssh %%HOST%% "export HOME=/backup/home/$USER;cd;echo LS0tYWRkLS0tCg==|base64 -d"
 expect {
 "(yes/no)" { send "yes\r"; exp_continue }
 "password:" { send "$PASSWD\r" }
 }
-expect "*$"
-send "echo --add--"
-expect "*$"
+expect "*"
 send "exit\r"
 expect eof
 EOF

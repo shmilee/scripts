@@ -14,6 +14,7 @@ lapack_dir=/usr/local/intel/Compiler/11.1/ifort/mkl/lib/em64t
 mpi_intel=/usr/local/mpi.intel
 _mpis=('openmpi1.6.4') ##'mvapi2_1.8') ##'mpich2_1.5')
 
+W_DIR=$(pwd)
 if [[ -n "$1" ]];then
     if [ $1 == extract -o $1 == e ]; then
         tar zxvf ${file}
@@ -26,7 +27,7 @@ if [[ -n "$1" ]];then
                 --PETSC_ARCH=${i_arch} \
                 --with-blas-lapack-dir=${lapack_dir} \
                 --with-mpi-dir=${mpi_intel}/${i_mpi} || exit 1
-            make PETSC_ARCH=${i_arch} all || exit 2
+            make PETSC_DIR=${W_DIR}/petsc-${Ver} PETSC_ARCH=${i_arch} all || exit 2
             echo "==> Done."
         done
     elif [ $1 == install -o $1 == i ]; then
@@ -34,7 +35,7 @@ if [[ -n "$1" ]];then
         for i_mpi in ${_mpis[@]}; do
             i_arch=linux-$(echo $i_mpi | sed 's/.\..\..//g;s/_.\..//g')-intel
             echo "==> PETSC_ARCH=${i_arch}"
-            make PETSC_ARCH=${i_arch} install ||exit 3
+            make PETSC_DIR=${W_DIR}/petsc-${Ver} PETSC_ARCH=${i_arch} install ||exit 3
             echo "==> Done."
         done
     else

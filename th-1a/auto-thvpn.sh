@@ -12,7 +12,7 @@ if [[ m$mode == m1 ]]; then
 elif [[ m$mode == m2 ]]; then
     ## local --> '127.0.0.xx TH-1A-LNx', except '$myip TH-1A-LN3'
     ## port 2222
-    myip=$(ip addr show $_IF |sed -n 's/inet \(.*\)\/.*brd.*$/\1/p')
+    myip=$(ip addr show $_IF |sed -n 's/^[ \t].*inet \(.*\)\/.*brd.*$/\1/p')
     sed -e 's/local=TH-1A-LN[1289]:22/&22/g' -e "s/local=TH-1A-LN3:22/local=$myip:2222/" $down_file >tmp_vpn.jnlp
 else
     echo 'Null mode.'

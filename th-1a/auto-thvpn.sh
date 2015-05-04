@@ -11,9 +11,10 @@ if [[ m$mode == m1 ]]; then
     ## port 2222
     sed 's/local=TH-1A-LN[12389]:22/&22/g' $down_file >tmp_vpn.jnlp
 elif [[ m$mode == m2 ]]; then
-    ## local --> '127.0.0.xx TH-1A-LNx', except '$myip TH-1A-LN3'
-    ## port 2222
-    sed -e 's/local=TH-1A-LN[1289]:22/&22/g' -e "s/local=TH-1A-LN3:22/local=$myip:2222/" \
+    ## local --> '127.0.0.xx TH-1A-LNx', except '$myip:222j TH-1A-LNj', j=3,9
+    ## port 2222 2223 2229
+    sed -e 's/local=TH-1A-LN[128]:22/&22/g' \
+        -e "s/local=TH-1A-LN\([39]\):22/local=$myip:222\1/g" \
         $down_file >tmp_vpn.jnlp
 elif [[ m$mode == m3 ]]; then
     ## local --> '$myip:222x TH-1A-LNx'

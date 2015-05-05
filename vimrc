@@ -59,6 +59,8 @@ let Tlist_WinHeight = 40
 "===========================
 set grepprg=grep\ -nH\ $*
 let g:tex_flavor = "latex"
+" disable conceal feature
+let g:tex_conceal= ''
 
 "===========================
 " Fortran配置

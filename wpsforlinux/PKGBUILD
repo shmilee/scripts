@@ -1,22 +1,29 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver=9.1.0.4945~a16p3
-_srcurl="http://kdl.cc.ksosoft.com/wps-community/download/a16"
+_pkgver=9.1.0.4953~a18
+_srcurl="http://kdl.cc.ksosoft.com/wps-community/download/a18"
 
 pkgbase=wpsforlinux
-pkgname=('wpsoffice-common'
-         'wpsoffice')
+pkgname=wpsoffice
+pkgver=${_pkgver}
 pkgrel=1
-arch=('any')
+pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
+arch=('i686' 'x86_64')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
 url='http://wps-community.org/'
-conflicts=('wps-office' 'kingsoft-office')
-source=("${_srcurl}/${_pkgname}_${_pkgver}_i386.deb" 'wps-office.xml')
-sha1sums=('ac849025e70c1e9ca23a05c54ad159f5a95b6d8c'
+depends=('fontconfig' 'libpng12' 'glib2' 'libsm' 'libxext' 'libxrender' 'libxml2' 'desktop-file-utils' 'shared-mime-info' 'xdg-utils')
+optdepends=('cups: for printing support'
+            'pango: for complex (right-to-left) text support')
+conflicts=('wps-office' 'kingsoft-office' 'wpsoffice-common')
+options=('!emptydirs' '!strip')
+install=wpsoffice.install
+[[ "$CARCH" = "i686" ]] && _archext=i386 || _archext=amd64
+source=("${_srcurl}/${_pkgname}_${_pkgver}_${_archext}.deb" 'wps-office.xml')
+sha1sums=('568602dc962318f0b15f16024e992ff5768556e5'
           'dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112')
-
+[[ "$CARCH" = "i686" ]] && sha1sums[0]='39d7891473bb8517a70173a0888e6f7e3fa5cc78'
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
 _etMT="MimeType=application\/wps-office.et;application\/wps-office.ett;application\/vnd.ms-excel;\
@@ -32,33 +39,7 @@ application\/msword;application\/msword-template;application\/rtf;\
 application\/vnd.openxmlformats-officedocument.wordprocessingml.template;\
 application\/vnd.openxmlformats-officedocument.wordprocessingml.document;"
 
-package_wpsoffice-common() {
-    pkgver=1.2
-    arch=('i686' 'x86_64')
-    pkgdesc="Dependencies and license for WPS office."
-    if [ "$CARCH" = "i686" ]; then
-        depends=('fontconfig' 'glib2' 'libpng12' 'libsm' 'libxext' 'libxrender' 'glu')
-        optdepends=('libcups: CUPS printing support')
-    elif [ "$CARCH" = "x86_64" ]; then
-        depends=('lib32-fontconfig' 'lib32-glib2' 'lib32-libpng12' 'lib32-libsm' 'lib32-libxext' 'lib32-libxrender' 'lib32-glu')
-        optdepends=('lib32-libcups: CUPS printing support')
-    fi
-
-    cd "$srcdir"
-    tar xv -f data.tar.xz ./opt/kingsoft/wps-office/office6/mui/default/EULA.txt
-    install -Dm644 ./opt/kingsoft/wps-office/office6/mui/default/EULA.txt "$pkgdir/usr/share/licenses/${_pkgname}/EULA.txt"
-}
-
-pkgver=${_pkgver}
-
-package_wpsoffice() {
-    arch=('any')
-    pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite.'
-    depends=('desktop-file-utils' 'shared-mime-info' 'xdg-utils' 'wpsoffice-common=1.2')
-    #optdepends=('wpsoffice-langpack: additional language support')
-    options=(!strip)
-    install=wpsoffice.install 
-    
+package() {
     cd "${srcdir}"
     tar xv -f data.tar.xz -C "${pkgdir}"
 
@@ -79,4 +60,8 @@ package_wpsoffice() {
         msg2 "Remove BOM (Byte-order mark) in utf-8 .desktop files ..."
         sed -i 's/^\xEF\xBB\xBF//;' *.desktop
     fi
+    install -Dm644 "$pkgdir/opt/kingsoft/wps-office/office6/mui/default/EULA.txt" \
+        "$pkgdir/usr/share/licenses/${_pkgname}/EULA.txt"
 }
+
+

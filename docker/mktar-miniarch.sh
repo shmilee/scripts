@@ -15,6 +15,11 @@ hash expect &>/dev/null || {
 }
 
 export LANG="C.UTF-8"
+export LC_ALL=C
+if [[ $EUID != 0 ]]; then
+    echo '==> This script must be run with root privileges'
+    exit 1
+fi
 
 ROOTFS=$(mktemp -d ${TMPDIR:-/var/tmp}/rootfs-archlinux-XXXXXXXXXX)
 chmod 755 $ROOTFS
@@ -75,8 +80,14 @@ arch-chroot $ROOTFS /bin/sh -c "ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/loc
 echo 'en_US.UTF-8 UTF-8' > $ROOTFS/etc/locale.gen
 echo 'zh_CN.UTF-8 UTF-8' >> $ROOTFS/etc/locale.gen
 arch-chroot $ROOTFS locale-gen
-cat ./mkimage-arch-pacman.conf > $ROOTFS/etc/pacman.conf
 arch-chroot $ROOTFS /bin/sh -c 'echo "Server = http://mirrors.ustc.edu.cn/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist'
+
+# add my repo and key
+cat ./mkimage-arch-pacman.conf > $ROOTFS/etc/pacman.conf
+# error: gpg: connecting dirmngr at '/root/.gnupg/S.dirmngr' failed: IPC connect call failed
+# possible reason tar: ./etc/pacman.d/gnupg/S.gpg-agent: socket ignored
+arch-chroot $ROOTFS /bin/sh -c 'dirmngr </dev/null' #or 'mkdir -p /root/.gnupg/'
+arch-chroot $ROOTFS /bin/sh -c 'pacman-key -r E2054497 && pacman-key --lsign-key E2054497'
 
 # udev doesn't work in containers, rebuild /dev
 DEV=$ROOTFS/dev

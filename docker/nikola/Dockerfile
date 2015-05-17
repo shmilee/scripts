@@ -1,5 +1,5 @@
 # nikola
-# docker build --force-rm --no-cache --rm -t nikola . 
+# docker build --force-rm --no-cache --rm -t nikola .
 FROM arch:1505
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
@@ -19,7 +19,7 @@ MAINTAINER shmilee <shmilee.zju@gmail.com>
 #RUN pacman -Syu --noconfirm sqlite python-pip ipython ipython-notebook \
 #    && pip install nikola requests markdown jinja2 webassets livereload micawber pygal typogrify phpserialize
 RUN useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee \
-    && pacman -Syu --noconfirm python-nikola sqlite python-pip python-requests python-markdown python-jinja python-webassets livereload python-pygal python-typogrify\
+    && pacman -Syu --noconfirm python-nikola sqlite python-pip ipython ipython-notebook python-requests python-markdown python-jinja python-webassets livereload python-pygal python-typogrify \
     && pip install -i http://pypi.douban.com/simple --trusted-host pypi.douban.com micawber phpserialize \
     && pacman -Rsn --noconfirm python-pip && rm -rf /{root,tmp} \
     && rm -rf /usr/share/{man/*,doc/*,gtk-doc/} \

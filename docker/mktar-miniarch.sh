@@ -21,6 +21,7 @@ if [[ $EUID != 0 ]]; then
     exit 1
 fi
 
+echo Building Arch Linux image arch$(date +%y%m).tar.xz ...
 ROOTFS=$(mktemp -d ${TMPDIR:-/var/tmp}/rootfs-archlinux-XXXXXXXXXX)
 chmod 755 $ROOTFS
 
@@ -72,22 +73,30 @@ expect <<EOF
 	}
 EOF
 
-arch-chroot $ROOTFS /bin/sh -c 'mv /usr/share/locale/zh_CN /zh_CN; mv /usr/share/locale/en_US /en_US'
-arch-chroot $ROOTFS /bin/sh -c 'rm -r /usr/share/locale/*; rm -r /usr/share/man/*; rm -r /usr/share/doc/*'
-arch-chroot $ROOTFS /bin/sh -c 'mv /{en_US,zh_CN} /usr/share/locale/; touch /usr/share/locale/locale.alias'
 arch-chroot $ROOTFS /bin/sh -c "haveged -w 1024; pacman-key --init; pkill haveged; pacman -Rs --noconfirm haveged; pacman-key --populate archlinux; pkill gpg-agent"
+
+# add my repository
+mkdir -p $ROOTFS/root/.gnupg
+touch $ROOTFS/root/.gnupg/dirmngr_ldapservers.conf
+arch-chroot $ROOTFS /bin/sh -c 'pacman-key -r E2054497 && pacman-key --lsign-key E2054497; pkill dirmngr; pkill gpg-agent'
+cat ./mkimage-arch-pacman.conf > $ROOTFS/etc/pacman.conf
+
 arch-chroot $ROOTFS /bin/sh -c "ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime"
 echo 'en_US.UTF-8 UTF-8' > $ROOTFS/etc/locale.gen
 echo 'zh_CN.UTF-8 UTF-8' >> $ROOTFS/etc/locale.gen
 arch-chroot $ROOTFS locale-gen
+echo 'LANG="en_US.UTF-8"' > $ROOTFS/etc/locale.conf
 arch-chroot $ROOTFS /bin/sh -c 'echo "Server = http://mirrors.ustc.edu.cn/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist'
 
-# add my repo and key
-cat ./mkimage-arch-pacman.conf > $ROOTFS/etc/pacman.conf
-# error: gpg: connecting dirmngr at '/root/.gnupg/S.dirmngr' failed: IPC connect call failed
-# possible reason tar: ./etc/pacman.d/gnupg/S.gpg-agent: socket ignored
-arch-chroot $ROOTFS /bin/sh -c 'dirmngr </dev/null' #or 'mkdir -p /root/.gnupg/'
-arch-chroot $ROOTFS /bin/sh -c 'pacman-key -r E2054497 && pacman-key --lsign-key E2054497'
+# remove locale information
+find $ROOTFS/usr/share/locale -mindepth 1 -maxdepth 1 -type d -not \( -name 'en_US' -o -name 'zh_CN' \) -exec rm -r {} \;
+touch $ROOTFS/usr/share/locale/locale.alias
+
+# clean up downloaded packages
+rm -rf $ROOTFS/var/cache/pacman/pkg/*
+
+# clean up manpages and docs
+rm -rf $ROOTFS/usr/share/{man,doc}
 
 # udev doesn't work in containers, rebuild /dev
 DEV=$ROOTFS/dev

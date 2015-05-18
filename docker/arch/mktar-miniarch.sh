@@ -92,8 +92,9 @@ arch-chroot $ROOTFS /bin/sh -c 'echo "Server = http://mirrors.ustc.edu.cn/archli
 find $ROOTFS/usr/share/locale -mindepth 1 -maxdepth 1 -type d -not \( -name 'en_US' -o -name 'zh_CN' \) -exec rm -r {} \;
 touch $ROOTFS/usr/share/locale/locale.alias
 
-# clean up downloaded packages
+# clean up downloaded packages and databases...
 rm -rf $ROOTFS/var/cache/pacman/pkg/*
+rm -rf $ROOTFS/var/lib/pacman/sync/*
 
 # clean up manpages and docs
 rm -rf $ROOTFS/usr/share/{man,doc}

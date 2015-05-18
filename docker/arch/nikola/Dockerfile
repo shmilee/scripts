@@ -27,6 +27,7 @@ RUN useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee \
 		\( -type d -a -name test -o -name tests \) \
 		-exec rm -rf '{}' + \
     && rm -r /var/cache/pacman/pkg/* \
+    && rm -r /var/lib/pacman/sync/*
 
 #ENTRYPOINT ["nikola"]
 #CMD ["help"]

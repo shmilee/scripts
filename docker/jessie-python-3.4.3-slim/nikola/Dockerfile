@@ -16,6 +16,7 @@ MAINTAINER shmilee <shmilee.zju@gmail.com>
 # webassets>=0.10.1
 # ipython[notebook]>=1.2.1
 # ghp-import>=0.4.1
+# pip install -i https://pypi.tuna.tsinghua.edu.cn/simple
 RUN useradd -m -g users -s /bin/bash -d /blog -u 1000 shmilee && \
     MIRROR='http://mirrors.tuna.tsinghua.edu.cn' && \
     echo "deb $MIRROR/debian/ jessie main non-free contrib" > /etc/apt/sources.list && \
@@ -40,7 +41,7 @@ RUN useradd -m -g users -s /bin/bash -d /blog -u 1000 shmilee && \
         phpserialize>=1.3 \
         webassets>=0.10.1 \
         ipython[notebook]>=1.2.1' && \
-    pip install -i http://pypi.douban.com/simple --trusted-host pypi.douban.com nikola $nikola_extras && \
+    pip install nikola $nikola_extras && \
     find /usr/local \
 		\( -type d -a -name test -o -name tests \) \
 		-exec rm -rf '{}' + && \

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate a minimal filesystem for archlinux and load it into the local
-# arch$(date +%y%m).tar.xz --> docker as "arch:$(date +%y%m)"
+# arch-$(date +%y%m).tar.xz --> docker as "arch:$(date +%y%m)"
 # requires root
 set -e
 
@@ -117,6 +117,6 @@ mknod -m 600 $DEV/initctl p
 mknod -m 666 $DEV/ptmx c 5 2
 ln -sf /proc/self/fd $DEV/fd
 
-tar --numeric-owner --xattrs --acls -C $ROOTFS -Jcf arch$(date +%y%m).tar.xz .
-#cat arch$(date +%y%m).tar.xz | docker import - arch:$(date +%y%m)
+tar --numeric-owner --xattrs --acls -C $ROOTFS -Jcf arch-$(date +%y%m).tar.xz .
+#cat arch-$(date +%y%m).tar.xz | docker import - arch:$(date +%y%m)
 rm -rf $ROOTFS

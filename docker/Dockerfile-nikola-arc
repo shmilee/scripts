@@ -28,6 +28,7 @@ RUN useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
         python-webassets \
         ipython \
         ipython-notebook && \
+    sed -i -e '/ipython/d' -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
     pip install -i "$PP_index" -r requirements-extras.txt nikola=="$nkl_Ver" && \
     pacman -Rsn --noconfirm python-pip && \
     rm -rf /usr/share/{man/*,doc/*,gtk-doc/,info/} /{root,tmp} && \

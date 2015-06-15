@@ -1,0 +1,41 @@
+# nikola 7.5.1
+# docker build --force-rm --no-cache --rm -t nikola .
+# docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -i nikola /usr/bin/nikola $@
+FROM arch:1506
+MAINTAINER shmilee <shmilee.zju@gmail.com>
+
+RUN useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
+    nkl_Url='https://raw.githubusercontent.com/getnikola/nikola' && \
+    nkl_Ver=7.5.1 && \
+    PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
+    curl -O "$nkl_Url/v$nkl_Ver"/requirements.txt && \
+    curl -O "$nkl_Url/v$nkl_Ver"/requirements-extras.txt && \
+    pacman -Syu --noconfirm \
+        python-pip \
+        sqlite \
+        python-pygments \
+        python-pillow \
+        python-dateutil=2.4.2 \
+        python-docutils \
+        python-mako \
+        python-unidecode \
+        python-lxml \
+        python-blinker \
+        python-setuptools \
+        python-requests \
+        python-markdown \
+        python-jinja \
+        python-webassets \
+        ipython \
+        ipython-notebook && \
+    pip install -i "$PP_index" -r requirements-extras.txt nikola=="$nkl_Ver" && \
+    pacman -Rsn --noconfirm python-pip && \
+    rm -rf /usr/share/{man/*,doc/*,gtk-doc/,info/} /{root,tmp} && \
+    find /usr/lib/python3.4 \
+		\( -type d -a -name test -o -name tests \) \
+		-exec rm -rf '{}' + && \
+    rm -r /var/cache/pacman/pkg/* && \
+    rm -r /var/lib/pacman/sync/*
+
+#ENTRYPOINT ["nikola"]
+#CMD ["help"]

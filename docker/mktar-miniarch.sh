@@ -96,8 +96,9 @@ touch $ROOTFS/usr/share/locale/locale.alias
 rm -rf $ROOTFS/var/cache/pacman/pkg/*
 rm -rf $ROOTFS/var/lib/pacman/sync/*
 
-# clean up manpages and docs
-rm -rf $ROOTFS/usr/share/{man,doc}
+# clean up manpages and docs, help files etc.
+rm -rf $ROOTFS/usr/share/{man,info,doc,gtk-doc}
+rm -rf $ROOTFS/usr/share/gnupg/help.*.txt
 
 # udev doesn't work in containers, rebuild /dev
 DEV=$ROOTFS/dev

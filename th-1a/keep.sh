@@ -9,7 +9,8 @@ while [ $try -lt 20 ]; do
         try=20 #正常退出
     else
         ((try++))
+        sleep 60s
     fi
-    date
-    sleep 60s
 done
+
+date

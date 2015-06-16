@@ -1,18 +1,18 @@
-# nikola 7.5.1
-# docker build --force-rm --no-cache --rm -t nikola .
-# docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -i nikola /usr/bin/nikola $@
+# nikola
+# nkl_Ver=7.5.0
+# docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver .
+# docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver /usr/bin/bash
 FROM arch:1506
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
 RUN useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
     nkl_Url='https://raw.githubusercontent.com/getnikola/nikola' && \
-    nkl_Ver=7.5.1 && \
+    nkl_Ver=7.5.0 && \
     PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements.txt && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements-extras.txt && \
     pacman -Syu --noconfirm \
         python-pip \
-        sqlite \
         python-pygments \
         python-pillow \
         python-dateutil=2.4.2 \
@@ -30,13 +30,13 @@ RUN useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
         ipython-notebook && \
     sed -i -e '/ipython/d' -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
     pip install -i "$PP_index" -r requirements-extras.txt nikola=="$nkl_Ver" && \
-    pacman -Rsn --noconfirm python-pip && \
     rm -rf /usr/share/{man/*,doc/*,gtk-doc/,info/} /{root,tmp} && \
     find /usr/lib/python3.4 \
 		\( -type d -a -name test -o -name tests \) \
 		-exec rm -rf '{}' + && \
     rm -r /var/cache/pacman/pkg/* && \
     rm -r /var/lib/pacman/sync/*
+#    pacman -Rsn --noconfirm python-pip
 
 #ENTRYPOINT ["nikola"]
 #CMD ["help"]

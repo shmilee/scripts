@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+PACKAGES=(git::https://www.kernel.org/pub/software/scm/git/git-2.3.1.tar.xz \
+    tig::http://jonas.nitro.dk/tig/releases/tig-2.1.1.tar.gz \
+    zsh::http://www.zsh.org/pub/old/zsh-5.0.7.tar.bz2 \
+    lapack::http://www.netlib.org/lapack/lapack-3.5.0.tgz \
+    petsc::http://ftp.mcs.anl.gov/pub/petsc/release-snapshots/petsc-3.5.3.tar.gz)
+
+usage() { echo "Usage: $0 [gettar|install]"; }
+
+get_tar_file() {
+    name=$1
+    url=$2
+    wget -c $url
+    if [ $name == git ]; then
+        xz $(basename $url)
+    fi
+    if [ $name == zsh ]; then
+        tar czvf oh-my-zsh.tar.gz -C /usr/share/ oh-my-zsh/
+        git clone https://github.com/shmilee/oh-my-zsh-custom.git
+    fi
+}
+
+install_package() {
+    script_cmd=$1.sh
+    if [ -f $script_cmd ]; then
+        ./$script_cmd e
+        ./$script_cmd b
+        ./$script_cmd i
+    else
+        echo "!!!!! NO $script_cmd !!!!!"
+        return 1
+    fi
+    if [ $script_cmd == zsh.sh ]; then
+        ./$script_cmd o
+        cd oh-my-zsh-custom
+        make && make install
+        cd ..
+    fi
+}
+
+if [[ -n "$1" ]];then
+    if [ $1 == gettar -o $1 == g ]; then
+        for pkg in ${PACKAGES[@]}; do
+            get_tar_file ${pkg%%::*} ${pkg##*::}
+        done
+    elif [ $1 == install -o $1 == i ]; then
+        for pkg in ${PACKAGES[@]}; do
+            install_package ${pkg%%::*}
+        done
+        ./stripmyapp.sh
+    else
+        usage
+    fi
+else
+    usage
+fi

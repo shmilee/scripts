@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ## zsh
-## http://www.zsh.org/pub/zsh-${Ver}.tar.bz2
+## http://www.zsh.org/pub/old/zsh-${Ver}.tar.bz2
 ## depends=('pcre' 'libcap' 'gdbm')
 
 Ver=5.0.7

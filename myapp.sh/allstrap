@@ -13,26 +13,26 @@ get_tar_file() {
     url=$2
     wget -c $url
     if [ $name == git ]; then
-        xz $(basename $url)
+        xz -d $(basename $url)
     fi
     if [ $name == zsh ]; then
-        tar czvf oh-my-zsh.tar.gz -C /usr/share/ oh-my-zsh/
-        git clone https://github.com/shmilee/oh-my-zsh-custom.git
+        tar czf oh-my-zsh.tar.gz -C /usr/share/ oh-my-zsh/
+        git clone --depth=1 https://github.com/shmilee/oh-my-zsh-custom.git
     fi
 }
 
 install_package() {
     script_cmd=$1.sh
     if [ -f $script_cmd ]; then
-        ./$script_cmd e
-        ./$script_cmd b
-        ./$script_cmd i
+        bash ./$script_cmd e
+        bash ./$script_cmd b
+        bash ./$script_cmd i
     else
         echo "!!!!! NO $script_cmd !!!!!"
         return 1
     fi
     if [ $script_cmd == zsh.sh ]; then
-        ./$script_cmd o
+        bash ./$script_cmd o
         cd oh-my-zsh-custom
         make && make install
         cd ..

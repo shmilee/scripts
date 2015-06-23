@@ -10,7 +10,7 @@ file=./petsc-${Ver}.tar.gz
 
 MYAPP=$HOME/myapp ## /usr
 
-lapack_dir=/usr/local/intel/Compiler/11.1/ifort/mkl/lib/em64t
+lapack_dir=$MYAPP
 mpi_intel=/usr/local/mpi.intel
 _mpis=('openmpi1.6.4') ##'mvapi2_1.8') ##'mpich2_1.5')
 

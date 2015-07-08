@@ -1,12 +1,13 @@
 # nikola
-# nkl_Ver=7.5.1
-# docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver .
-# docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver /usr/bin/bash
-FROM arch:1506
+# nkl_Ver=7.6.0
+# py_Ver=py2
+# docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver$py_Ver .
+# docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver$py_Ver /usr/bin/bash
+FROM arch:1507
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
-RUN nkl_Ver=7.5.1 && \
-    py_Ver=2 && \
+RUN nkl_Ver=7.6.0 && \
+    py_Ver=py2 && \
     py3_packages=(python-pip \
         python-pygments \
         python-pillow \
@@ -30,13 +31,13 @@ RUN nkl_Ver=7.5.1 && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements-extras.txt && \
     sed -i -e '/ipython/d' -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
     useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
-    if [[ $py_Ver == 3 ]]; then \
+    if [[ $py_Ver == py3 ]]; then \
         pacman -Syu --noconfirm ${py3_packages[@]} && \
         pip3 install -i "$PP_index" -r requirements-extras.txt nikola=="$nkl_Ver" && \
         find /usr/lib/python3* \
 		    \( -type d -a -name test -o -name tests \) \
 		    -exec rm -rf '{}' + ; \
-    elif [[ $py_Ver == 2 ]]; then \
+    elif [[ $py_Ver == py2 ]]; then \
         pacman -Syu --noconfirm ${py2_packages[@]} && \
         pip2 install -i "$PP_index" -r requirements-extras.txt nikola=="$nkl_Ver" && \
         find /usr/lib/python2* \

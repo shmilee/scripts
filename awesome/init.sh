@@ -113,8 +113,28 @@ sed -i "${n5} r separator.lua" rc.lua
 # 6) alsa-temp-bat bar
 n6=`grep -n '^-- Weather' rc.lua|cut -d: -f1`
 ((n6--))
-sed -i "${n6} r alsa-temp-bat.lua" rc.lua
-sed -i '/right_layout:add(yawn.icon)/i \ \ \ \ right_layout:add(bar_spr)\n    right_layout:add(baticon)\n    right_layout:add(batwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(tempicon)\n    right_layout:add(tempwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(volicon)\n    right_layout:add(volumewidget)\n    right_layout:add(bar_spr)' rc.lua
+if ! BATs=(/sys/class/power_supply/BAT*); then
+    echo "No battery found."
+    exit 1
+fi
+if [ ${#BATs[@]} == 1 ];then
+    BAT=$(basename ${BATs[0]})
+    sed -e '/BAT#2#/d' -e "s/BAT#1#/$BAT/" \
+        alsa-temp-bat.lua >./alsa-temp-bat.temp.lua
+    BAT_Layout='right_layout:add(baticon)\n    right_layout:add(bat1widget)'
+else
+    if [ ${#BATs[@]} != 2 ];then
+        echo "${#BATs[@]} batteries, take 2 only."
+    fi
+    BAT1=$(basename ${BATs[0]})
+    BAT2=$(basename ${BATs[1]})
+    sed -e "s/BAT#1#/$BAT1/" -e "s/BAT#2#/$BAT2/" \
+        alsa-temp-bat.lua >./alsa-temp-bat.temp.lua
+    BAT_Layout='right_layout:add(baticon)\n    right_layout:add(bat1widget)\n    right_layout:add(baticon)\n    right_layout:add(bat2widget)'
+fi
+sed -i "${n6} r alsa-temp-bat.temp.lua" rc.lua
+rm ./alsa-temp-bat.temp.lua
+sed -i "/right_layout:add(yawn.icon)/i \ \ \ \ right_layout:add(bar_spr)\n    $BAT_Layout\n    right_layout:add(bar_spr)\n    right_layout:add(tempicon)\n    right_layout:add(tempwidget)\n    right_layout:add(bar_spr)\n    right_layout:add(volicon)\n    right_layout:add(volumewidget)\n    right_layout:add(bar_spr)" rc.lua
 
 ## 7. revelation
 n7=`grep -n '^local lain' rc.lua|cut -d: -f1`

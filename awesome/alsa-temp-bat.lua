@@ -42,25 +42,25 @@ tempwidget = lain.widgets.temp({
 
 -- Battery
 baticon = wibox.widget.imagebox(beautiful.bat)
-batwidget = lain.widgets.bat({battery = "BAT1",
-    settings = function()
-        if bat_now.perc == "N/A" or bat_now.perc == "100" then
-            widget:set_markup(" AC ")
-            baticon:set_image(beautiful.ac)
-            return
-        else
-            bat_perc = tonumber(bat_now.perc)
-            if bat_perc > 50 then
-                widget:set_markup(" " .. bat_now.perc .. "% ")
-                baticon:set_image(beautiful.bat)
-            elseif bat_perc > 15 then
-                widget:set_markup(markup("#EB8F8F", bat_now.perc .. "% "))
-                baticon:set_image(beautiful.bat_low)
-            else
-                widget:set_markup(markup("#D91E1E", bat_now.perc .. "% "))
-                baticon:set_image(beautiful.bat_no)
-            end
-        end
+batsettings  = function()
+     if bat_now.perc == "N/A" or bat_now.perc == "100" then
+         widget:set_markup(" AC ")
+         baticon:set_image(beautiful.ac)
+         return
+     else
+         bat_perc = tonumber(bat_now.perc)
+         if bat_perc > 50 then
+             widget:set_markup(" " .. bat_now.perc .. "% ")
+             baticon:set_image(beautiful.bat)
+         elseif bat_perc > 15 then
+             widget:set_markup(markup("#EB8F8F", bat_now.perc .. "% "))
+             baticon:set_image(beautiful.bat_low)
+         else
+             widget:set_markup(markup("#D91E1E", bat_now.perc .. "% "))
+             baticon:set_image(beautiful.bat_no)
+         end
     end
-})
+end
+bat1widget = lain.widgets.bat({battery = "BAT#1#", settings = batsettings })
+bat2widget = lain.widgets.bat({battery = "BAT#2#", settings = batsettings })
 

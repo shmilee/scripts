@@ -1,12 +1,12 @@
 # nikola
-# nkl_Ver=7.6.0
+# nkl_Ver=7.6.1
 # py_Ver=py2
 # docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver$py_Ver .
 # docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver$py_Ver /usr/bin/bash
 FROM arch:1507
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
-RUN nkl_Ver=7.6.0 && \
+RUN nkl_Ver=7.6.1 && \
     py_Ver=py2 && \
     py3_packages=(python-pip \
         python-pygments \

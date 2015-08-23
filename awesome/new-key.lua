@@ -17,6 +17,10 @@
             awful.util.spawn("amixer -q set " .. volume.channel .. " playback toggle")
             volume.notify()
         end),
+
+     -- Brightness
+    awful.key({ }, "XF86MonBrightnessDown", function () awful.util.spawn("xbacklight -dec 10") end),
+    awful.key({ }, "XF86MonBrightnessUp", function () awful.util.spawn("xbacklight -inc 10") end),
     --休眠
     awful.key({ modkey, "Control" }, "s", function () awful.util.spawn("systemctl suspend") end),
     --锁屏

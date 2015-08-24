@@ -1,0 +1,62 @@
+# nbviewer
+# git version, python 3
+# lock ipython[notebook]==3.2.1
+# select pypi-index-url $PP_index
+# docker build --force-rm --no-cache --rm -f Dockerfile-nbviewer-arc -t nbviewer:$(date +%y%m%d) .
+# docker run --rm -u nobody -p 8080:8080 nbviewer:$(date +%y%m%d)
+FROM arch:1508
+MAINTAINER shmilee <shmilee.zju@gmail.com>
+
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 NBVIEWER_THREADS=2
+
+RUN rm_google_analytics=yes && \
+    packages=(python-pip \
+        python-setuptools \
+        python-tornado \
+        python-pycurl \
+        python-markdown \
+        python-pyzmq \
+        python-urllib3 \
+        python-jinja \
+        python-pygments \
+        python-terminado \
+        python-jsonschema \
+        python-mistune \
+        mathjax \
+        npm \
+        git) && \
+    pacman -Syu --noconfirm ${packages[@]} && \
+    PP_index='https://pypi.python.org/simple' && \
+    PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
+    cd /srv && \
+    git clone --depth 1 https://github.com/jupyter/nbviewer.git && \
+    cd ./nbviewer && \
+    npm install . && \
+    sed -i -e 's/^ipython.note.*$/ipython[notebook]==3.2.1/' \
+        -e '/pylibmc/d' requirements.txt && \
+    pip install -i "$PP_index" -r requirements.txt invoke && \
+    invoke bower && \
+    invoke less && \
+    ln -s /usr/share/mathjax ./nbviewer/static/mathjax && \
+    if [[ $rm_google_analytics == yes ]]; then \
+        echo "==> remove google-analytics ..."; \
+        if grep -A10 -B10 -n UA-38683231-2 ./nbviewer/templates/layout.html; then \
+            _line=$(grep UA-38683231-2 ./nbviewer/templates/layout.html -n|awk -F: '{print $1}'); \
+            _ln1=$(expr $_line - 5); \
+            _ln2=$(expr $_line + 2); \
+            echo "==> from line $_ln1 to $_ln2. Check this."; \
+            sed -i "${_ln1},${_ln2}d" ./nbviewer/templates/layout.html; \
+        else \
+            echo "==> Not found the script for google-analytics."; \
+        fi; \
+    fi && \
+    rm -r ./node_modules/ && \
+    find /usr/lib/python3* \
+		    \( -type d -a -name test -o -name tests \) \
+		    -exec rm -rf '{}' + ; \
+    rm -rf /usr/share/{man/*,doc/*,gtk-doc/,info/} /{root,tmp} && \
+    rm -r /var/cache/pacman/pkg/* && \
+    rm -r /var/lib/pacman/sync/*
+
+WORKDIR /srv/nbviewer
+CMD ["python", "-m", "nbviewer", "--port=8080", "--no-cache", "--mathjax_url=/static/mathjax/"]

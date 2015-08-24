@@ -1,12 +1,13 @@
 # nikola
-# nkl_Ver=7.6.1
+# nkl_Ver=7.6.4
 # py_Ver=py2
+# select pypi-index-url $PP_index
 # docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver$py_Ver .
 # docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver$py_Ver /usr/bin/bash
-FROM arch:1507
+FROM arch:1508
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
-RUN nkl_Ver=7.6.1 && \
+RUN nkl_Ver=7.6.4 && \
     py_Ver=py2 && \
     py3_packages=(python-pip \
         python-pygments \
@@ -22,13 +23,14 @@ RUN nkl_Ver=7.6.1 && \
         python-markdown \
         python-jinja \
         python-webassets \
-        ipython \
-        ipython-notebook) && \
+        python-pyzmq ) && \
     py2_packages=($(echo ${py3_packages[@]}|sed 's/python/&2/g')) && \
     PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
+    PP_index='https://pypi.python.org/simple' && \
     nkl_Url='https://raw.githubusercontent.com/getnikola/nikola' && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements.txt && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements-extras.txt && \
+    sed -i 's/^ipython.note.*$/ipython[notebook]==3.2.1/' requirements-extras.txt && \
     sed -i -e '/ipython/d' -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
     useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
     if [[ $py_Ver == py3 ]]; then \

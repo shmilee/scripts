@@ -1,0 +1,19 @@
+# docker tag <A nbviewer docker image> nbviewer:using
+# Copy this file to /usr/lib/systemd/system/
+# sudo systemctl daemon-reload
+# systemctl start nbviewer
+# https://docs.docker.com/articles/systemd/
+
+[Unit]
+Description=nbviewer webservice rendering ipynb to static HTML
+After=network.target
+
+[Service]
+Restart=always
+SyslogIdentifier=nbviewer
+ExecStart=/usr/bin/docker run --rm -u nobody -p 8080:8080 --name nbviewer_server nbviewer:using
+ExecStop=/usr/bin/docker stop -t 2 nbviewer_server
+User=shmilee
+
+[Install]
+WantedBy=multi-user.target

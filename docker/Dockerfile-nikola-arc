@@ -31,7 +31,7 @@ RUN nkl_Ver=7.6.4 && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements.txt && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements-extras.txt && \
     sed -i 's/^ipython.note.*$/ipython[notebook]==3.2.1/' requirements-extras.txt && \
-    sed -i -e '/ipython/d' -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
+    sed -i -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
     useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
     if [[ $py_Ver == py3 ]]; then \
         pacman -Syu --noconfirm ${py3_packages[@]} && \

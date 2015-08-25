@@ -146,3 +146,7 @@ sed -i "${n7} i revelation.init()" rc.lua
 n7=`grep -n 'awful.key({ modkey,           }, "Escape",' rc.lua|cut -d: -f1`
 ((n7++))
 sed -i "${n7} i \ \ \ \ awful.key({ modkey,           }, \"e\",      revelation)," rc.lua
+
+## 8. window transparency
+sed -i -e 's|c.border_color = beautiful.border_focus|& c.opacity = 1|' \
+    -e 's|c.border_color = beautiful.border_normal|& c.opacity = 0.8|' rc.lua

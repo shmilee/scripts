@@ -11,7 +11,8 @@
         volume.notify()
     end),
     awful.key({}, "XF86AudioMute", function ()
-        awful.util.spawn("amixer -q set " .. volume.channel .. " playback toggle")
+        --awful.util.spawn("amixer -q set " .. volume.channel .. " playback toggle")
+        awful.util.spawn("ponymix toggle")
         volume.notify()
     end),
     -- keycode 198 = XF86AudioMicMute

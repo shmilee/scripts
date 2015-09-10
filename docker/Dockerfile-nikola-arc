@@ -1,5 +1,5 @@
 # nikola
-# nkl_Ver=7.6.4
+# nkl_Ver=7.7.0
 # py_Ver=py2
 # select pypi-index-url $PP_index
 # docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver$py_Ver .
@@ -8,7 +8,7 @@ FROM arch:1508
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
-RUN nkl_Ver=7.6.4 && \
+RUN nkl_Ver=7.7.0 && \
     py_Ver=py2 && \
     py3_packages=(python-pip \
         python-pygments \
@@ -24,7 +24,10 @@ RUN nkl_Ver=7.6.4 && \
         python-markdown \
         python-jinja \
         python-webassets \
-        python-pyzmq ) && \
+        python-pyzmq \
+        python-jsonschema \
+        python-terminado \
+        python-mistune) && \
     py2_packages=($(echo ${py3_packages[@]}|sed 's/python/&2/g')) && \
     PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
     PP_index='https://pypi.python.org/simple' && \

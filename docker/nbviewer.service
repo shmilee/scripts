@@ -7,6 +7,8 @@
 [Unit]
 Description=nbviewer webservice rendering ipynb to static HTML
 After=network.target
+Requires=docker.service
+After=docker.service
 
 [Service]
 Restart=always

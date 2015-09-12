@@ -11,8 +11,8 @@
         volume.notify()
     end),
     awful.key({}, "XF86AudioMute", function ()
-        --awful.util.spawn("amixer -q set " .. volume.channel .. " playback toggle")
-        awful.util.spawn("ponymix toggle")
+        awful.util.spawn("amixer -q set " .. volume.channel .. " playback toggle")
+        --awful.util.spawn("ponymix toggle")
         volume.notify()
     end),
     -- keycode 198 = XF86AudioMicMute
@@ -21,7 +21,8 @@
     end),
     -- keycode 235 = XF86Display
     awful.key({ }, "XF86Display", function ()
-        naughty.notify({ title = "Oops, Key XF86Display not set" })
+        --naughty.notify({ title = "Oops, Key XF86Display not set" })
+        awful.util.spawn("arandr")
     end),
     -- keycode 179 = XF86Tools, --> Hide / show wibox
     awful.key({ }, "XF86Tools", function ()
@@ -42,6 +43,8 @@
     awful.key({ }, "XF86MonBrightnessUp", function ()
         awful.util.spawn("xbacklight -inc 5")
     end),
+    -- Display
+    awful.key({ modkey, "Control" }, "l", function () awful.util.spawn("arandr") end),
     --休眠
     awful.key({ modkey, "Control" }, "s", function ()
         awful.util.spawn("systemctl suspend")

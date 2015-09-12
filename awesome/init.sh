@@ -59,7 +59,6 @@ sed -i '/keys = clientkeys,/s/,/,size_hints_honor = false,/' rc.lua
 ## 3. tags 宫商角徵羽
 n1=`grep -n '1, 2, 3, 4, 5, 6, 7, 8, 9' rc.lua|cut -d: -f1`
 sed -i "${n1} s/1, 2, 3, 4, 5, 6, 7, 8, 9/1, 2, 3, 4, 5/" rc.lua
-((n1++))
 sed -i "${n1} r tag-name.lua" rc.lua
 
 ## 4. mainmenu : add mainmenu favorite(2) xdgmenu(2)
@@ -148,5 +147,8 @@ n7=`grep -n 'awful.key({ modkey,           }, "Escape",' rc.lua|cut -d: -f1`
 sed -i "${n7} i \ \ \ \ awful.key({ modkey,           }, \"e\",      revelation)," rc.lua
 
 ## 8. window transparency
-sed -i -e 's|c.border_color = beautiful.border_focus|& c.opacity = 1|' \
-    -e 's|c.border_color = beautiful.border_normal|& c.opacity = 0.8|' rc.lua
+w_T=N
+if [[ $w_T == Y ]]; then
+    sed -i -e 's|c.border_color = beautiful.border_focus|& c.opacity = 1|' \
+        -e 's|c.border_color = beautiful.border_normal|& c.opacity = 0.8|' rc.lua
+fi

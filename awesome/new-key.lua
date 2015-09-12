@@ -3,16 +3,19 @@
     -- keycode 122 = XF86AudioLowerVolume
     -- keycode 123 = XF86AudioRaiseVolume
     awful.key({}, "XF86AudioRaiseVolume", function ()
-        awful.util.spawn("amixer -q set " .. volume.channel .. " " .. volume.step .. "+")
+        os.execute(string.format("amixer -q set %s %s+", volume.channel, volume.step))
+        volume.update()
         volume.notify()
     end),
     awful.key({}, "XF86AudioLowerVolume", function ()
-        awful.util.spawn("amixer -q set " .. volume.channel .. " " .. volume.step .. "-")
+        os.execute(string.format("amixer -q set %s %s-", volume.channel, volume.step))
+        volume.update()
         volume.notify()
     end),
     awful.key({}, "XF86AudioMute", function ()
-        awful.util.spawn("amixer -q set " .. volume.channel .. " playback toggle")
         --awful.util.spawn("ponymix toggle")
+        os.execute(string.format("amixer -q set %s playback toggle", volume.channel))
+        volume.update()
         volume.notify()
     end),
     -- keycode 198 = XF86AudioMicMute
@@ -44,7 +47,7 @@
         awful.util.spawn("xbacklight -inc 5")
     end),
     -- Display
-    awful.key({ modkey, "Control" }, "l", function () awful.util.spawn("arandr") end),
+    awful.key({ modkey, "Control" }, "p", function () awful.util.spawn("arandr") end),
     --休眠
     awful.key({ modkey, "Control" }, "s", function ()
         awful.util.spawn("systemctl suspend")

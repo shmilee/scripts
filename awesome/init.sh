@@ -96,15 +96,14 @@ sed -i "${n2} i local lain = require(\"lain\")" rc.lua
 # 2) wibox height = 20
 sed -i '/awful.wibox({ position/s|screen = s|screen = s, height = 20|' rc.lua
 # 3) mytextclock with calendar
-sed -i 's|mytextclock = awful.widget.textclock()|mytextclock = awful.widget.textclock(" %H:%M")\n\n-- Calendar\nlain.widgets.calendar:attach(mytextclock)|' rc.lua
+sed -i 's|mytextclock = awful.widget.textclock()|mytextclock = awful.widget.textclock(" %H:%M")\n\n-- Calendar\nlain.widgets.calendar:attach(mytextclock, {followmouse = true})|' rc.lua
 # 4) weather 
-id=2132574
+id=1808926
 n4=`grep -n '^-- Calendar' rc.lua|cut -d: -f1`
 ((n4++))
 ((n4++))
-sed -i "${n4} a -- Weather\nyawn = lain.widgets.yawn($id,\n{\n    settings = function()\n        yawn_notification_preset.fg = white\n    end\n})\n" rc.lua
+sed -i "${n4} a -- Weather\nyawn = lain.widgets.weather({\n    city_id = $id,\n    lang = \"zh\",\n    followmouse = true\n})\nyawn.attach(yawn.icon)\n" rc.lua
 sed -i '/right_layout:add(mytextclock)/i \ \ \ \ right_layout:add(yawn.icon)' rc.lua
-sed -i '/-- Prompt/i \ \ \ \ awful.key({ modkey, "Shift"      }, "w",      function () yawn.show(7) end),\n' rc.lua
 # 5) separator
 n5=`grep -n '^-- Create a textclock widget' rc.lua|cut -d: -f1`
 ((n5--))

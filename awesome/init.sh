@@ -50,6 +50,8 @@ cp /etc/xdg/awesome/rc.lua rc.lua
 
 ## 1. add theme
 sed -i "s|/usr/share/awesome/themes/default/theme.lua|${HOME}/.config/awesome/theme.lua|" rc.lua
+n0=`grep -n 'gears.wallpaper.' rc.lua|cut -d: -f1`
+sed -i "${n0} a \        if s == 2 then\n            gears.wallpaper.maximized(beautiful.wallpaper2, s, true)\n        end" rc.lua
 
 ## 2. terminal : xterm & editor : nano --> vim &窗口缝隙
 sed -i '/^terminal =/s/xterm/xfce4-terminal/' rc.lua

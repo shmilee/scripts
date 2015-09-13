@@ -10,6 +10,7 @@
 theme = {}
 theme.dir       = os.getenv("HOME") .. "/.config/awesome"
 theme.wallpaper = "/usr/share/random-desktop/wall/bg20.jpg"
+theme.wallpaper2 = "/usr/share/random-desktop/wall/bg11.jpg"
 -- }}}
 
 -- {{{ Styles

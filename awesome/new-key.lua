@@ -4,19 +4,16 @@
     -- keycode 123 = XF86AudioRaiseVolume
     awful.key({}, "XF86AudioRaiseVolume", function ()
         os.execute(string.format("amixer -q set %s %s+", volume.channel, volume.step))
-        volume.update()
-        volume.notify()
+        volume.mynotify()
     end),
     awful.key({}, "XF86AudioLowerVolume", function ()
         os.execute(string.format("amixer -q set %s %s-", volume.channel, volume.step))
-        volume.update()
-        volume.notify()
+        volume.mynotify()
     end),
     awful.key({}, "XF86AudioMute", function ()
         --awful.util.spawn("ponymix toggle")
         os.execute(string.format("amixer -q set %s playback toggle", volume.channel))
-        volume.update()
-        volume.notify()
+        volume.mynotify()
     end),
     -- keycode 198 = XF86AudioMicMute
     awful.key({}, "XF86AudioMicMute", function ()
@@ -41,10 +38,12 @@
     awful.key({ }, "XF86Explorer", revelation),
     -- Brightness
     awful.key({ }, "XF86MonBrightnessDown", function ()
-        awful.util.spawn("xbacklight -dec 5")
+        os.execute(string.format("volnoti-show -s %s `xbacklight -dec %s; xbacklight`",
+            "/usr/share/pixmaps/volnoti/display-brightness-symbolic.svg", 5))
     end),
     awful.key({ }, "XF86MonBrightnessUp", function ()
-        awful.util.spawn("xbacklight -inc 5")
+        os.execute(string.format("volnoti-show -s %s `xbacklight -inc %s; xbacklight`",
+            "/usr/share/pixmaps/volnoti/display-brightness-symbolic.svg", 5))
     end),
     -- Display
     awful.key({ modkey, "Control" }, "p", function () awful.util.spawn("arandr") end),

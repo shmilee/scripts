@@ -26,6 +26,14 @@ volmargin:set_top(6)
 volmargin:set_bottom(6)
 volumewidget = wibox.widget.background(volmargin)
 volumewidget:set_bgimage(beautiful.widget_bg)
+function volume.mynotify()
+    volume.notify()
+    if volume._muted then
+        os.execute(string.format("volnoti-show -m"))
+    else
+        os.execute(string.format("volnoti-show %s", volume_now.level))
+    end
+end
 
 -- Coretemp
 tempicon = wibox.widget.imagebox(beautiful.widget_temp)

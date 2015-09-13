@@ -1,6 +1,16 @@
 #!/bin/bash
 need_pkg=('awesome'
-          'lain-git')
+          'lain-git'
+          'volnoti'
+          'arandr'
+          'slock'
+          'deepin-scrot'
+          'conky'
+          'compton'
+          'fcitx'
+          'parcellite'
+          'fcitx-sogoupinyin'
+          'wicd-gtk')
 files=('alsa-bat.lua'
        'arch-icon.png'
        'favorite.lua'
@@ -9,7 +19,9 @@ files=('alsa-bat.lua'
        'separator.lua'
        'tag-name.lua'
        'theme.lua'
-       'icons/*.png')
+       'icons/*.png'
+       'revelation'
+       'run_once.lua')
 
 ## theme.lua : copy from /usr/share/awesome/themes/zenburn/
 # theme.dir = os.getenv("HOME") .. "/.config/awesome"
@@ -49,7 +61,7 @@ fi
 cp /etc/xdg/awesome/rc.lua rc.lua
 
 ## 1. add theme
-sed -i "s|/usr/share/awesome/themes/default/theme.lua|${HOME}/.config/awesome/theme.lua|" rc.lua
+sed -i 's|"/usr/share/awesome/themes/default/theme.lua"|os.getenv("HOME") .. "/.config/awesome/theme.lua"|' rc.lua
 n0=`grep -n 'gears.wallpaper.' rc.lua|cut -d: -f1`
 sed -i "${n0} a \        if s == 2 then\n            gears.wallpaper.maximized(beautiful.wallpaper2, s, true)\n        end" rc.lua
 
@@ -153,3 +165,6 @@ if [[ $w_T == Y ]]; then
     sed -i -e 's|c.border_color = beautiful.border_focus|& c.opacity = 1|' \
         -e 's|c.border_color = beautiful.border_normal|& c.opacity = 0.8|' rc.lua
 fi
+
+## 9. autostart programs
+cat ./run_once.lua >> rc.lua

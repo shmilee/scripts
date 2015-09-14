@@ -45,6 +45,18 @@
         os.execute(string.format("volnoti-show -s %s `xbacklight -inc %s; xbacklight`",
             "/usr/share/pixmaps/volnoti/display-brightness-symbolic.svg", 5))
     end),
+    -- OSD Caps_Lock notify
+    awful.key({ }, "Caps_Lock", function()
+        local str = "sleep 0.2; xset q|grep 'Caps Lock:[ ]*on' >/dev/null"
+        local check_on = os.execute(str)
+        str = os.getenv("HOME") .. '/.config/awesome/icons'
+        if check_on then
+            str = str .. '/capslock_on.png'
+        else
+            str = str .. '/capslock_off.png'
+        end
+        os.execute(string.format("volnoti-show -n 0 -s %s",str))
+    end),
     -- Display
     awful.key({ modkey, "Control" }, "p", function () awful.util.spawn("arandr") end),
     --休眠

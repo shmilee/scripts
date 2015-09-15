@@ -14,7 +14,8 @@ if [ x$1 == xS -o x$1 == xs ]; then
     sed -e "s/.*=//" -i ~/.synergy/SSL/Fingerprints/Local.txt
     echo " -> add configuration file"
     cp -v ./synergy.conf ~/.synergy/synergy.conf
-    sudo insrall -Dvm644 ./customexec.conf /etc/systemd/system/synergys@${USER}.service.d/customexec.conf
+    sudo install -Dvm644 ./customexec.conf /etc/systemd/system/synergys@${USER}.service.d/customexec.conf
+    sudo systemctl daemon-reload
     echo " -> !! Edit your /etc/hosts, by yourself!"
     echo " -> !! Then, enable synergys@$USER"
     echo " -> !! Do not forget add the fingerprint to your client!!!"

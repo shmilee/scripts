@@ -30,24 +30,6 @@ files=('alsa-bat.lua'
 # Widgets
 # theme.awesome_icon = theme.dir .. "/arch-icon.png"
 
-## archmenu.lua xdgmenu.lua
-get_menu_file() {
-    # lxde-applications.menu  arch-applications.menu  xfce-applications.menu  kde-applications.menu
-    if xdg_menu --format awesome --root-menu /etc/xdg/menus/xfce-applications.menu |sed -e 's/local menu/menu/' > /tmp/xdg-awesome-menu ; then
-        local end_row=`grep xdgmenu -n /tmp/xdg-awesome-menu |cut -d: -f1`
-        ((end_row--))
-        # output menuxxxxxxxxxx and xdgmenu
-        cat /tmp/xdg-awesome-menu > archmenu.lua
-        # output xdgmenu2
-        sed -e "1,${end_row}d" -e 's/xdgmenu =/xdgmenu2 = awful.menu({ items =/' -e 's|^}$|}})|' /tmp/xdg-awesome-menu > xdgmenu2.lua
-        # favorite2.lua
-        sed -e 's/myfavorite =/myfavorite2 = awful.menu({ items =/'  -e 's|^}$|}})|' favorite.lua >favorite2.lua
-    else
-        echo "xdg_menu::error."
-        return 1
-    fi
-}
-
 ## BEGIN ##
 workdir=`pwd`
 if [ "${workdir}" != "${HOME}/.config/awesome" ];then
@@ -76,26 +58,17 @@ sed -i "${n1} s/1, 2, 3, 4, 5, 6, 7, 8, 9/1, 2, 3, 4, 5/" rc.lua
 sed -i "${n1} r tag-name.lua" rc.lua
 
 ## 4. mainmenu : add mainmenu favorite(2) xdgmenu(2)
-get_menu_file
-#寻找第一个空行,add library
-n2=`grep -n '^$' rc.lua|head -n1|cut -d: -f1`
-sed -i "${n2} i require(\"archmenu\")" rc.lua
-((n2++)) #for lain
+# lxde-applications.menu  arch-applications.menu  xfce-applications.menu  kde-applications.menu
+if ! xdg_menu --format awesome --root-menu /etc/xdg/menus/xfce-applications.menu >archmenu.lua; then
+    echo "xdg_menu::error."
+    exit 1
+fi
 # 加菜单
-sed -i 's|{ "open terminal", terminal }|{ "所有 (\&A)", xdgmenu },\n                                   { "常用 (\&C)", myfavorite }|' rc.lua
-# 1个
+sed -i 's|{ "open terminal", terminal }|{ "所有 (\&A)", xdgmenu }, { "常用 (\&C)", myfavorite }|' rc.lua
+# favorite2 xdgmenu2
 n3=`grep -n '^mymainmenu =' rc.lua|head -n1|cut -d: -f1`
 ((n3--))
-sed -i "${n3} r favorite.lua" rc.lua
-# 2个
-n3=`grep -n '^mymainmenu =' rc.lua|head -n1|cut -d: -f1`
-((n3--))
-sed -i "${n3} r favorite2.lua" rc.lua
-# 3个
-n3=`grep -n '^mymainmenu =' rc.lua|head -n1|cut -d: -f1`
-((n3--))
-sed -i "${n3} r xdgmenu2.lua" rc.lua
-rm xdgmenu2.lua favorite2.lua
+sed -i "${n3} i require(\"archmenu\")\nrequire(\"favorite\")\nmyfavorite2 = awful.menu({ items = myfavorite })\nxdgmenu2 = awful.menu({ items = xdgmenu })" rc.lua
 # xdgmenu2 绑定 modkey + a, favorite2 绑定 modkey + c
 sed -i 's|"w", function () mymainmenu:show() end),|"a", function () xdgmenu2:show() end),\n    awful.key({ modkey,           }, "c", function () myfavorite2:show() end),|' rc.lua
 
@@ -105,7 +78,9 @@ n3=`grep -n '\-\- Menubar$' rc.lua|cut -d: -f1`
 sed -i "${n3} r new-key.lua" rc.lua
 
 ## 6. lain-wibox
-# 1) add lain library
+# 1) add lain library, 寻找第一个空行
+n2=`grep -n '^$' rc.lua|head -n1|cut -d: -f1`
+((n2++))
 sed -i "${n2} i local lain = require(\"lain\")" rc.lua
 # 2) wibox height = 20
 sed -i '/awful.wibox({ position/s|screen = s|screen = s, height = 20|' rc.lua

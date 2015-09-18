@@ -1,15 +1,19 @@
-    -- ALSA volume control
-    -- keycode 121 = XF86AudioMute
-    -- keycode 122 = XF86AudioLowerVolume
+local awful = require("awful")
+local naughty = require("naughty")
+local menubar = require("menubar")
+
+mykeys = awful.util.table.join(
     -- keycode 123 = XF86AudioRaiseVolume
     awful.key({}, "XF86AudioRaiseVolume", function ()
         os.execute(string.format("amixer -q set %s %s+", volume.channel, volume.step))
         volume.mynotify()
     end),
+    -- keycode 122 = XF86AudioLowerVolume
     awful.key({}, "XF86AudioLowerVolume", function ()
         os.execute(string.format("amixer -q set %s %s-", volume.channel, volume.step))
         volume.mynotify()
     end),
+    -- keycode 121 = XF86AudioMute
     awful.key({}, "XF86AudioMute", function ()
         --awful.util.spawn("ponymix toggle")
         os.execute(string.format("amixer -q set %s playback toggle", volume.channel))
@@ -70,4 +74,6 @@
     -- Hide / show wibox
     awful.key({ modkey }, "b", function ()
         mywibox[mouse.screen].visible = not mywibox[mouse.screen].visible
-    end),
+    end)
+)
+return mykeys

@@ -1,3 +1,5 @@
+local awful = require("awful")
+
 -- autostart programs
 function run_once(prg,arg_string,pname,screen)
     if not prg then

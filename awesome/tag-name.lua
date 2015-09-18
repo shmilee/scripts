@@ -1,5 +1,0 @@
-    tags[s][1].name = "宫"
-    tags[s][2].name = "商"
-    tags[s][3].name = "角"
-    tags[s][4].name = "徵"
-    tags[s][5].name = "羽"

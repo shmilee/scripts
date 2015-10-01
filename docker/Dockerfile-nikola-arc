@@ -1,15 +1,15 @@
 # nikola
-# nkl_Ver=7.7.0
-# py_Ver=py2
+# nkl_Ver=7.7.1
+# py_Ver=py3
 # select pypi-index-url $PP_index
 # docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver$py_Ver .
 # docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver$py_Ver /usr/bin/bash
-FROM arch:1508
+FROM arch:1510
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
-RUN nkl_Ver=7.7.0 && \
-    py_Ver=py2 && \
+RUN nkl_Ver=7.7.1 && \
+    py_Ver=py3 && \
     py3_packages=(python-pip \
         python-pygments \
         python-pillow \
@@ -18,6 +18,7 @@ RUN nkl_Ver=7.7.0 && \
         python-mako \
         python-unidecode \
         python-lxml \
+        python-logbook \
         python-blinker \
         python-setuptools \
         python-requests \
@@ -27,14 +28,15 @@ RUN nkl_Ver=7.7.0 && \
         python-pyzmq \
         python-jsonschema \
         python-terminado \
-        python-mistune) && \
+        python-mistune \
+        sqlite3) && \
     py2_packages=($(echo ${py3_packages[@]}|sed 's/python/&2/g')) && \
     PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
     PP_index='https://pypi.python.org/simple' && \
     nkl_Url='https://raw.githubusercontent.com/getnikola/nikola' && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements.txt && \
     curl -O "$nkl_Url/v$nkl_Ver"/requirements-extras.txt && \
-    sed -i 's/^ipython.note.*$/ipython[notebook]==3.2.1/' requirements-extras.txt && \
+    sed -i 's/^ipython.note.*$/ipython[notebook]==3.2.2/' requirements-extras.txt && \
     sed -i -e '/pyphen/d' -e '/ghp-import/d' requirements-extras.txt && \
     useradd -m -g users -G wheel -s /bin/bash -d /blog -u 1000 shmilee && \
     if [[ $py_Ver == py3 ]]; then \

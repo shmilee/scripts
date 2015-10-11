@@ -2,6 +2,7 @@ local awful = require("awful")
 local wibox = require("wibox")
 local beautiful = require("beautiful")
 local lain = require("lain")
+local cnweather = require("cnweather")
 local helpers = require("lain.helpers")
 beautiful.init(os.getenv("HOME") .. "/.config/awesome/theme.lua")
 
@@ -16,7 +17,7 @@ bar_spr = wibox.widget.textbox('<span font="FreeSans 3"> </span>' .. markup("#33
 mytextclock = awful.widget.textclock(" %H:%M")
 
 -- Calendar
-lain.widgets.calendar:attach(mytextclock, {followmouse = true})
+lain.widgets.calendar:attach(mytextclock, {font = 'Ubuntu Mono', followmouse = true})
 
 -- ALSA volume bar
 volicon = wibox.widget.imagebox(beautiful.vol)
@@ -86,9 +87,10 @@ tempwidget = lain.widgets.temp({
 })
 
 -- Weather
-yawn = lain.widgets.weather({
-    city_id = 1808926,
-    lang = "zh",
+yawn = cnweather({
+    api  = 'lib360',
+    city = '杭州',
+    icons_path = theme.dir .. '/icons/cnweather/',
     followmouse = true
 })
 yawn.attach(yawn.icon)

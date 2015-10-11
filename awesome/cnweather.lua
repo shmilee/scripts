@@ -99,7 +99,7 @@ end
 local function etouch_now(city)
     local cmd = string.format("curl -s 'http://wthrcdn.etouch.cn/weather_mini?city=%s'|gzip -d", city)
     local weather_now_icon = ''
-    local aql = ''
+    local aql = 'AQI: N/A '
     local weather_now, pos, err
     weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
 
@@ -139,13 +139,15 @@ end
 local function lib360_now(city)
     local cmd = string.format("curl -s 'http://api.lib360.net/open/weather.json?city=%s'", city)
     local weather_now_icon=''
-    local aql = ''
+    local aql = 'AQI: N/A '
     local weather_now, pos, err
     weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
 
-    if not err and weather_now ~= nil and weather_now.datanow ~= nil then
+    if not err and weather_now.datanow ~= nil then
         weather_now_icon = icon_table[weather_now.datanow.Weather] .. ".png"
         --weather_now_icon = string.sub(weather_now.datanow.WeatherICON,2,3) .. ".png"
+    end
+    if not err and weather_now.pm25 ~= nil then
         aql = aqi2apl(weather_now.pm25)
     end
     return weather_now_icon, aql
@@ -155,7 +157,7 @@ end
 local function worker(args)
     local cnweather              = {}
     local args                 = args or {}
-    local timeout              = args.timeout or 1800   -- 30 min
+    local timeout              = args.timeout or 900    -- 15 min
     local timeout_forecast     = args.timeout or 86400  -- 24 hrs
     local api                  = args.api or 'etouch'   -- etouch or lib360
     local city                 = args.city or '杭州'    -- placeholder
@@ -228,18 +230,17 @@ local function worker(args)
         elseif api == 'lib360' then
             icon, aql = lib360_now(url_city)
         else
-            icon, aql = '', ''
+            icon, aql = '', 'AQI: N/A '
         end
 
+        cnweather.aql = aql
         if icon == '' then
             cnweather.icon_path = icons_path .. "day/undefined.png"
             cnweather.icon:set_image(cnweather.icon_path)
             cnweather.widget._layout.text = " N/A " -- tries to avoid textbox bugs
-            cnweather.aql = "AQI: N/A "
         else
             cnweather.icon_path = icons_path .. dorn .. icon
             cnweather.icon:set_image(cnweather.icon_path)
-            cnweather.aql = aql
             widget = cnweather.widget
             settings()
         end

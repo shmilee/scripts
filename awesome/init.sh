@@ -1,6 +1,8 @@
 #!/bin/bash
 need_pkg=('awesome'
           'lain-git'
+          'garcon'
+          'ttf-ubuntu-font-family'
           'volnoti'
           'arandr'
           'slock'

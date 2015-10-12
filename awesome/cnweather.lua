@@ -220,7 +220,7 @@ local function worker(args)
 
     function cnweather.update()
         local dorn, icon, aql
-        if tonumber(os.date('%H')) <= 18 and tonumber(os.date('%H')) >= 6 then
+        if tonumber(os.date('%H')) < 18 and tonumber(os.date('%H')) >= 6 then
             dorn = 'day/'
         else
             dorn = 'night/'

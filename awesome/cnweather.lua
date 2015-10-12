@@ -157,10 +157,10 @@ end
 local function worker(args)
     local cnweather              = {}
     local args                 = args or {}
-    local timeout              = args.timeout or 900    -- 15 min
-    local timeout_forecast     = args.timeout or 86400  -- 24 hrs
-    local api                  = args.api or 'etouch'   -- etouch or lib360
-    local city                 = args.city or '杭州'    -- placeholder
+    local timeout              = args.timeout or 600            -- 10 min
+    local timeout_forecast     = args.timeout_forecast or 18000 -- 5 hrs
+    local api                  = args.api or 'etouch'           -- etouch or lib360
+    local city                 = args.city or '杭州'            -- placeholder
     local icons_path           = args.icons_path or lain_icons .. "cnweather/"
     local notification_preset  = args.notification_preset or {}
     local followmouse          = args.followmouse or false
@@ -248,7 +248,7 @@ local function worker(args)
 
     cnweather.attach(cnweather.widget)
     newtimer("cnweather-" .. city, timeout, cnweather.update)
-    newtimer("cnweather_forecast-" .. city, timeout, cnweather.forecast_update)
+    newtimer("cnweather_forecast-" .. city, timeout_forecast, cnweather.forecast_update)
     return setmetatable(cnweather, { __index = cnweather.widget })
 end
 

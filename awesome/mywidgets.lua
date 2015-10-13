@@ -90,9 +90,11 @@ tempwidget = lain.widgets.temp({
 yawn = cnweather({
     --timeout = 600,            -- 10 min
     --timeout_forecast = 18000, -- 5 hrs
-    api  = 'lib360',          -- etouch or lib360
-    city = '杭州',            -- place
-    icons_path = theme.dir .. '/icons/cnweather/',
+    api         = 'lib360',     -- etouch, lib360, xiaomi
+    city        = '杭州',       -- for etouch, lib360
+    cityid      = 101210101,    -- for xiaomi
+    city_desc   = '杭州市',     -- desc for the city
+    icons_path  = theme.dir .. '/icons/cnweather/',
     followmouse = true
 })
 yawn.attach(yawn.icon)

@@ -62,13 +62,23 @@ local icon_table={
     ["霾"]               = '53',
     ["无"]               = 'undefined' }
 
+function encodeURI(s)
+    local s = string.gsub(s, "([^%w%.%- ])", function(c) return string.format("%%%02X", string.byte(c)) end)
+    return string.gsub(s, " ", "+")
+end
+
 -- http://www.pm25.com/news/91.html
 -- AQI PM2.5 --> Air Pollution Level
 local function aqi2apl(aqi)
-    local aql={'优', '良',   '轻度污染', '中度污染', '重度污染','重度污染', '严重污染','严重污染','严重污染','严重污染'}
-    ----  aqi  0-50, 51-100, 101 - 150,  151 - 200,  201 - - 250 - - - 300, 301 - - 350 - - - - 400 - - - - 450 - - 500
+    local aql={'优', '良',   '轻度污染', '中度污染', '重度污染','重度污染', '严重污染'}
+    ----  aqi  0-50, 51-100, 101 - 150,  151 - 200,  201 - - 250 - - - 300, 301 - - 500
     local i=math.floor(aqi/50.16)+1
-    return "空气质量指数: " .. tostring(aqi) .. ', ' .. aql[i]
+    if i == nil then
+        return 'AQI: N/A '
+    else
+        if i > 7 then i = 7 end
+        return "空气质量: " .. tostring(aqi) .. ', ' .. aql[i]
+    end
 end
 
 -- wthrcdn.etouch.cn --
@@ -105,7 +115,7 @@ local function etouch_now(city)
 
     if not err and weather_now ~= nil and weather_now["desc"] == 'OK' then
         weather_now_icon = icon_table[weather_now.data.forecast[1].type] .. ".png"
-        aql = aqi2apl(weather_now.data.aqi)
+        aql = '温度: ' .. weather_now.data.wendu .. '℃\n' ..  aqi2apl(weather_now.data.aqi)
     end
     return weather_now_icon, aql
 end
@@ -154,13 +164,55 @@ local function lib360_now(city)
 end
 --}}}
 
+--http://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=101210101
+--{{{
+local function xiaomi_forecast(city)
+    local cmd = string.format("curl -s 'https://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=%s'", city)
+    local notification_text = ''
+    local weather_now, pos, err
+    weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
+
+    if not err and weather_now ~= nil and weather_now.forecast ~= nil then
+        -- weather_now.forecast.date_y == os.date('%Y年%m月%d日')
+        for i = 1, 5 do
+            local day  = os.date('%m月%d日',os.time()+60*60*24*(i-1))
+            local temp = weather_now.forecast['temp'.. i]
+            local desc = weather_now.forecast['weather'.. i]
+            local wind = weather_now.forecast['wind'.. i]
+            notification_text = notification_text ..
+                string.format("<b>%s</b>:  %s,  %s,  %s ", day, desc, temp, wind)
+            if i < 5 then
+                notification_text = notification_text .. "\n"
+            end
+        end
+    end
+    return notification_text
+end
+
+local function xiaomi_now(city)
+    local cmd = string.format("curl -s 'https://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=%s'", city)
+    local weather_now_icon=''
+    local aql = 'AQI: N/A '
+    local weather_now, pos, err
+    weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
+
+    if not err and weather_now.realtime ~= nil then
+        weather_now_icon = icon_table[weather_now.realtime.weather] .. ".png"
+        aql = '温度: ' .. weather_now.realtime.temp .. '℃\n' .. aqi2apl(weather_now.aqi.aqi)
+    end
+    return weather_now_icon, aql
+end
+--}}}
+
 local function worker(args)
     local cnweather              = {}
     local args                 = args or {}
     local timeout              = args.timeout or 600            -- 10 min
     local timeout_forecast     = args.timeout_forecast or 18000 -- 5 hrs
-    local api                  = args.api or 'etouch'           -- etouch or lib360
-    local city                 = args.city or '杭州'            -- placeholder
+    local api                  = args.api or 'etouch'           -- etouch, lib360, xiaomi
+    local city                 = args.city or '杭州'            -- for etouch, lib360
+    local cityid               = args.cityid or 101210101       -- for xiaomi
+    local city_desc            = args.city_desc or city         -- desc for the city
     local icons_path           = args.icons_path or lain_icons .. "cnweather/"
     local notification_preset  = args.notification_preset or {}
     local followmouse          = args.followmouse or false
@@ -177,7 +229,7 @@ local function worker(args)
         end
 
         cnweather.notification = naughty.notify({
-            text    = cnweather.aql .. '\n' .. cnweather.notification_text,
+            text    = string.format("<b>%s</b>\n%s\n%s ", city_desc, cnweather.aql, cnweather.notification_text),
             icon    = cnweather.icon_path,
             timeout = t_out,
             preset  = notification_preset
@@ -200,14 +252,13 @@ local function worker(args)
         end)
     end
 
-    -- encodeURI
-    url_city = string.gsub(city, "([^%w%.%- ])", function(c) return string.format("%%%02X", string.byte(c)) end)
-
     function cnweather.forecast_update()
         if api == 'etouch' then
-            cnweather.notification_text = etouch_forecast(url_city)
+            cnweather.notification_text = etouch_forecast(encodeURI(city))
         elseif api == 'lib360' then
-            cnweather.notification_text = lib360_forecast(url_city)
+            cnweather.notification_text = lib360_forecast(encodeURI(city))
+        elseif api == 'xiaomi' then
+            cnweather.notification_text = xiaomi_forecast(cityid)
         else
             cnweather.notification_text = ''
         end
@@ -226,11 +277,13 @@ local function worker(args)
             dorn = 'night/'
         end
         if api == 'etouch' then
-            icon, aql = etouch_now(url_city)
+            icon, aql = etouch_now(encodeURI(city))
         elseif api == 'lib360' then
-            icon, aql = lib360_now(url_city)
+            icon, aql = lib360_now(encodeURI(city))
+        elseif api == 'xiaomi' then
+            icon, aql = xiaomi_now(cityid)
         else
-            icon, aql = '', 'AQI: N/A '
+            icon, aql = '', ' N/A '
         end
 
         cnweather.aql = aql

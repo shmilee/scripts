@@ -1,0 +1,20 @@
+# Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
+
+pkgname=setwp
+pkgver=0.1
+pkgrel=1
+pkgdesc="Set random root desktop wallpaper by program habak and imagemagick."
+arch=('any')
+url=none
+license=('GPL')
+depends=('python' 'habak' 'imagemagick')
+source=('setwp.py' 'setwp.conf')
+md5sums=('8568966056ac6f2a7b38e1ebe9b4a5a1'
+         '8663dd75111e192eca1a1d9cc3f1d70e')
+
+package() {
+    cd "$srcdir"
+    install -Dm755 setwp.py "$pkgdir"/usr/bin/setwp.py
+    ln -s setwp.py "$pkgdir"/usr/bin/setwp
+    install -Dm644 setwp.conf "$pkgdir"/etc/setwp.conf.example
+}

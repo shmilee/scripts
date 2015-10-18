@@ -1,0 +1,10 @@
+>= 2 screens
+
+1.
+http://www.imagemagick.org/Usage/
+http://www.imagemagick.org/Usage/layers/
+
+convert -> wallpaper1.jpg and wallpaper2.jpg
+
+2. 
+feh --bg-fill wallpaper1.jpg --bg-fill wallpaper2.jpg ...

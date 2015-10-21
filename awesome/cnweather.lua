@@ -24,9 +24,11 @@ local setmetatable = setmetatable
 
 -- lain.widgets.contrib.zhweather
 -- current weather and forecast
---
+
+local curl         = 'curl -f -s -m 1.7'
+
 -- http://openweather.weather.com.cn/Home/Help/icon.html
-local icon_table={
+local icon_table   = {
     ["晴"]               = '00',
     ["多云"]             = '01',
     ["阴"]               = '02',
@@ -84,7 +86,7 @@ end
 -- wthrcdn.etouch.cn --
 --{{{
 local function etouch_forecast(city)
-    local cmd = string.format("curl -s 'http://wthrcdn.etouch.cn/weather_mini?city=%s'|gzip -d", city)
+    local cmd = string.format("%s 'http://wthrcdn.etouch.cn/weather_mini?city=%s'|gzip -d", curl, city)
     local notification_text = ''
     local weather_now, pos, err
     weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
@@ -107,7 +109,7 @@ local function etouch_forecast(city)
 end
 
 local function etouch_now(city)
-    local cmd = string.format("curl -s 'http://wthrcdn.etouch.cn/weather_mini?city=%s'|gzip -d", city)
+    local cmd = string.format("%s 'http://wthrcdn.etouch.cn/weather_mini?city=%s'|gzip -d", curl, city)
     local weather_now_icon = ''
     local aql = 'AQI: N/A '
     local weather_now, pos, err
@@ -124,7 +126,7 @@ end
 -- api.lib360.net --
 --{{{
 local function lib360_forecast(city)
-    local cmd = string.format("curl -s 'http://api.lib360.net/open/weather.json?city=%s'", city)
+    local cmd = string.format("%s 'http://api.lib360.net/open/weather.json?city=%s'", curl, city)
     local notification_text = ''
     local weather_now, pos, err
     weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
@@ -147,7 +149,7 @@ local function lib360_forecast(city)
 end
 
 local function lib360_now(city)
-    local cmd = string.format("curl -s 'http://api.lib360.net/open/weather.json?city=%s'", city)
+    local cmd = string.format("%s 'http://api.lib360.net/open/weather.json?city=%s'", curl, city)
     local weather_now_icon=''
     local aql = 'AQI: N/A '
     local weather_now, pos, err
@@ -167,7 +169,7 @@ end
 --http://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=101210101
 --{{{
 local function xiaomi_forecast(city)
-    local cmd = string.format("curl -s 'https://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=%s'", city)
+    local cmd = string.format("%s 'https://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=%s'", curl, city)
     local notification_text = ''
     local weather_now, pos, err
     weather_now, pos, err = json.decode(read_pipe(cmd), 1, nil)
@@ -190,7 +192,7 @@ local function xiaomi_forecast(city)
 end
 
 local function xiaomi_now(city)
-    local cmd = string.format("curl -s 'https://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=%s'", city)
+    local cmd = string.format("%s 'https://weatherapi.market.xiaomi.com/wtr-v2/weather?cityId=%s'", curl, city)
     local weather_now_icon=''
     local aql = 'AQI: N/A '
     local weather_now, pos, err

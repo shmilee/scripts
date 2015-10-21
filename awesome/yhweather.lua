@@ -27,14 +27,15 @@ local setmetatable = setmetatable
 -- https://query.yahooapis.com/v1/public/yql?format=json&q=
 -- select * from weather.forecast where woeid in (select woeid from geo.places(1) where text="中国, 杭州") and u="c"
 
-local unit_char={ ['c'] = '℃', ['f'] = '℉' }
+local curl      = 'curl -f -s -m 2'
+local unit_char = { ['c'] = '℃', ['f'] = '℉' }
 
 local function get_cmd(country, city, item, unit)
     local YQL_Q = string.format('select %s from weather.forecast where woeid in (select woeid from geo.places(1) where text="%s, %s") and u="%s"', item, country, city, unit)
     -- encodeURI
     local yql_q = string.gsub(YQL_Q, "([^%w%.%- ])", function(c) return string.format("%%%02X", string.byte(c)) end)
     local yql_q = string.gsub(yql_q, " ", "+")
-    local cmd   = string.format("curl -s 'https://query.yahooapis.com/v1/public/yql?format=json&q=%s'", yql_q)
+    local cmd   = string.format("%s 'https://query.yahooapis.com/v1/public/yql?format=json&q=%s'", curl, yql_q)
     return cmd
 end
 

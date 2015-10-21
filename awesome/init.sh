@@ -98,20 +98,43 @@ sed -i '/awful.wibox({ position/s|screen = s|screen = s, height = 20|' rc.lua
 # 2) mywidgets
 sed -i 's/^.*Create.*textclock.*widget.*$/require("mywidgets")/' rc.lua
 sed -i '/mytextclock.*=.*widget/d' rc.lua
+sed -i '/left_layout:add(mypromptbox\[s\])/i \
+    left_layout:add(spr)' rc.lua
+sed -i '/left_layout:add(mypromptbox\[s\])/a \
+    left_layout:add(spr)\
+    left_layout:add(netdownicon)\
+    left_layout:add(netdowninfo)\
+    left_layout:add(netupicon)\
+    left_layout:add(netupinfo)' rc.lua
 sed -i '/right_layout:add(mytextclock)/i \
-    right_layout:add(bar_spr)\
-    for i,BAT in ipairs(BAT_table) do\
-        right_layout:add(baticon[i])\
-        right_layout:add(batwidget[i])\
+\
+    local right_layout_toggle = true\
+    local function right_layout_add (arg)\
+        if right_layout_toggle then\
+            right_layout:add(arrl_ld)\
+            for i, n in pairs(arg) do\
+                right_layout:add(wibox.widget.background(n ,beautiful.bg_focus))\
+            end\
+        else\
+            right_layout:add(arrl_dl)\
+            for i, n in pairs(arg) do\
+                right_layout:add(n)\
+            end\
+        end\
+        right_layout_toggle = not right_layout_toggle\
     end\
-    right_layout:add(bar_spr)\
-    right_layout:add(tempicon)\
-    right_layout:add(tempwidget)\
-    right_layout:add(bar_spr)\
-    right_layout:add(volicon)\
-    right_layout:add(volumewidget)\
-    right_layout:add(bar_spr)\
-    right_layout:add(yawn.icon)' rc.lua
+\
+    right_layout:add(spr)\
+    right_layout:add(arrl)\
+    --right_layout_add({netdownicon,netdowninfo, netupicon,netupinfo})\
+    right_layout_add({memicon,memwidget})\
+    right_layout_add({cpuicon,cpuwidget, tempicon,tempwidget})\
+    right_layout_add(BAT_Widgets)\
+    right_layout_add({volicon,volumewidget})\
+    right_layout_add({spr,yawn.icon,mytextclock})\
+    right_layout_add({mylayoutbox[s]})' rc.lua
+sed -i '/right_layout:add(mytextclock)/d' rc.lua
+sed -i '/right_layout:add(mylayoutbox\[s\])/d' rc.lua
 
 ## 8. window transparency
 w_T=N

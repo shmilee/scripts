@@ -9,8 +9,8 @@
 -- {{{ Main
 theme = {}
 theme.dir       = os.getenv("HOME") .. "/.config/awesome"
-theme.wallpaper = "/usr/share/random-desktop/wall/bg20.jpg"
-theme.wallpaper2 = "/usr/share/random-desktop/wall/bg11.jpg"
+theme.wallpaper = "/usr/share/wallpapers-shmilee/1200/think-1920x1200.jpg"
+theme.wallpaper2 = "/usr/share/wallpapers-shmilee/1080/violin-1920x1080.jpg"
 -- }}}
 
 -- {{{ Styles
@@ -23,7 +23,7 @@ theme.fg_urgent  = "#CC9393"
 theme.bg_normal  = "#3F3F3F"
 theme.bg_focus   = "#1E2320"
 theme.bg_urgent  = "#3F3F3F"
-theme.bg_systray = theme.bg_normal
+theme.bg_systray = theme.bg_focus
 -- }}}
 
 -- {{{ Borders
@@ -68,7 +68,12 @@ theme.bat_low     = theme.dir .. "/icons/bat_low.png"
 theme.bat_no      = theme.dir .. "/icons/bat_no.png"
 theme.play        = theme.dir .. "/icons/play.png"
 theme.pause       = theme.dir .. "/icons/pause.png"
-theme.widget_temp = theme.dir .. "/icons/temp.png"
+theme.temp        = theme.dir .. "/icons/temp.png"
+theme.cpu         = theme.dir .. "/icons/cpu.png"
+theme.mem         = theme.dir .. "/icons/mem.png"
+theme.netdown     = theme.dir .. "/icons/net_down.png"
+theme.netup       = theme.dir .. "/icons/net_up.png"
+theme.arrl        = theme.dir .. "/icons/arrl.png"
 -- }}}
 
 -- {{{ Mouse finder
@@ -98,18 +103,18 @@ theme.menu_submenu_icon      = "/usr/share/awesome/themes/default/submenu.png"
 -- }}}
 
 -- {{{ Layout
-theme.layout_tile       = "/usr/share/awesome/themes/zenburn/layouts/tile.png"
-theme.layout_tileleft   = "/usr/share/awesome/themes/zenburn/layouts/tileleft.png"
-theme.layout_tilebottom = "/usr/share/awesome/themes/zenburn/layouts/tilebottom.png"
-theme.layout_tiletop    = "/usr/share/awesome/themes/zenburn/layouts/tiletop.png"
-theme.layout_fairv      = "/usr/share/awesome/themes/zenburn/layouts/fairv.png"
-theme.layout_fairh      = "/usr/share/awesome/themes/zenburn/layouts/fairh.png"
-theme.layout_spiral     = "/usr/share/awesome/themes/zenburn/layouts/spiral.png"
-theme.layout_dwindle    = "/usr/share/awesome/themes/zenburn/layouts/dwindle.png"
-theme.layout_max        = "/usr/share/awesome/themes/zenburn/layouts/max.png"
-theme.layout_fullscreen = "/usr/share/awesome/themes/zenburn/layouts/fullscreen.png"
-theme.layout_magnifier  = "/usr/share/awesome/themes/zenburn/layouts/magnifier.png"
-theme.layout_floating   = "/usr/share/awesome/themes/zenburn/layouts/floating.png"
+theme.layout_tile       = theme.dir .. "/icons/tile.png"
+theme.layout_tileleft   = theme.dir .. "/icons/tileleft.png"
+theme.layout_tilebottom = theme.dir .. "/icons/tilebottom.png"
+theme.layout_tiletop    = theme.dir .. "/icons/tiletop.png"
+theme.layout_fairv      = theme.dir .. "/icons/fairv.png"
+theme.layout_fairh      = theme.dir .. "/icons/fairh.png"
+theme.layout_spiral     = theme.dir .. "/icons/spiral.png"
+theme.layout_dwindle    = theme.dir .. "/icons/dwindle.png"
+theme.layout_max        = theme.dir .. "/icons/max.png"
+theme.layout_fullscreen = theme.dir .. "/icons/fullscreen.png"
+theme.layout_magnifier  = theme.dir .. "/icons/magnifier.png"
+theme.layout_floating   = theme.dir .. "/icons/floating.png"
 -- }}}
 
 -- {{{ Titlebar

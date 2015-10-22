@@ -63,9 +63,9 @@ memwidget = lain.widgets.mem({
         mem_used = tonumber(mem_now.used) / 1024
         mem_prec = tonumber(mem_now.used) / tonumber(mem_now.total) * 100
         if mem_used > 1 then
-            widget:set_markup(markup("#e0da37", string.format("%.2f",mem_used) .. "G (".. string.format("%.0f",mem_prec) .. "%)"))
+            widget:set_markup(markup("#e0da37", string.format("%.2f",mem_used) .. "G(".. string.format("%.0f",mem_prec) .. "%)"))
         else
-            widget:set_markup(mem_now.used .. "M (".. string.format("%.0f",mem_prec) .. "%)")
+            widget:set_markup(mem_now.used .. "M(".. string.format("%.0f",mem_prec) .. "%)")
         end
     end
 })

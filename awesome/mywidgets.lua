@@ -44,12 +44,12 @@ netupinfo = lain.widgets.net({
         net_sent = tonumber(net_now.sent) / 1024
         net_rece = tonumber(net_now.received) / 1024
         if net_sent > 1 then
-            widget:set_markup(markup("#e54c62", net_sent - net_sent%0.01 .. "M "))
+            widget:set_markup(markup("#e54c62", string.format("%.1f",net_sent) .. "M "))
         else
             widget:set_markup(markup("#e54c62", net_now.sent .. "K "))
         end
         if net_rece > 1 then
-            netdowninfo:set_markup(markup("#87af5f", net_rece - net_rece%0.01 .. "M "))
+            netdowninfo:set_markup(markup("#87af5f", string.format("%.1f",net_rece) .. "M "))
         else
             netdowninfo:set_markup(markup("#87af5f", net_now.received .. "K "))
         end
@@ -61,10 +61,11 @@ memicon   = wibox.widget.imagebox(beautiful.mem)
 memwidget = lain.widgets.mem({
     settings = function()
         mem_used = tonumber(mem_now.used) / 1024
+        mem_prec = tonumber(mem_now.used) / tonumber(mem_now.total) * 100
         if mem_used > 1 then
-            widget:set_markup(markup("#e0da37", mem_used - mem_used%0.01 .. "G "))
+            widget:set_markup(markup("#e0da37", string.format("%.2f",mem_used) .. "G (".. string.format("%.0f",mem_prec) .. "%)"))
         else
-            widget:set_markup(mem_now.used .. "M ")
+            widget:set_markup(mem_now.used .. "M (".. string.format("%.0f",mem_prec) .. "%)")
         end
     end
 })
@@ -89,13 +90,13 @@ tempicon    = wibox.widget.imagebox(beautiful.temp)
 tempwidget  = lain.widgets.temp({
     tempfile = "/sys/class/thermal/" .. temp_device .. "/temp",
     settings = function()
-        core_temp = tonumber(coretemp_now)
+        core_temp = tonumber(string.format("%.0f",coretemp_now))
         if core_temp >70 then
-            widget:set_markup(markup("#D91E1E", coretemp_now .. "°C "))
+            widget:set_markup(markup("#D91E1E", core_temp .. "°C "))
         elseif core_temp >50 then
-            widget:set_markup(markup("#f1af5f", coretemp_now .. "°C "))
+            widget:set_markup(markup("#f1af5f", core_temp .. "°C "))
         else
-            widget:set_markup(" " .. coretemp_now .. "°C ")
+            widget:set_markup(" " .. core_temp .. "°C ")
         end
     end
 })

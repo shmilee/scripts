@@ -23,7 +23,7 @@ theme.fg_urgent  = "#CC9393"
 theme.bg_normal  = "#3F3F3F"
 theme.bg_focus   = "#1E2320"
 theme.bg_urgent  = "#3F3F3F"
-theme.bg_systray = theme.bg_focus
+theme.bg_systray = theme.bg_normal
 -- }}}
 
 -- {{{ Borders
@@ -74,6 +74,7 @@ theme.mem         = theme.dir .. "/icons/mem.png"
 theme.netdown     = theme.dir .. "/icons/net_down.png"
 theme.netup       = theme.dir .. "/icons/net_up.png"
 theme.arrl        = theme.dir .. "/icons/arrl.png"
+theme.arrr        = theme.dir .. "/icons/arrr.png"
 -- }}}
 
 -- {{{ Mouse finder

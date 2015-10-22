@@ -25,11 +25,12 @@ separators = lain.util.separators
 spr  = wibox.widget.textbox(' ')
 arrl = wibox.widget.imagebox()
 arrl:set_image(beautiful.arrl)
-arrl_dl = separators.arrow_left(beautiful.bg_focus, "alpha")
-arrl_ld = separators.arrow_left("alpha", beautiful.bg_focus)
+arrr = wibox.widget.imagebox()
+arrr:set_image(beautiful.arrr)
 
 -- Create a textclock widget
-mytextclock = awful.widget.textclock(" %H:%M:%S ",1)
+lunar = helpers.read_pipe(os.getenv("HOME") .. '/.config/awesome/lunar')
+mytextclock = awful.widget.textclock("%H:%M:%S " .. lunar,1)
 
 -- Calendar
 lain.widgets.calendar:attach(mytextclock, {font = 'Ubuntu Mono', followmouse = true})
@@ -136,7 +137,7 @@ end
 -- ALSA volume bar
 volicon = wibox.widget.imagebox(beautiful.vol)
 volume  = lain.widgets.alsabar({
-    width = 54, ticks = true, ticks_size = 6,
+    width = 30, ticks = true, ticks_size = 4,
     followmouse = true,
     settings = function()
         if volume_now.status == "off" then
@@ -174,7 +175,7 @@ end
 yawn = cnweather({
     --timeout = 600,            -- 10 min
     --timeout_forecast = 18000, -- 5 hrs
-    api         = 'lib360',     -- etouch, lib360, xiaomi
+    api         = 'etouch',     -- etouch, lib360, xiaomi
     city        = '杭州',       -- for etouch, lib360
     cityid      = 101210101,    -- for xiaomi
     city_desc   = '杭州市',     -- desc for the city

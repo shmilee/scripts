@@ -1,14 +1,14 @@
 # nikola
-# nkl_Ver=7.7.1
+# nkl_Ver=7.7.3
 # py_Ver=py3
 # select pypi-index-url $PP_index
 # docker build --force-rm --no-cache --rm -f Dockerfile-nikola-arc -t nikola:$nkl_Ver$py_Ver .
 # docker run -u 1000 --rm -p 8000:8000 -v $(pwd):/blog -w /blog -t -i nikola:$nkl_Ver$py_Ver /usr/bin/bash
-FROM arch:1510
+FROM arch:1512
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
-RUN nkl_Ver=7.7.1 && \
+RUN nkl_Ver=7.7.3 && \
     py_Ver=py3 && \
     py3_packages=(python-pip \
         python-pygments \

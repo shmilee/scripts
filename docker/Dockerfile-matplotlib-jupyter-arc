@@ -1,0 +1,39 @@
+# use matplotlib in jupyter-notebook
+# python 3 
+# select pypi-index-url $PP_index
+# docker build --force-rm --no-cache --rm -f Dockerfile-matplotlib-jupyter-arc -t matplot:$(date +%y%m%d) .
+# docker run --rm -u 1000 -v $PWD:/workdir -p 8888:8888 matplot:$(date +%y%m%d)
+# configfile: $PWD/nb_config.py
+
+FROM arch:1512
+MAINTAINER shmilee <shmilee.zju@gmail.com>
+
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+RUN PP_index='https://pypi.python.org/simple' && \
+    PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
+    packages=(python-pip \
+        ipython \
+        ipython-notebook \
+        python-numpy \
+        python-scipy \
+        python-pandas \
+        python-sympy \
+        mathjax \
+        python-pillow python-pyparsing  python-cycler \
+        pkg-config freetype2 gcc) && \
+    pacman -Sy --noconfirm ${packages[@]} && \
+    pip3 install -i "$PP_index" matplotlib && \
+    pacman -Rsn --noconfirm gcc && \
+    useradd -m -g users -G wheel -s /bin/bash -d /workdir -u 1000 shmilee && \
+    find /usr/lib/python3* \
+		    \( -type d -a -name test -o -name tests \) \
+		    -exec rm -rf '{}' + ; \
+    rm -rf /usr/share/{man/*,doc/*,gtk-doc/,info/} /{root,tmp} && \
+    rm -r /var/cache/pacman/pkg/* && \
+    rm -r /var/lib/pacman/sync/* && \
+    echo -e '#!/bin/bash\nsleep ${1:-10}\njupyter-notebook --config=/workdir/nb_config.py' >/usr/bin/init.sh && \
+    chmod +x /usr/bin/init.sh
+
+WORKDIR /workdir
+CMD ["init.sh", "3"]

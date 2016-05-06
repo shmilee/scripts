@@ -2,10 +2,12 @@
 # python 3 
 # select pypi-index-url $PP_index
 # docker build --force-rm --no-cache --rm -f Dockerfile-matplotlib-jupyter-arc -t matplot:$(date +%y%m%d) .
-# docker run --rm -u 1000 -v $PWD:/workdir -p 8888:8888 matplot:$(date +%y%m%d)
-# configfile: $PWD/nb_config.py
+# mkdir $PWD/host-workdir/{config,notebook}
+# docker run --rm -u 1000 -v $PWD/host-workdir:/workdir -p 8888:8888 matplot:$(date +%y%m%d)
+# configfile: $PWD/host-workdir/config/nb_config.py
+# init.sh: exec jupyter-notebook? dead kernel
 
-FROM arch:1512
+FROM arch:1605
 MAINTAINER shmilee <shmilee.zju@gmail.com>
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
@@ -14,12 +16,14 @@ RUN PP_index='https://pypi.python.org/simple' && \
     PP_index='https://pypi.tuna.tsinghua.edu.cn/simple' && \
     packages=(python-pip \
         ipython \
-        ipython-notebook \
+        jupyter-notebook \
+        jupyter-nbconvert \
         python-numpy \
         python-scipy \
         python-pandas \
         python-sympy \
         mathjax \
+        pandoc \
         python-pillow python-pyparsing  python-cycler \
         pkg-config freetype2 gcc) && \
     pacman -Sy --noconfirm ${packages[@]} && \
@@ -32,8 +36,9 @@ RUN PP_index='https://pypi.python.org/simple' && \
     rm -rf /usr/share/{man/*,doc/*,gtk-doc/,info/} /{root,tmp} && \
     rm -r /var/cache/pacman/pkg/* && \
     rm -r /var/lib/pacman/sync/* && \
-    echo -e '#!/bin/bash\nsleep ${1:-10}\njupyter-notebook --config=/workdir/nb_config.py' >/usr/bin/init.sh && \
+    echo -e '#!/bin/bash\nsleep ${1:-5}' >/usr/bin/init.sh && \
+    echo 'jupyter-notebook --config=/workdir/config/nb_config.py' >>/usr/bin/init.sh && \
     chmod +x /usr/bin/init.sh
 
-WORKDIR /workdir
+WORKDIR /workdir/notebook
 CMD ["init.sh", "3"]

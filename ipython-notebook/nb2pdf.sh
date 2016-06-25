@@ -34,7 +34,7 @@ for _f in $@; do
     if [ -f "$_f" ];then
         echo
         echo "==> Converting '$_f' to '$_out' ..."
-        ipython nbconvert --to latex --post PDF --PDFPostProcessor.latex_command="['xelatex', '{filename}']" --LatexExporter.template_file="$TPLX" --LatexExporter.template_path="['cjk_tplx/']" "$_f"
+        ipython nbconvert --to pdf --PDFExporter.latex_command="['xelatex', '{filename}']" --LatexExporter.template_file="$TPLX" --LatexExporter.template_path="['cjk_tplx/']" "$_f"
     else
         echo  "==> No file '$_f'!"
     fi

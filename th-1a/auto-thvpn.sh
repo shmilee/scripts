@@ -1,50 +1,132 @@
 #!/usr/bin/env bash
-depends=('icedtea-web' 'iproute2' 'sed' 'firefox' 'curl')
+depend_pkgs=('icedtea-web' 'iproute2' 'sed' 'firefox' 'curl')
+depend_file='sslvpn_jnlp.cgi' #change SvpnUid, get by firefox
 
-down_file='sslvpn_jnlp.cgi' #change SvpnUid, get by firefox
-mode=3 # 1 2 3
-_IF=eth0 # valid for mode 2 3
+usage() {
+    cat <<EOF
+$0 -f /path/to/sslvpn_jnlp.cgi [-d] [-i] [-m]
 
-RET=1
-if [ x$1 == x-d -o x$1 == xd ];then
-    #download_jars
-    jars=$(sed -n '/href.*jar/ s/^.*="\(.*\)".*$/\1/ p' sslvpn_jnlp.cgi)
-    codebase=$(sed -n '/codebase="/ s/^.*codebase="\(.*\)".*$/\1/ p' sslvpn_jnlp.cgi)
-    [ -d ./sslvpn ] && rm -r ./sslvpn/
-    mkdir -pv ./sslvpn/{linux,mac,windows}
-    RET=0
+  -h        show this help
+  -p        print mode info
+  -d        download jars of ssl vpn
+  -f < >    set config file
+  -i < >    set a network interface before
+            the default list 'eth0 wlan0 lo'
+            useful for mode 2
+  -m [1|2]  set mode number
+EOF
+}
+
+mode_info() {
+    cat <<EOF
+# mode 1 (default)
+
+TH-1A-LN1:22 -> TH-1A-LN1:2222
+TH-1A-LN2:22 -> TH-1A-LN2:2222
+TH-1A-LN3:22 -> TH-1A-LN3:2222
+TH-1A-LN8:22 -> TH-1A-LN8:2222
+TH-1A-LN9:22 -> TH-1A-LN9:2222
+TH-1A-ns1:22 -> TH-1A-ns1:2222
+
+##H3C8042HJJMTW ADD
+127.0.0.2 TH-1A-LN1
+127.0.0.3 TH-1A-LN2
+127.0.0.4 TH-1A-LN3
+127.0.0.5 TH-1A-LN8
+127.0.0.6 TH-1A-LN9
+127.0.0.7 TH-1A-ns1
+
+# mode 2
+
+network interface IP: netIP
+TH-1A-LN1:22 -> netIP:2221
+TH-1A-LN2:22 -> netIP:2222
+TH-1A-LN3:22 -> netIP:2223
+TH-1A-LN8:22 -> netIP:2228
+TH-1A-LN9:22 -> netIP:2229
+TH-1A-ns1:22 -> netIP:2231
+
+IF_list=(eth0 wlan0 lo)
+
+EOF
+}
+
+while getopts 'df:i:m:hp' arg; do
+    case "$arg" in
+        d) _download='yes';;
+        f) _config_file="$OPTARG" ;;
+        i) _IF="$OPTARG" ;;
+        m) _mode="$OPTARG" ;;
+        p) mode_info; exit 0 ;;
+        h|*) usage; exit 0 ;;
+	esac
+done
+
+RUNPATH=/tmp/sslvpn4th1a
+
+if [ ! -d $RUNPATH ]; then
+    mkdir -pv $RUNPATH
+    _download='yes'
+fi
+
+_config_file=${_config_file:-./sslvpn_jnlp.cgi}
+if [ ! -f $_config_file ]; then
+    echo "!!! lost jnlp file(sslvpn_jnlp.cgi): $_config_file, get by firefox."
+    usage
+    exit 1
+fi
+cp $_config_file $RUNPATH/sslvpn.jnlp
+
+_mode=${_mode:-1}
+
+IF_list=(eth0 wlan0 lo)
+for netif in $_IF ${IF_list[@]}; do
+    if [[ x$_mode == 'x1' ]]; then
+        break
+    fi
+    if [ -f /sys/class/net/$netif/operstate ]; then
+        if [[ $(cat /sys/class/net/$netif/operstate) == 'up' ]]; then
+            _myIP=$(ip addr show $netif | sed -n 's/^[ \t].*inet \(.*\)\/.*brd.*$/\1/p')
+            echo "Using network interface: $netif ($_myIP)"
+            break
+        fi
+    fi
+done
+
+_RET=1
+if [ x$_download == 'xyes' ]; then
+    #download jars
+    jars=$(sed -n '/href.*jar/ s/^.*="\(.*\)".*$/\1/ p' $RUNPATH/sslvpn.jnlp)
+    codebase=$(sed -n '/codebase="/ s/^.*codebase="\(.*\)".*$/\1/ p' $RUNPATH/sslvpn.jnlp)
+    [ -d $RUNPATH/sslvpn ] && rm -r $RUNPATH/sslvpn/
+    mkdir -pv $RUNPATH/sslvpn/{linux,mac,windows}
+    _RET=0
     for jar in $jars; do
-        curl -fLC - --retry 3 --retry-delay 3 -k -o ./sslvpn/$jar "$codebase$jar" || RET=1
+        curl -fLC - --retry 3 --retry-delay 3 -k -o $RUNPATH/sslvpn/$jar "$codebase$jar" || _RET=1
     done
-    [[ $RET == 1 ]] && rm -r ./sslvpn/
+    if [[ $_RET == 1 ]]; then
+        rm -r $RUNPATH/sslvpn/
+    fi
 fi
-if [ $RET == 0 -o -d ./sslvpn ]; then
+if [ $_RET == 0 -o -d $RUNPATH/sslvpn ]; then
     echo 'Use local codebase.'
-    sed 's|\(^.*codebase="\).*\(".*$\)|\1file:./sslvpn/\2|' $down_file >tmp_vpn.jnlp
+    sed -i 's|\(^.*codebase="\).*\(".*$\)|\1file:./sslvpn/\2|' $RUNPATH/sslvpn.jnlp
 else
-    echo 'No download_jars.'
-    cat $down_file >tmp_vpn.jnlp
+    echo 'Warnning: No download sslvpn jars.'
 fi
 
-myip=$(ip addr show $_IF |sed -n 's/^[ \t].*inet \(.*\)\/.*brd.*$/\1/p')
-if [[ m$mode == m1 ]]; then
-    ## local --> '127.0.0.xx TH-1A-LNx', x=1,2,3,8,9
-    ## port 2222
-    sed -i 's/local=TH-1A-LN[12389]:22/&22/g' tmp_vpn.jnlp
-elif [[ m$mode == m2 ]]; then
-    ## local --> '127.0.0.xx TH-1A-LNx', except '$myip:222j TH-1A-LNj', j=3,9
-    ## port 2222 2223 2229
-    sed -i -e 's/local=TH-1A-LN[128]:22/&22/g' \
-        -e "s/local=TH-1A-LN\([39]\):22/local=$myip:222\1/g" tmp_vpn.jnlp
-elif [[ m$mode == m3 ]]; then
-    ## local --> '$myip:222x TH-1A-LNx'
-    ## port 2221 2222 2223 2228 2229
-    sed -i -e "s/local=TH-1A-LN\([12389]\):22/local=$myip:222\1/g" tmp_vpn.jnlp
+if [[ x$_mode == 'x1' ]]; then
+    sed -i -e 's/local=TH-1A-LN[12389]:22/&22/g' \
+           -e 's/local=TH-1A-ns1:22/&22/g' $RUNPATH/sslvpn.jnlp
+elif [[ x$_mode == 'x2' ]]; then
+    sed -i -e "s/local=TH-1A-LN\([12389]\):22/local=$_myIP:222\1/g" \
+           -e "s/local=TH-1A-ns1:22/local=$_myIP:2231/g" $RUNPATH/sslvpn.jnlp
 else
-    echo 'Null mode.'
-    exit 0
+    echo '!!! Illegal mode.'
+    usage
+    exit 3
 fi
 
 ## Run
-javaws tmp_vpn.jnlp
-rm tmp_vpn.jnlp
+cd $RUNPATH/
+javaws sslvpn.jnlp

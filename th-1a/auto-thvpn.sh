@@ -124,6 +124,8 @@ _mode=${_mode:-1}
 
 for netif in $_IF ${IF_list[@]}; do
     if [[ x$_mode == 'x1' ]]; then
+        netif='Local Loopback'
+        _myIP='127.0.0.[234567]'
         break
     fi
     if [[ $netif == 'lo' ]]; then

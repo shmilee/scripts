@@ -1,7 +1,7 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='10.1.0.5672~a21'
+_pkgver='10.1.0.5707~a21'
 _srcurl='http://kdl.cc.ksosoft.com/wps-community/download/a21'
 _common_dirs=(./etc ./usr ./opt/kingsoft/wps-office/office6/{addons,cfgs,chart,data,dicts,mui,res,skins})
 
@@ -19,9 +19,9 @@ options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh')
 sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937')
 source_i686=("${_srcurl}/${_pkgname}_${_pkgver}_i386.deb")
-sha1sums_i686=('a5e33090a58289db4b6ed7c0a05532e51428f9a7')
+sha1sums_i686=('1630100ddf0dff7f94ecfb65a0760b0d25b0d37b')
 source_x86_64=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums_x86_64=('80d884c47eaeee3305958ed87e61eafbee30b0cf')
+sha1sums_x86_64=('c6c13413d1c974468d0589498c41870146fd9a91')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -48,20 +48,26 @@ package_wpsoffice-common() {
     tar xv -C "${pkgdir}" -f data.tar.xz './opt/kingsoft/wps-office/office6/document theme'
 
     msg2 "editing mime files: wps-office-{et,wpp,wps}.xml ..."
-    rm $pkgdir/usr/share/mime/packages/wps-office-{wps,wpp,et}.xml
-    install -Dm644 wps-office.xml $pkgdir/usr/share/mime/packages/wps-office.xml
+    rm "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et}.xml
+    install -Dm644 wps-office.xml "$pkgdir"/usr/share/mime/packages/wps-office.xml
 
     msg2 "editing desktop files: wps-office-{et,wpp,wps}.desktop, with shared-mime-info ..."
     #_et
-    sed -i "s/^MimeType.*$/$_etMT/" $pkgdir/usr/share/applications/wps-office-et.desktop
+    sed -i "s/^MimeType.*$/$_etMT/" "$pkgdir"/usr/share/applications/wps-office-et.desktop
     #_wpp
-    sed -i "s/^MimeType.*$/$_wppMT/" $pkgdir/usr/share/applications/wps-office-wpp.desktop
+    sed -i "s/^MimeType.*$/$_wppMT/" "$pkgdir"/usr/share/applications/wps-office-wpp.desktop
     #_wps
-    sed -i "s/^MimeType.*$/$_wpsMT/" $pkgdir/usr/share/applications/wps-office-wps.desktop
-    cd $pkgdir/usr/share/applications/
+    sed -i "s/^MimeType.*$/$_wpsMT/" "$pkgdir"/usr/share/applications/wps-office-wps.desktop
+
+    cd "$pkgdir"/usr/share/applications/
     if grep -r -I -l $'^\xEF\xBB\xBF' *.desktop 2>&1 >/dev/null; then
         msg2 "Remove BOM (Byte-order mark) in utf-8 .desktop files ..."
         sed -i 's/^\xEF\xBB\xBF//;' *.desktop
+    fi
+
+    if [[ $_pkgver == '10.1.0.5707~a21' ]]; then
+        cd "$pkgdir"/usr/bin/
+        sed -i 's|^#gOptExt=.*$|gOptExt="-style gtk+" &|' et wpp wps
     fi
 
     # license

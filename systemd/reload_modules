@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# https://wiki.archlinux.org/index.php/Power_management#Hooks_in_.2Fusr.2Flib.2Fsystemd.2Fsystem-sleep
+# /usr/lib/systemd/system-sleep/
+_modules=(r8188eu)
+
+case $1/$2 in
+  pre/*)
+    for mod in ${_modules[@]}; do
+      echo "$1/$2: rmmod $mod ..."
+      rmmod $mod
+    done
+    ;;
+  post/*)
+    for mod in ${_modules[@]}; do
+      echo "$1/$2: modprobe $mod ..."
+      modprobe $mod
+    done
+    ;;
+esac

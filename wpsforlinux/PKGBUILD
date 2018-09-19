@@ -1,9 +1,15 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='10.1.0.5707~a21'
-_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/a21'
-_common_dirs=(./etc ./usr ./opt/kingsoft/wps-office/office6/{addons,cfgs,chart,data,dicts,mui,res,skins})
+_pkgver='10.1.0.6757'
+_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/6757'
+_common_dirs=(
+    ./etc
+    ./usr
+    ./opt/kingsoft/wps-office/office6/addons/{kwpsartstyleborder/resource,officespace/mui}
+    ./opt/kingsoft/wps-office/office6/{cfgs,data,dicts,mui,res,skins,smart-art}
+    ./opt/kingsoft/wps-office/templates
+)
 
 pkgbase=wpsforlinux
 pkgname=('wpsoffice-common'
@@ -19,9 +25,9 @@ options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh')
 sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937')
 source_i686=("${_srcurl}/${_pkgname}_${_pkgver}_i386.deb")
-sha1sums_i686=('1630100ddf0dff7f94ecfb65a0760b0d25b0d37b')
+sha1sums_i686=('dc1e35fd0844c0e203cf288e16f29941e223cd49')
 source_x86_64=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums_x86_64=('c6c13413d1c974468d0589498c41870146fd9a91')
+sha1sums_x86_64=('9974078cde40c26419998294a0a754bc102afe37')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -65,22 +71,22 @@ package_wpsoffice-common() {
         sed -i 's/^\xEF\xBB\xBF//;' *.desktop
     fi
 
-    if [[ $_pkgver == '10.1.0.5707~a21' ]]; then
-        cd "$pkgdir"/usr/bin/
-        sed -i 's|^#gOptExt=.*$|gOptExt="-style gtk+" &|' et wpp wps
-    fi
-
     # license
-    install -Dm644 "$pkgdir/opt/kingsoft/wps-office/office6/mui/default/EULA.txt" \
+    install -Dm644 "$pkgdir/opt/kingsoft/wps-office/office6/mui/default/EULA_linux.txt" \
         "$pkgdir/usr/share/licenses/${_pkgname}/EULA.txt"
 }
 
 package_wpsoffice() {
     arch=('i686' 'x86_64')
     pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
-    depends=('fontconfig' 'libpng12' 'glib2' 'libsm' 'libxext' 'libxrender' 'libxml2' 'desktop-file-utils' 'shared-mime-info' 'xdg-utils' "wpsoffice-common=${pkgver}")
+    depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
+             'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
+             'glu' 'openssl-1.0' 'sdl2' 'libpulse' 'hicolor-icon-theme'
+             "wpsoffice-common=${pkgver}")
     optdepends=('cups: for printing support'
-                'pango: for complex (right-to-left) text support')
+                'libjpeg-turbo: JPEG image codec support'
+                'pango: for complex (right-to-left) text support'
+                'curl: An URL retrieval utility and library')
     install=wpsoffice.install
 
     cd "${srcdir}"

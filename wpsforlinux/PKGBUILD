@@ -1,8 +1,8 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='10.1.0.6757'
-_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/6757'
+_pkgver='10.1.0.6758'
+_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/6758'
 _common_dirs=(
     ./etc
     ./usr
@@ -25,9 +25,9 @@ options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh')
 sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937')
 source_i686=("${_srcurl}/${_pkgname}_${_pkgver}_i386.deb")
-sha1sums_i686=('dc1e35fd0844c0e203cf288e16f29941e223cd49')
+sha1sums_i686=('a33b6a9b786b168918eb82b88bcce597512f6b7e')
 source_x86_64=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums_x86_64=('9974078cde40c26419998294a0a754bc102afe37')
+sha1sums_x86_64=('1d537341964b1e9700afb4718dc94dabd87a3bd6')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 

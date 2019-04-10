@@ -1,13 +1,13 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='10.1.0.6758'
-_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/6758'
+_pkgver='11.1.0.8372'
+_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/8372'
 _common_dirs=(
     ./etc
     ./usr
-    ./opt/kingsoft/wps-office/office6/addons/{kwpsartstyleborder/resource,officespace/mui}
-    ./opt/kingsoft/wps-office/office6/{cfgs,data,dicts,mui,res,skins,smart-art}
+    ./opt/kingsoft/wps-office/office6/addons/{kwpsartstyleborder/resource,officespace/mui,qing/mui}
+    ./opt/kingsoft/wps-office/office6/{cfgs,data,dicts,mui,res,skins,wpsart}
     ./opt/kingsoft/wps-office/templates
 )
 
@@ -25,9 +25,9 @@ options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh')
 sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937')
 source_i686=("${_srcurl}/${_pkgname}_${_pkgver}_i386.deb")
-sha1sums_i686=('a33b6a9b786b168918eb82b88bcce597512f6b7e')
+sha1sums_i686=('d2a12b05fb2cb8f19a12c266f1e4477f199906ad')
 source_x86_64=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums_x86_64=('1d537341964b1e9700afb4718dc94dabd87a3bd6')
+sha1sums_x86_64=('3b7a199c7da8ea64aaa2f00d6474a11c9714eb8a')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 

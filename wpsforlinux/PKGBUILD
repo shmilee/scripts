@@ -15,7 +15,7 @@ pkgbase=wpsforlinux
 pkgname=('wpsoffice-common'
          'wpsoffice')
 pkgver=${_pkgver/\~/_}
-pkgrel=1
+pkgrel=2
 arch=('any')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
@@ -65,11 +65,18 @@ package_wpsoffice-common() {
     #_wps
     sed -i "s/^MimeType.*$/$_wpsMT/" "$pkgdir"/usr/share/applications/wps-office-wps.desktop
 
+    # fix: BOM
     cd "$pkgdir"/usr/share/applications/
     if grep -r -I -l $'^\xEF\xBB\xBF' *.desktop 2>&1 >/dev/null; then
         msg2 "Remove BOM (Byte-order mark) in utf-8 .desktop files ..."
         sed -i 's/^\xEF\xBB\xBF//;' *.desktop
     fi
+
+    # fix wps update log logrotate error
+    # sed 's|su root|su root root|' "$pkgdir"/etc/logrotate.d/wpsupdatelog
+    # or rm wps update
+    cd "$pkgdir"/etc/
+    rm -rf cron.d/ logrotate.d/ xdg/autostart/
 
     # license
     install -Dm644 "$pkgdir/opt/kingsoft/wps-office/office6/mui/default/EULA_linux.txt" \

@@ -1,12 +1,12 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.8392'
-_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/8392'
+_pkgver='11.1.0.8722'
+_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/8722'
 _common_dirs=(
     ./etc
     ./usr
-    ./opt/kingsoft/wps-office/office6/addons/{kwpsartstyleborder/resource,officespace/mui,qing/mui}
+    ./opt/kingsoft/wps-office/office6/addons/officespace/mui
     ./opt/kingsoft/wps-office/office6/{cfgs,data,dicts,mui,res,skins,wpsart}
     ./opt/kingsoft/wps-office/templates
 )
@@ -16,18 +16,14 @@ pkgname=('wpsoffice-common'
          'wpsoffice')
 pkgver=${_pkgver/\~/_}
 pkgrel=2
-arch=('any')
+arch=('x86_64')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
 url='http://wps-community.org/'
 conflicts=('wps-office' 'kingsoft-office')
 options=(!emptydirs !strip)
-source=('wps-office.xml' 'check_data.sh')
-sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937')
-source_i686=("${_srcurl}/${_pkgname}_${_pkgver}_i386.deb")
-sha1sums_i686=('60b1c9e33ee6fc1edcefe40dc9ec529d4a668825')
-source_x86_64=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums_x86_64=('edb1bc215e46c46bb979869e374788498486b56c')
+source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
+sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937' '438cdd5057ebf16bff3b0b6b3a9f06fcfca9a3da')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -53,8 +49,8 @@ package_wpsoffice-common() {
     tar xv -C "${pkgdir}" -f data.tar.xz ${_common_dirs[@]}
     tar xv -C "${pkgdir}" -f data.tar.xz './opt/kingsoft/wps-office/office6/document theme'
 
-    msg2 "editing mime files: wps-office-{et,wpp,wps}.xml ..."
-    rm "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et}.xml
+    msg2 "editing mime files: wps-office-{et,wpp,wps,pdf}.xml ..."
+    rm "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et,pdf}.xml
     install -Dm644 wps-office.xml "$pkgdir"/usr/share/mime/packages/wps-office.xml
 
     msg2 "editing desktop files: wps-office-{et,wpp,wps}.desktop, with shared-mime-info ..."
@@ -64,6 +60,13 @@ package_wpsoffice-common() {
     sed -i "s/^MimeType.*$/$_wppMT/" "$pkgdir"/usr/share/applications/wps-office-wpp.desktop
     #_wps
     sed -i "s/^MimeType.*$/$_wpsMT/" "$pkgdir"/usr/share/applications/wps-office-wps.desktop
+
+    # fix: lost menu icon
+    cd "${pkgdir}/usr/share/icons/hicolor"
+    for _size in *; do
+        install -dm755 "${_size}/apps"
+        find "${_size}/mimetypes" -name 'wps-office2019-*main.*' -exec mv {} "${_size}/apps" \;
+    done
 
     # fix: BOM
     cd "$pkgdir"/usr/share/applications/
@@ -81,10 +84,12 @@ package_wpsoffice-common() {
     # license
     install -Dm644 "$pkgdir/opt/kingsoft/wps-office/office6/mui/default/EULA_linux.txt" \
         "$pkgdir/usr/share/licenses/${_pkgname}/EULA.txt"
+
+    clean_startpage_qing "${pkgdir}/opt/kingsoft/wps-office/office6/"
 }
 
 package_wpsoffice() {
-    arch=('i686' 'x86_64')
+    arch=('x86_64')
     pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
     depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
              'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
@@ -99,4 +104,20 @@ package_wpsoffice() {
     cd "${srcdir}"
     tar xv -C "${pkgdir}" -f data.tar.xz ${_common_dirs[@]/\.\//--exclude=\.\/} \
         --exclude='./opt/kingsoft/wps-office/office6/document theme'
+
+    clean_startpage_qing "${pkgdir}/opt/kingsoft/wps-office/office6/"
+}
+
+# rm built-in(internal) browser, startpage etc.
+# 去除左上角主图标及设置, 云文档, 登录, 轻办公等需要浏览器插件的功能
+# 修改设置默认浏览器打开
+# sqlite3 ~/.local/share/Kingsoft/wps/addons/data/win-i386/promebrowser/Preferences \
+#   'update global_preference set useDefaultBrowser=1 where id=1;'
+clean_startpage_qing() {
+    # office6_path="$1"
+    cd "$1"
+    rm -rf libcef.so addons/cef/
+    rm -rf addons/{k*,qing}
+    rm -rf wpsoffice wpsoffice-off
+    find . -name qing.qm -exec rm {} \;
 }

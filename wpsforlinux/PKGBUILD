@@ -1,8 +1,8 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.8722'
-_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/8722'
+_pkgver='11.1.0.8865'
+_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/8865'
 _common_dirs=(
     ./etc
     ./usr
@@ -15,7 +15,7 @@ pkgbase=wpsforlinux
 pkgname=('wpsoffice-common'
          'wpsoffice')
 pkgver=${_pkgver/\~/_}
-pkgrel=2
+pkgrel=1
 arch=('x86_64')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
@@ -23,7 +23,7 @@ url='http://wps-community.org/'
 conflicts=('wps-office' 'kingsoft-office')
 options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937' '438cdd5057ebf16bff3b0b6b3a9f06fcfca9a3da')
+sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937' 'ee5e2ea5f7480bb7d6e116dd7690990a861c8a37')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 

@@ -120,4 +120,5 @@ clean_startpage_qing() {
     rm -rf addons/{k*,qing}
     rm -rf wpsoffice wpsoffice-off
     find . -name qing.qm -exec rm {} \;
+    mv transerr transerr.bk
 }

@@ -1,11 +1,12 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.8865'
-_srcurl='http://kdl.cc.ksosoft.com/wps-community/download/8865'
+_pkgver='11.1.0.9615'
+_srcurl='https://wdl1.cache.wps.cn/wps/download/ep/Linux2019/9615'
 _common_dirs=(
     ./etc
     ./usr
+    ./opt/kingsoft/wps-office/desktops
     ./opt/kingsoft/wps-office/office6/addons/officespace/mui
     ./opt/kingsoft/wps-office/office6/{cfgs,data,dicts,mui,res,skins,wpsart}
     ./opt/kingsoft/wps-office/templates
@@ -23,7 +24,9 @@ url='http://wps-community.org/'
 conflicts=('wps-office' 'kingsoft-office')
 options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums=('dfa2ae8b74ac763d6d7e1d28e33dcb289bca9112' '1819bae14fa888f92c29c9fd01b59246f53e6937' 'ee5e2ea5f7480bb7d6e116dd7690990a861c8a37')
+sha1sums=('0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
+          '1819bae14fa888f92c29c9fd01b59246f53e6937'
+          '244473ac738e88c3392f280cddea5bc211335431')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -50,10 +53,11 @@ package_wpsoffice-common() {
     tar xv -C "${pkgdir}" -f data.tar.xz './opt/kingsoft/wps-office/office6/document theme'
 
     msg2 "editing mime files: wps-office-{et,wpp,wps,pdf}.xml ..."
-    rm "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et,pdf}.xml
+    rm -f "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et,pdf}.xml
     install -Dm644 wps-office.xml "$pkgdir"/usr/share/mime/packages/wps-office.xml
 
     msg2 "editing desktop files: wps-office-{et,wpp,wps}.desktop, with shared-mime-info ..."
+    rm -rf "${pkgdir}/opt/kingsoft/wps-office/desktops/"
     #_et
     sed -i "s/^MimeType.*$/$_etMT/" "$pkgdir"/usr/share/applications/wps-office-et.desktop
     #_wpp
@@ -120,5 +124,7 @@ clean_startpage_qing() {
     rm -rf addons/{k*,qing}
     rm -rf wpsoffice wpsoffice-off
     find . -name qing.qm -exec rm {} \;
-    mv transerr transerr.bk
+    if [ -f 'transerr' ]; then
+        mv transerr transerr.bk
+    fi
 }

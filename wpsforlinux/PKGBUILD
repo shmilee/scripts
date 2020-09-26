@@ -1,8 +1,8 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.9615'
-_srcurl='https://wdl1.cache.wps.cn/wps/download/ep/Linux2019/9615'
+_pkgver='11.1.0.9662'
+_srcurl='https://wdl1.cache.wps.cn/wps/download/ep/Linux2019/9662'
 _common_dirs=(
     ./etc
     ./usr
@@ -26,7 +26,7 @@ options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
 sha1sums=('0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
           '1819bae14fa888f92c29c9fd01b59246f53e6937'
-          '244473ac738e88c3392f280cddea5bc211335431')
+          'a62490083b087e735b1cd89dab75b49d2ddf3bbc')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 

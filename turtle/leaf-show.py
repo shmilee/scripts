@@ -24,6 +24,8 @@ B3 = array([0,0.45])
 A4 = array([[0,0],[0,0.17]])
 B4 = array([0,0])
 
+tt.speed(0)
+tt.Turtle().screen.delay(0)
 tt.color("black")
 tt.penup()
 

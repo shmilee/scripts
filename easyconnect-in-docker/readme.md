@@ -1,4 +1,4 @@
-# 参考
+# 参考致谢
 https://github.com/Hagb/docker-easyconnect
 
 # build
@@ -11,8 +11,9 @@ docker build --rm -t shmilee/easyconnect:$tag -f Dockerfile .
 # run
 
 ## deb url
-[7.6.3](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_01/EasyConnect_x64.deb)
-[7.6.7](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_767/EasyConnect_x64_7_6_7_3.deb)
+
+* [7.6.3](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_01/EasyConnect_x64.deb)
+* [7.6.7](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_767/EasyConnect_x64_7_6_7_3.deb)
 
 ## deploy & start
 
@@ -24,6 +25,8 @@ docker build --rm -t shmilee/easyconnect:$tag -f Dockerfile .
 ```
 
 ```bash
+path/to/ECrepo/ECdata_vVersion/start.sh <image tag> <params>
+
 tag=210223
 cd ./ECDATA/EasyConnect_x64_v7.6.3/
 
@@ -86,3 +89,9 @@ Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals
 non-network local connections being removed from access control list
 Stop watching url.
 ```
+
+## issues
+
+1. EasyConnect, 在登陆后产生一到两个僵尸进程, 所以镜像中最好包含 `tini`.
+   `ps -A -ostat,ppid | grep -e '[zZ]'| awk '{ print $2 }' | uniq | xargs ps -p`
+2. Host 浏览器未设置EC代理时, 打开 EC 相关 URL 卡圈.

@@ -9,11 +9,11 @@ hook_iptables() { #{{{
     # 感谢 @BoringCat https://github.com/Hagb/docker-easyconnect/issues/5
     if { [ -z "$IPTABLES_LEGACY" ] && iptables-nft -L 1>/dev/null 2>/dev/null ;}
     then
-    	update-alternatives --set iptables /usr/sbin/iptables-nft
-    	update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
+        update-alternatives --set iptables /usr/sbin/iptables-nft
+        update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
     else
-    	update-alternatives --set iptables /usr/sbin/iptables-legacy
-    	update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+        update-alternatives --set iptables /usr/sbin/iptables-legacy
+        update-alternatives --set ip6tables /usr/sbin/ip6tables-le    gacy
     fi
 
     # https://github.com/Hagb/docker-easyconnect/issues/20
@@ -25,8 +25,8 @@ hook_iptables() { #{{{
     (
     IFS=$'\n'
     for i in $(ip route show); do
-    	IFS=' '
-    	ip route add $i table 2
+        IFS=' '
+        ip route add $i table 2
     done
     ip rule add fwmark 1 table 2
     )
@@ -56,6 +56,8 @@ external: lo
 external.rotation: route
 socksmethod: none
 clientmethod: none
+user.privileged: proxy
+user.notprivileged: nobody
 client pass {
     from: 0.0.0.0/0 to: 0.0.0.0/0
 }
@@ -80,21 +82,21 @@ hook_vnc() { #{{{
     apt-get update
     apt-get install -y --no-install-recommends --no-install-suggests \
         xclip tigervnc-standalone-server tigervnc-common flwm x11-utils
-	# container 再次运行时清除 /tmp 中的锁，使 container 能够反复使用。
-	# 感谢 @skychan https://github.com/Hagb/docker-easyconnect/issues/4#issuecomment-660842149
-	rm -rf /tmp
-	mkdir /tmp
+    # container 再次运行时清除 /tmp 中的锁，使 container 能够反复使用。
+    # 感谢 @skychan https://github.com/Hagb/docker-easyconnect/issues/4#issuecomment-660842149
+    rm -rf /tmp
+    mkdir /tmp
 
-	# $PASSWORD 不为空时，更新 vnc 密码
-	[ -e ~/.vnc/passwd ] || (mkdir -p ~/.vnc && (echo password | tigervncpasswd -f > ~/.vnc/passwd)) 
-	[ -n "$PASSWORD" ] && printf %s "$PASSWORD" | tigervncpasswd -f > ~/.vnc/passwd
+    # $PASSWORD 不为空时，更新 vnc 密码
+    [ -e ~/.vnc/passwd ] || (mkdir -p ~/.vnc && (echo password | tigervncpasswd -f > ~/.vnc/passwd)) 
+    [ -n "$PASSWORD" ] && printf %s "$PASSWORD" | tigervncpasswd -f > ~/.vnc/passwd
 
-	tigervncserver :1 -geometry 800x600 -localhost no -passwd ~/.vnc/passwd -xstartup flwm
-	DISPLAY=:1
+    tigervncserver :1 -geometry 800x600 -localhost no -passwd ~/.vnc/passwd -xstartup flwm
+    DISPLAY=:1
 
-	# 将 easyconnect 的密码放入粘贴板中，应对密码复杂且无法保存的情况 (eg: 需要短信验证登陆)
-	# 感谢 @yakumioto https://github.com/Hagb/docker-easyconnect/pull/8
-	echo "$ECPASSWORD" | DISPLAY=:1 xclip -selection c
+    # 将 easyconnect 的密码放入粘贴板中，应对密码复杂且无法保存的情况 (eg: 需要短信验证登陆)
+    # 感谢 @yakumioto https://github.com/Hagb/docker-easyconnect/pull/8
+    echo "$ECPASSWORD" | DISPLAY=:1 xclip -selection c
 } #}}}
 
 ## use sshd instead of danted

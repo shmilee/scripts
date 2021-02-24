@@ -80,6 +80,5 @@ Run hook_danted
 Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor 
 Start EasyMonitor success!
 Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
-Feb 24 02:35:30 (1614134130.893715) danted[382]: warning: checkconfig(): setting the unprivileged uid to 0 is not recommended for security reasons
 non-network local connections being removed from access control list
 ```

@@ -26,18 +26,60 @@ docker build --rm -t shmilee/easyconnect:$tag -f Dockerfile .
 ```bash
 tag=210223
 cd ./ECDATA/EasyConnect_x64_v7.6.3/
-# show help
+
+# 1. show help
 ./start.sh -h
-# default: enable danted port
+
+# 2. default: enable danted port
 ./start.sh $tag -p 127.0.0.1:1080:1080
-# use VNC instead of X11
+
+# 3. use VNC instead of X11
 TYPE=VNC ./start.sh $tag -p 127.0.0.1:1080:1080 \
     -e TYPE=VNC -e PASSWORD=vncpasswd -p 5901:5901
-# disable danted, enable iptables, enable sshd
+
+# 4. disable danted, enable iptables, enable sshd
 ./start.sh $tag -e NODANTED=1 \
     -e IPTABLES=1 -e IPTABLES_LEGACY=1 \
     -e SSHD=1 -p 127.0.0.1:2222:22 -e ROOTPASSWD=w123q234
+# 4. output
+>>> Host Dir to mount: /home/xxxxx/ECDATA/EasyConnect_x64_v7.6.3
+non-network local connections being added to access control list
+source hook_script.sh ...
+Running hook main ...
+Run hook_iptables
+update-alternatives: using /usr/sbin/iptables-legacy to provide /usr/sbin/iptables (iptables) in manual mode
+update-alternatives: using /usr/sbin/ip6tables-legacy to provide /usr/sbin/ip6tables (ip6tables) in manual mode
+Run hook_sshd
+mkdir: created directory '/run/sshd'
+Run hook_fix763_login
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor 
+Start EasyMonitor success!
+Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
+(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
+(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
+[2021-02-24 02:28:48][E][  49][ 114][Register]cms client connect failed.
+Starting CSClient svpnservice ...
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/CSClient 
+Start CSClient success!
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/svpnservice -h /usr/share/sangfor/EasyConnect/resources/
+Start svpnservice success!
+(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
+(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
+non-network local connections being removed from access control list
+```
 
+```bash
 cd
 $HOME/.ECDATA/EasyConnect_x64_v7.6.7/start.sh $tag -p 3600:1080
+# output
+>>> Host Dir to mount: /home/xxx/.ECDATA/EasyConnect_x64_v7.6.7
+non-network local connections being added to access control list
+source hook_script.sh ...
+Running hook main ...
+Run hook_danted
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor 
+Start EasyMonitor success!
+Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
+Feb 24 02:35:30 (1614134130.893715) danted[382]: warning: checkconfig(): setting the unprivileged uid to 0 is not recommended for security reasons
+non-network local connections being removed from access control list
 ```

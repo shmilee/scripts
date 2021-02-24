@@ -23,8 +23,7 @@ hook_iptables() { #{{{
     iptables -t mangle -I PREROUTING -m connmark --mark 1 -j MARK --set-mark 1
     iptables -t mangle -I PREROUTING -i eth0 -j CONNMARK --set-mark 1
     (
-    IFS="
-    "
+    IFS=$'\n'
     for i in $(ip route show); do
     	IFS=' '
     	ip route add $i table 2

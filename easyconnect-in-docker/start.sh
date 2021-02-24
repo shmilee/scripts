@@ -25,6 +25,21 @@ EasyConnectDir=/usr/share/sangfor/EasyConnect
 HOSTECDIR="$(dirname $(realpath $0))"
 echo ">>> Host Dir to mount: ${HOSTECDIR}"
 
+watch_url() {
+    echo "Start watching url."
+    echo >"${HOSTECDIR}"/tmp-url
+    while true; do
+        tail -n 0 -f "${HOSTECDIR}"/tmp-url | grep 'NEWURL:' -m1 >/dev/null
+        if grep '#BREAK#' "${HOSTECDIR}"/tmp-url >/dev/null; then
+            break
+        fi
+        xdg-open "$(tail -n1 ${HOSTECDIR}/tmp-url)"
+    done
+    echo "Stop watching url."
+    rm "${HOSTECDIR}"/tmp-url
+}
+
+watch_url &
 use="${TYPE:-X11}"
 if [ x"$use" = xX11 ]; then
     xhost +LOCAL:
@@ -42,3 +57,6 @@ else
         $params \
         shmilee/easyconnect:$tag
 fi
+
+echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url
+exit 0

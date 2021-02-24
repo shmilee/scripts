@@ -45,6 +45,12 @@ deploy_data() {
     if [ ! -x "${HOSTECDIR}/start.sh" ]; then
         chmod +x "${HOSTECDIR}/start.sh"
     fi
+    openurl="${HOSTECDIR}/resources/shell/open_browser.sh"
+    if ! grep 'NEWURL' "$openurl" >/dev/null; then
+        sed -i "2iexit 0" "$openurl"
+        sed -i "2iecho \"\$2\" >>${EasyConnectDir}/tmp-url" "$openurl"
+        sed -i "2iecho 'NEWURL:' >>${EasyConnectDir}/tmp-url" "$openurl"
+    fi
 }
 
 deploy_data

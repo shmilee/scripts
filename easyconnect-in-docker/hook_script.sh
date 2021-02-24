@@ -141,7 +141,7 @@ main() {
     [ x"$TYPE" = x"VNC" ] && hook_vnc # PASSWORD= ECPASSWORD= -p xxx:5901
     [ -n "$SSHD" ] && hook_sshd       # ROOTPASSWD= -p xxxx:22
     hook_fix763_login                 # if EC VERSION is 7.6.3
-    # ignore: -e URLWIN=1, $ResourcesDir/shell/open_browser.sh
+    # ignore: URLWIN=1, shell/open_browser.sh. Use xdg-open in host.
 
     run_cmd EasyMonitor
     start_EC

@@ -43,6 +43,7 @@ TYPE=VNC ./start.sh $tag -p 127.0.0.1:1080:1080 \
     -e SSHD=1 -p 127.0.0.1:2222:22 -e ROOTPASSWD=w123q234
 # 4. output
 >>> Host Dir to mount: /home/xxxxx/ECDATA/EasyConnect_x64_v7.6.3
+Start watching url.
 non-network local connections being added to access control list
 source hook_script.sh ...
 Running hook main ...
@@ -66,6 +67,7 @@ Start svpnservice success!
 (node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
 (node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
 non-network local connections being removed from access control list
+Stop watching url.
 ```
 
 ```bash
@@ -73,6 +75,7 @@ cd
 $HOME/.ECDATA/EasyConnect_x64_v7.6.7/start.sh $tag -p 3600:1080
 # output
 >>> Host Dir to mount: /home/xxx/.ECDATA/EasyConnect_x64_v7.6.7
+Start watching url.
 non-network local connections being added to access control list
 source hook_script.sh ...
 Running hook main ...
@@ -81,4 +84,5 @@ Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor
 Start EasyMonitor success!
 Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
 non-network local connections being removed from access control list
+Stop watching url.
 ```

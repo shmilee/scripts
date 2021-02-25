@@ -21,7 +21,10 @@ docker build --rm -t shmilee/easyconnect:$tag -f Dockerfile .
 ./deploy.sh <ec version> <ec data repo>
 
 ./deploy.sh # default 7.6.3 ./ECDATA
+./deploy.sh 7.6.7
 ./deploy.sh 7.6.7 $HOME/.ECDATA # example
+
+./slim_ecdata.sh 7.6.3 7.6.7 ./ECDATA # ln file 3 <- 7 if md5 equal
 ```
 
 ```bash

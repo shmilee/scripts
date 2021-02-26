@@ -47,9 +47,17 @@ deploy_data() {
     fi
     openurl="${HOSTECDIR}/resources/shell/open_browser.sh"
     if ! grep 'NEWURL' "$openurl" >/dev/null; then
+        echo "edit resources/shell/open_browser.sh"
         sed -i "2iexit 0" "$openurl"
         sed -i "2iecho \"\$2\" >>${EasyConnectDir}/tmp-url" "$openurl"
         sed -i "2iecho 'NEWURL:' >>${EasyConnectDir}/tmp-url" "$openurl"
+    fi
+    if [ ! -f "${DATAREPO}/ec-$VERSION.desktop" ]; then
+        echo "add desktop file: ${DATAREPO}/ec-$VERSION.desktop"
+        realHOSTECDIR="$(realpath ${HOSTECDIR})"
+        sed -e "s|{{VERSION}}|$VERSION|" \
+            -e "s|{{HOSTECDIR}}|${realHOSTECDIR}|" \
+            ./ec-example.desktop >"${DATAREPO}/ec-$VERSION.desktop"
     fi
 }
 

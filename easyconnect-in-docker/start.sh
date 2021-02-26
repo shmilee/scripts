@@ -43,7 +43,7 @@ watch_url &
 use="${TYPE:-X11}"
 if [ x"$use" = xX11 ]; then
     xhost +LOCAL:
-    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -i -t \
+    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN \
         -v ${HOSTECDIR}:${EasyConnectDir} \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
         -v $HOME/.Xauthority:/root/.Xauthority \
@@ -52,7 +52,7 @@ if [ x"$use" = xX11 ]; then
         shmilee/easyconnect:$tag
     xhost -LOCAL:
 else
-    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -i -t \
+    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -t \
         -v ${HOSTECDIR}:${EasyConnectDir} \
         $params \
         shmilee/easyconnect:$tag

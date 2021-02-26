@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=EC{{VERSION}}
+Comment=EC{{VERSION}}
+# edit options, like tag, port
+Exec="{{HOSTECDIR}}/start.sh" 210223 -p 127.0.0.1:3600:1080
+Icon={{HOSTECDIR}}/resources/EasyConnect.png
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Network;

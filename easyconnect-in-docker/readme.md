@@ -93,6 +93,27 @@ non-network local connections being removed from access control list
 Stop watching url.
 ```
 
+## desktop file
+
+* edit `Exec` options in `ec-7.6.x.desktop`
+
+```bash
+ls .ECDATA/
+# output
+EasyConnect_x64_v7.6.3      EasyConnect_x64_v7.6.7      ec-7.6.3.desktop
+EasyConnect_x64_v7.6.3.deb  EasyConnect_x64_v7.6.7.deb  ec-7.6.7.desktop
+
+du -d2 -h .ECDATA/
+# output
+421K    .ECDATA/EasyConnect_x64_v7.6.3/locales
+34M     .ECDATA/EasyConnect_x64_v7.6.3/resources
+156M    .ECDATA/EasyConnect_x64_v7.6.3
+421K    .ECDATA/EasyConnect_x64_v7.6.7/locales
+21M     .ECDATA/EasyConnect_x64_v7.6.7/resources
+21M     .ECDATA/EasyConnect_x64_v7.6.7
+292M    .ECDATA
+```
+
 ## issues
 
 1. EasyConnect, 在登陆后产生一到两个僵尸进程, 所以镜像中最好包含 `tini`.

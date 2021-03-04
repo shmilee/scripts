@@ -131,6 +131,21 @@ hook_fix763_login() { #{{{
     ) &
 } #}}}
 
+## exec easyconn
+start_easyconn() {
+    local params="-v"
+    [ -n "$ECADDRESS" ] && params+=" -d $ECADDRESS"
+    [ -n "$ECUSER" ] && params+=" -u $ECUSER"
+    [ -n "$ECPASSWD" ] && params+=" -p $ECPASSWD"
+
+    run_cmd easyconn foreground login $params
+    keep='K'
+    while [ x"$keep" != x'XXX' ]; do
+        read -p " -> Enter 'XXX' to exit:" keep
+    done
+    run_cmd easyconn foreground logout
+}
+
 ## reload main
 main() {
     echo "Running hook main ..."
@@ -144,6 +159,11 @@ main() {
     # ignore: URLWIN=1, shell/open_browser.sh. Use xdg-open in host.
 
     run_cmd EasyMonitor
-    start_EC
+
+    if [ x"$TYPE" = x"CLI" ]; then
+        start_easyconn
+    else
+        start_EC
+    fi
 }
 

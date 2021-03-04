@@ -10,12 +10,13 @@ docker build --rm -t shmilee/easyconnect:$tag -f Dockerfile .
 
 # run
 
-## deb url
+## package files
 
 * [7.6.3](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_01/EasyConnect_x64.deb)
 * [7.6.7](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_767/EasyConnect_x64_7_6_7_3.deb)
+* 7.6.8 CLI: `easyconn_7.6.8.2-ubuntu_amd64.deb`, `md5: 88371f0dc336c5021e213e10745cf47c`
 
-## deploy & start
+## GUI deploy & start
 
 ```bash
 ./deploy.sh <ec version> <ec data repo>
@@ -91,6 +92,51 @@ Start EasyMonitor success!
 Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
 non-network local connections being removed from access control list
 Stop watching url.
+```
+
+## CLI deploy & start
+
+```bash
+./deploy-cli.sh 7.6.8 $HOME/.ECDATA # example
+```
+
+```bash
+tag=210223
+TYPE=CLI $HOME/.ECDATA/EasyConnect_cli_x64_v7.6.8/start.sh $tag -e TYPE=CLI -p 3600:1080
+# output
+>>> Host Dir to mount: /home/xxx/.ECDATA/EasyConnect_cli_x64_v7.6.8
+source hook_script.sh ...
+Running hook main ...
+Run hook_danted
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor 
+Start EasyMonitor success!
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/easyconn login -v
+No previous user logged in!
+No previous user logged in!
+vpn adress: vpn.xxx.cn:443
+Get https://vpn.xxx.cn:443/por/login_auth.csp ...
+Get https://vpn.xxx.cn:443/por/login_auth.csp Done, code=200
+Cipher Suite: AES128-SHA
+Begin detect listen port of ECAgent ...
+Read listen port of ECAgent from file: 54530
+Done detect listen port of ECAgent, result: 54530!
+Get https://127.0.0.1:54530/ECAgent ...
+Get https://127.0.0.1:54530/ECAgent Done, code=200
+username: xxxx
+password: xxxx
+Authenticating user "xxxx" by password ...
+Post https://vpn.xxx.cn:443/por/login_psw.csp ...
+Post https://vpn.xxx.cn:443/por/login_psw.csp Done, code=200
+Get https://127.0.0.1:54530/ECAgent ...
+Get https://127.0.0.1:54530/ECAgent Done, code=200
+Get https://127.0.0.1:54530/ECAgent ...
+Get https://127.0.0.1:54530/ECAgent Done, code=200
+user "xxxx" login successfully!
+Start easyconn success!
+ -> Enter 'XXX' to exit:XXX
+Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/easyconn logout
+user "xxxx" is already logged out!
+Start easyconn success!
 ```
 
 ## desktop file

@@ -11,9 +11,9 @@ HOSTECDIR="${DATAREPO}/EasyConnect_cli_x64_v$VERSION"
 
 deploy_data() {
     # deb url
-    urlprefix='http://download.sangfor.com.cn/download/product/sslvpn/pkg'
+    urlprefix='https://github.com/shmilee/scripts/releases/download/v0.0.1'
     if [ x"$VERSION" = x"7.6.8" ]; then
-        deburl="$urlprefix/linux_broken/easyconn_7.6.8.2-ubuntu_amd64.deb"
+        deburl="$urlprefix/easyconn_7.6.8.2-ubuntu_amd64.deb"
     else
         echo ">> Not supported CLI EC version: $VERSION"
         exit 1

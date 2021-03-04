@@ -14,7 +14,7 @@ docker build --rm -t shmilee/easyconnect:$tag -f Dockerfile .
 
 * [7.6.3](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_01/EasyConnect_x64.deb)
 * [7.6.7](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_767/EasyConnect_x64_7_6_7_3.deb)
-* 7.6.8 CLI: `easyconn_7.6.8.2-ubuntu_amd64.deb`, `md5: 88371f0dc336c5021e213e10745cf47c`
+* [7.6.8 CLI](https://github.com/shmilee/scripts/releases/download/v0.0.1/easyconn_7.6.8.2-ubuntu_amd64.deb)
 
 ## GUI deploy & start
 

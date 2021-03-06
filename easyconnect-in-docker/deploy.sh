@@ -34,7 +34,23 @@ deploy_data() {
         bsdtar -v -x -f /tmp/ec-tmp/data.tar.gz -C /tmp/ec-tmp
         mv -v /tmp/ec-tmp/${EasyConnectDir} "${HOSTECDIR}"
         rm -r /tmp/ec-tmp/
+        mv -v "${HOSTECDIR}/resources/bin" "${HOSTECDIR}/resources/bin-orig"
+        ln -s -v bin-orig "${HOSTECDIR}/resources/bin"
     fi
+    # download & extract cli768 deb bin data
+    urlprefix='https://github.com/shmilee/scripts/releases/download/v0.0.1'
+    debfile="easyconn_7.6.8.2-ubuntu_amd64.deb"
+    if [ ! -f "${DATAREPO}/${debfile}" ]; then
+        wget -c "$urlprefix/${debfile}" -O "${DATAREPO}/${debfile}"
+    fi
+    if [ ! -d "${HOSTECDIR}/resources/bin-cli768" ]; then
+        mkdir /tmp/ec-tmp
+        bsdtar -v -x -f "${DATAREPO}/${debfile}" -C /tmp/ec-tmp
+        bsdtar -v -x -f /tmp/ec-tmp/data.tar.xz -C /tmp/ec-tmp
+        mv -v /tmp/ec-tmp/${EasyConnectDir}/resources/bin "${HOSTECDIR}/resources/bin-cli768"
+        rm -r /tmp/ec-tmp/
+    fi
+    # misc files
     echo -n $VERSION >"${HOSTECDIR}/ecversion"
     if [ ! -f "${HOSTECDIR}/hook_script.sh" ]; then
         cp -v ./hook_script.sh "${HOSTECDIR}/hook_script.sh"

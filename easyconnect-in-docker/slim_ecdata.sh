@@ -41,3 +41,5 @@ fi
 ln_equal "../EasyConnect_x64_v$VERSIONa" "$HOSTECDIRb"
 ln_equal "../../../EasyConnect_x64_v$VERSIONa/resources/lib64" \
     "$HOSTECDIRb/resources/lib64"
+ln_equal "../../../EasyConnect_x64_v$VERSIONa/resources/bin-cli768" \
+    "$HOSTECDIRb/resources/bin-cli768"

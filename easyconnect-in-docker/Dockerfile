@@ -11,7 +11,7 @@ LABEL maintainer="shmilee.zju@gmail.com" \
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 \
     DEBIAN_CODENAME=buster \
     DEBIAN_MIRROR=http://mirrors.163.com/debian \
-    DISPLAY=:0
+    EasyConnectDir=/usr/share/sangfor/EasyConnect
 
 #    DEBIAN_SECURITY_MIRROR=http://mirrors.163.com/debian-security \
 #    && echo "deb $DEBIAN_SECURITY_MIRROR $DEBIAN_CODENAME/updates main contrib" >> /etc/apt/sources.list \

@@ -4,13 +4,15 @@
 sleep ${1:-5}
 
 ## from deb postinst
-EasyConnectDir=/usr/share/sangfor/EasyConnect
+EasyConnectDir=${EasyConnectDir:-/usr/share/sangfor/EasyConnect}
 ResourcesDir=${EasyConnectDir}/resources
 
 change_authority() {
     rm -f ${ResourcesDir}/authority_ok
     #文件权限处理
-    chmod +x ${EasyConnectDir}/EasyConnect
+    if [ -f ${EasyConnectDir}/EasyConnect ]; then
+        chmod +x ${EasyConnectDir}/EasyConnect
+    fi
     #保证logs文件夹存在
     mkdir -p ${ResourcesDir}/logs
     chmod 777 ${ResourcesDir}/logs
@@ -40,8 +42,13 @@ check_EasyConnectDir() {
         echo ">> lost resources in dir ${EasyConnectDir}!"
         exit 12
     fi
-    for cmd in ${EasyConnectDir}/EasyConnect \
-            ${ResourcesDir}/bin/{ECAgent,svpnservice,CSClient}; do
+    if [ -f ${EasyConnectDir}/EasyConnect ]; then
+        if [ ! -x ${EasyConnectDir}/EasyConnect ]; then
+            echo ">> ${EasyConnectDir}/EasyConnect not executable!"
+            rm -f ${ResourcesDir}/authority_ok
+        fi
+    fi
+    for cmd in ${ResourcesDir}/bin/{EasyMonitor,ECAgent,svpnservice,CSClient}; do
         if [ ! -f $cmd ]; then
             echo ">> $cmd not found!"
             exit 13
@@ -64,7 +71,7 @@ check_EasyConnectDir() {
     fi
 }
 
-## rum cmd in ${ResourcesDir}/bin
+## run cmd in ${ResourcesDir}/bin
 ## from sslservice.sh EasyMonitor.sh
 run_cmd() {
     local cmd=$1
@@ -76,7 +83,7 @@ run_cmd() {
     fi
     pidof $cmd >/dev/null && killall $cmd
     pidof $cmd >/dev/null && killall -9 $cmd
-    if [ x"$background" == "xbackground" ]; then
+    if [ x"$background" = "xbackground" ]; then
         echo "Run CMD: ${ResourcesDir}/bin/$cmd $params &"
         ${ResourcesDir}/bin/$cmd $params &
     else
@@ -91,16 +98,19 @@ run_cmd() {
     fi
 }
 
-## exec EasyConnect
+## run cmd in ${EasyConnectDir}, like EasyConnect
 start_EC() {
-    local ECCMD=${EasyConnectDir}/EasyConnect
-    local params="--enable-transparent-visuals --disable-gpu"
-    if [ ! -f $ECCMD ]; then
-        echo ">> '$ECCMD' not found in ${EasyConnectDir}!"
+    local CMD=${1:-EasyConnect}
+    if [ ! -f ${EasyConnectDir}/$CMD ]; then
+        echo ">> '$CMD' not found in ${EasyConnectDir}!"
         exit 31
     fi
-    echo "Run CMD: $ECCMD $params"
-    $ECCMD $params
+    local params="${@:2}"
+    if [ "$CMD" = 'EasyConnect' ] && [ -z "$params" ]; then
+        params="--enable-transparent-visuals --disable-gpu"
+    fi
+    echo "Run CMD: ${EasyConnectDir}/$CMD $params"
+    ${EasyConnectDir}/$CMD $params
 }
 
 ## main

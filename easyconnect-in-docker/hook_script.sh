@@ -13,7 +13,7 @@ hook_iptables() { #{{{
         update-alternatives --set ip6tables /usr/sbin/ip6tables-nft
     else
         update-alternatives --set iptables /usr/sbin/iptables-legacy
-        update-alternatives --set ip6tables /usr/sbin/ip6tables-le    gacy
+        update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
     fi
 
     # https://github.com/Hagb/docker-easyconnect/issues/20
@@ -100,7 +100,7 @@ hook_vnc() { #{{{
 } #}}}
 
 ## use sshd instead of danted
-hook_sshd() {
+hook_sshd() { #{{{
     echo "Run hook_sshd"
     if [ ! -d /run/sshd ]; then
         mkdir -pv /run/sshd
@@ -109,7 +109,7 @@ hook_sshd() {
     echo "root:$passwd" | chpasswd
     sed -i 's|#PermitRootLogin.*$|PermitRootLogin yes|' /etc/ssh/sshd_config
     /usr/sbin/sshd -f /etc/ssh/sshd_config
-}
+} #}}}
 
 ## from github.com/Hagb/docker-easyconnect/ start-sangfor.sh
 ## from https://blog.51cto.com/13226459/2476193
@@ -131,36 +131,60 @@ hook_fix763_login() { #{{{
     ) &
 } #}}}
 
-## exec easyconn
+## use cmds in resources/bin-orig/ or resources/bin-cli768/
+hook_resources_bin() {
+    echo "Run hook_resources_bin"
+    if [ ! -d "${ResourcesDir}/bin-orig" ]; then
+        echo ">> ${ResourcesDir}/bin-orig/ not found!"
+        exit 51
+    fi
+    if [ ! -d "${ResourcesDir}/bin-cli768" ]; then
+        echo ">> ${ResourcesDir}/bin-cli768/ not found!"
+        exit 52
+    fi
+    rm -f -v ${ResourcesDir}/bin
+    if [ x"$1" = x"cli768" ]; then
+        ln -sf -v bin-cli768 ${ResourcesDir}/bin
+    else
+        ln -sf -v bin-orig ${ResourcesDir}/bin
+    fi
+}
+
+## run CLI EC cmd easyconn
 start_easyconn() {
     local params="-v"
     [ -n "$ECADDRESS" ] && params+=" -d $ECADDRESS"
     [ -n "$ECUSER" ] && params+=" -u $ECUSER"
     [ -n "$ECPASSWD" ] && params+=" -p $ECPASSWD"
 
-    run_cmd easyconn foreground login $params
+    start_EC resources/bin/easyconn login $params
     keep='K'
     while [ x"$keep" != x'XXX' ]; do
         read -p " -> Enter 'XXX' to exit:" keep
     done
-    run_cmd easyconn foreground logout
+    start_EC resources/bin/easyconn logout
 }
 
 ## reload main
 main() {
     echo "Running hook main ..."
+    if [ x"$USEUI" = x"CLI" ]; then
+        hook_resources_bin cli768
+    else
+        hook_resources_bin orig
+    fi
     check_EasyConnectDir
 
     [ -n "$IPTABLES" ] && hook_iptables tun0 # IPTABLES_LEGACY=
     [ -n "$NODANTED" ] || hook_danted tun0   # -p xxx:1080
-    [ x"$TYPE" = x"VNC" ] && hook_vnc # PASSWORD= ECPASSWORD= -p xxx:5901
+    [ x"$USEUI" = x"VNC" ] && hook_vnc # PASSWORD= ECPASSWORD= -p xxx:5901
     [ -n "$SSHD" ] && hook_sshd       # ROOTPASSWD= -p xxxx:22
     hook_fix763_login                 # if EC VERSION is 7.6.3
     # ignore: URLWIN=1, shell/open_browser.sh. Use xdg-open in host.
 
     run_cmd EasyMonitor
 
-    if [ x"$TYPE" = x"CLI" ]; then
+    if [ x"$USEUI" = x"CLI" ]; then
         start_easyconn
     else
         start_EC

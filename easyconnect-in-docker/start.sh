@@ -2,23 +2,23 @@
 # Copyright (C) 2021 shmilee
 
 # image tag
-tag="${1:-210223}"
-
-# params, like -p, -e etc.
-params="${@:2}"
+TAG="${TAG:-210306}"
+# X11, VNC, CLI
+USEUI="${USEUI:-X11}"
 
 if [ x"$1" = x"-h" -o  x"$1" = x"--help" ]; then
     cat <<EOF
 >> Usage:
-    $0 <image tag> <params>
-    TYPE=VNC $0 <image tag> <params>
-    TYPE=CLI $0 <image tag> <params>
+    $0 <params>
+    TAG=<image tag> USEUI=<X11,VNC,CLI> $0 <params>
+>> default TAG: ${TAG}
+>> default USEUI: ${USEUI}
 >> params example:
-# iptable  :  -e IPTABLES=1 -e IPTABLES_LEGACY=1
-# danted   :  -e NODANTED=1 OR -p 127.0.0.1:1080:1080
-# TYPE=VNC :  -e TYPE=VNC -e PASSWORD=x -e ECPASSWORD= -p 127.0.0.1:5901:5901
-# sshd     :  -e SSHD=1 -e ROOTPASSWD=x1 -p 127.0.0.1:2222:22
-# TYPE=CLI :  -e TYPE=CLI -e ECADDRESS=x:p -e ECUSER= -e ECPASSWORD=
+# iptable   :  -e IPTABLES=1 -e IPTABLES_LEGACY=1
+# danted    :  -e NODANTED=1 OR -p 127.0.0.1:1080:1080
+# USEUI=VNC :  -e PASSWORD=x -e ECPASSWORD= -p 127.0.0.1:5901:5901
+# sshd      :  -e SSHD=1 -e ROOTPASSWD=x1 -p 127.0.0.1:2222:22
+# USEUI=CLI :  -e ECADDRESS=x:p -e ECUSER= -e ECPASSWORD=
 EOF
     exit 0
 fi
@@ -41,20 +41,22 @@ watch_url() {
     rm "${HOSTECDIR}"/tmp-url
 }
 
-use="${TYPE:-X11}"
-if [ x"$use" = xVNC ]; then
+# params, like -p, -e etc.
+params="-e USEUI=$USEUI ${@}"
+if [ x"$USEUI" = xVNC ]; then
     watch_url &
     docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -t \
         -v ${HOSTECDIR}:${EasyConnectDir} \
         $params \
-        shmilee/easyconnect:$tag
+        shmilee/easyconnect:$TAG
     echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url
-elif [ x"$use" = xCLI ]; then
+elif [ x"$USEUI" = xCLI ]; then
     docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -i -t \
         -v ${HOSTECDIR}:${EasyConnectDir} \
         $params \
-        shmilee/easyconnect:$tag
+        shmilee/easyconnect:$TAG
 else
+    # default USEUI=X11
     watch_url &
     xhost +LOCAL:
     docker run --rm --device /dev/net/tun --cap-add NET_ADMIN \
@@ -63,7 +65,7 @@ else
         -v $HOME/.Xauthority:/root/.Xauthority \
         -e DISPLAY=$DISPLAY \
         $params \
-        shmilee/easyconnect:$tag
+        shmilee/easyconnect:$TAG
     xhost -LOCAL:
     echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url
 fi

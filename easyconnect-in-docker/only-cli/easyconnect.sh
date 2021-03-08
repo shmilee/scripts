@@ -127,24 +127,6 @@ EOF
     done) &
 } #}}}
 
-## from github.com/Hagb/docker-easyconnect/ start-sangfor.sh
-## from https://blog.51cto.com/13226459/2476193
-hook_fix763_login() { #{{{
-    if [ x"$VERSION" != x"7.6.3" ]; then
-        return
-    fi
-    echo "Run hook_fix763_login"
-    if [ ! -f ${ResourcesDir}/logs/ECAgent.log ]; then
-        touch ${ResourcesDir}/logs/ECAgent.log
-    fi
-    (tail -n 0 -f ${ResourcesDir}/logs/ECAgent.log \
-        | grep "\\[Register\\]cms client connect failed" -m 1
-        echo "Starting CSClient svpnservice ..."
-        run_cmd CSClient
-        run_cmd svpnservice foreground -h $ResourcesDir/
-    ) &
-} #}}}
-
 ## use conf in resources/conf-v$VERSION
 hook_resources_conf() {
     if [ x"$VERSION" = x"7.6.3" ] || [ x"$VERSION" = x"7.6.7" ] || [ x"$VERSION" = x"7.6.8" ]; then
@@ -172,7 +154,6 @@ main() {
 
     [ -n "$IPTABLES" ] && hook_iptables tun0 # IPTABLES_LEGACY=
     [ -n "$NODANTED" ] || hook_danted tun0   # -p xxx:1080
-    hook_fix763_login                 # if EC VERSION is 7.6.3
 
     run_cmd ECAgent background --resume
     start_easyconn

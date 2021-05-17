@@ -15,7 +15,12 @@ luafile=./lua-5.3.6.tar.gz
 luaver=5.3.6
 argparse=./argparse-0.7.1.lua
 
-MYAPP="$HOME/.local" ## /usr
+## skip TH3 flags: MYCFLAGS=" " MYLDFLAGS=" "  bash luaprompt.sh b
+readline_path='/vol7/software/readline/8.0-gcc4.9.3'
+MYCFLAGS=${MYCFLAGS:-"-I${readline_path}/include"}
+MYLDFLAGS=${MYLDFLAGS:-"-L${readline_path}/lib -lncurses"}
+
+MYAPP=${MYAPP:-"$HOME/.local"} ## /usr
 
 if [[ -n "$1" ]];then
     if [ $1 == download -o $1 == d ]; then
@@ -28,15 +33,15 @@ if [[ -n "$1" ]];then
     elif [ $1 == build -o $1 == b ]; then
         cd lua-$luaver/
         sed -i "s|\(LUA_ROOT.*\)/usr/local/|\1$MYAPP/|" src/luaconf.h
-        make INSTALL_TOP=$MYAPP linux || exit 91
+        make INSTALL_TOP=$MYAPP linux MYCFLAGS="${MYCFLAGS}" MYLDFLAGS="${MYLDFLAGS}" || exit 91
         make INSTALL_TOP=$MYAPP install || exit 92
         cd ../
         install -Dm644 ${argparse} $MYAPP/share/lua/5.3/argparse.lua
         cd luaprompt-$pkgver/
-        make PREFIX=$MYAPP LUA_CFLAGS=-I$MYAPP/include || exit 1
+        make PREFIX=$MYAPP LUA_CFLAGS="-I$MYAPP/include ${MYCFLAGS}" LUA_LDFLAGS="${MYLDFLAGS}" || exit 1
     elif [ $1 == install -o $1 == i ]; then
         cd luaprompt-$pkgver/
-        make PREFIX=$MYAPP LUA_CFLAGS=-I$MYAPP/include install || exit 2
+        make PREFIX=$MYAPP install || exit 2
     else
         echo "Usage: $0 [download|extract|build|install]"
     fi

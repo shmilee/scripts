@@ -321,16 +321,20 @@ class RiverConverter(object):
             ]
         ]
 
-    def _search_fill_tribs(self, tribs, search_arr):
+    def _search_fill_tribs(self, tribs, search, kws={}):
         '''
-        Read values from search_arr and fill them to each river tributaries.
+        Read values from search array or returned by search function.
+        Then fill them to each river tributaries.
         '''
         points = tribs[0][2]
-        res = [search_arr[p[0], p[1]] for p in points]
+        if callable(search):
+            res = [search(p, **kws) for p in points]
+        else:
+            res = [search[p[0], p[1]] for p in points]
         return [
             tribs[0] + (res,),
             [
-                (jidx, self._search_fill_tribs(subtrib, search_arr))
+                (jidx, self._search_fill_tribs(subtrib, search, kws=kws))
                 for jidx, subtrib in tribs[1]
             ]
         ]
@@ -363,7 +367,7 @@ class RiverConverter(object):
         ]
 
     def get_river_tribs(self, point, end_in_channel=False, mode='length',
-                        add_info=[('w', 2.0, 10.0, {}), ]):
+                        add_info=[('width', 2.0, 10.0, {}), ]):
         """
         Return the river tributaries, its number
         and infor of source/join/end points in a dict.
@@ -378,8 +382,12 @@ class RiverConverter(object):
             how to select trunk channel
         add_info: list
             each quantity's input is (label, startv, endv, known dict)
-            or (label, search_arr). known dict's keys are the river points.
+            or (label, search_arr) or (label, search_fun, kwargs).
+            known dict's keys are the river points.
             search_arr's shape is equal to :attr:`river_arr`.
+            search_fun's input is each point.
+            For lisflood-fp outputs, should add 'width', 'manning n',
+            'bed DE', 'dh'. 'upstream side points' is optional.
         Notes
         -----
         The tributaries is a tree list like this.
@@ -419,18 +427,16 @@ class RiverConverter(object):
         Ntribs = next(count)
         print('Tributaries number: ', Ntribs)
         for info in add_info:
+            print('Add quantity: %s' % info[0])
             if len(info) == 2:
-                print('Add quantity: %s' % info[0])
                 tribs = self._search_fill_tribs(tribs, info[1])
+            elif len(info) == 3:
+                tribs = self._search_fill_tribs(tribs, info[1], info[2])
             elif len(info) == 4:
-                print('Add quantity: %s' % info[0])
                 a, b, c = info[1:]
                 tribs = self._interp_tribs(tribs, startv=a, endv=b, known=c)
             else:
-                try:
-                    print('Warnning: ignore info of %s!' % info[0])
-                except Exception:
-                    print('Warnning: ignore one info!')
+                print('Warnning: ignore info of %s!' % info[0])
         print(' -> Add quantities time cost: %.2fs\n' %
               (time.time()-start_time2))
         print(' -> All Time cost: %.2fs\n' % (time.time()-start_time0))
@@ -444,12 +450,23 @@ class RiverConverter(object):
         X = (point[1]-0.5)*self.grid_size
         return -Y + self.top_left_Y, X + self.top_left_X
 
+    @staticmethod
+    def point_list2str(plist):
+        '''[(a,b), (x,y)] -> ab_xy'''
+        return '_'.join(['%d%d' % p for p in plist])
+
     def _save_tribs_lisflood(self, tribs, fo):
         '''
         Write each tributaries' info line by line to opend file object.
         '''
         idx, pidx, points = tribs[0][:3]
-        w_arr, n_arr, de_arr, h_arr = tribs[0][3:]
+        # 'width', 'manning n', 'DE', 'dh'
+        w_arr, n_arr, DE_arr, dh_arr = tribs[0][3:7]
+        # optional side points
+        if len(tribs[0]) > 7:
+            side_points = tribs[0][7]
+        else:
+            side_points = None
         join_indexs = [i for i, subt in tribs[1]]
         join_subtribs = [subt[0][0] for i, subt in tribs[1]]
         N = len(points)
@@ -469,25 +486,36 @@ class RiverConverter(object):
         fo.write('%d\n' % N)
         for i, p in enumerate(points):
             Y, X = self.loc(p)
-            w, n, de, h = w_arr[i], n_arr[i], de_arr[i], h_arr[i]
+            w, n, de, h = w_arr[i], n_arr[i], DE_arr[i], dh_arr[i]
             if i == 0:
+                # source point line
                 fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQVAR qvar%d%d\n'
                          % (X, Y, w, n, de-h, p[0], p[1]))
             elif i == N-1:
                 if pidx is None:
                     assert idx == 0
+                    # trunk last line
                     fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tHVAR hvar%d%d\n'
                              % (X, Y, w, n, de-h, p[0], p[1]))
                 else:
+                    # tributaries' last line
                     fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQOUT %d\n'
                              % (X, Y, w, n, de-h, pidx))
             elif i in join_indexs:
                 _index = join_indexs.index(i)
+                # tributaries join to trunk line
                 fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tTRIB %d\n'
                          % (X, Y, w, n, de-h, join_subtribs[_index]))
             else:
-                fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\n'
-                         % (X, Y, w, n, de-h))
+                if side_points and side_points[i]:
+                    # has upstream side points
+                    # river, bdy should use same idstr
+                    idstr = self.point_list2str(sorted(side_points[i]))
+                    fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQVAR qvar%s\n'
+                             % (X, Y, w, n, de-h, idstr))
+                else:
+                    fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\n'
+                             % (X, Y, w, n, de-h))
         # write its subtrib
         for jidx, subtrib in tribs[1]:
             self._save_tribs_lisflood(subtrib, fo)
@@ -507,8 +535,59 @@ class RiverConverter(object):
             else:
                 raise NotImplementedError('%s is not implemented!' % fmt)
 
+    def extract_all_channel_points(self, tribs, index=2):
+        '''Return all channel points in a list'''
+        res = []
+        if len(tribs[0]) > index:
+            res.extend(tribs[0][index])
+            for jidx, subtrib in tribs[1]:
+                subres = self.extract_all_channel_points(subtrib)
+                res.extend(subres)
+            return res
+        else:
+            print("Warnning: No channel points found in tribs!")
+            return []
+
+    def extract_all_upstream_side_points(self, tribs, index=7):
+        '''Return all upstream side points in a list'''
+        res = []
+        if len(tribs[0]) > index:
+            for plist in tribs[0][index]:
+                res.extend(plist)
+            for jidx, subtrib in tribs[1]:
+                res.extend(self.extract_all_upstream_side_points(
+                    subtrib, index=index))
+            return res
+        else:
+            print("Warnning: No upstream side points found in tribs!")
+            return []
+
     # plot, show, check
-    def plot_get_river_tribs(self, tribs, N, dinfo):
+    def __plot_upstream_side_points(self, tribs, index, channel_index):
+        if len(tribs[0]) > index:
+            for i, plist in enumerate(tribs[0][index]):
+                ch_p = tribs[0][channel_index][i]
+                for j, p in enumerate(plist):
+                    plt.annotate(
+                        "%d" % j,
+                        xy=(ch_p[1], ch_p[0]), xytext=(p[1], p[0]),
+                        arrowprops=dict(arrowstyle="->", color="r"))
+            for jidx, subtrib in tribs[1]:
+                self.__plot_upstream_side_points(
+                    subtrib, index=index, channel_index=channel_index)
+        else:
+            print("Warnning: No upstream side points found in tribs!")
+
+    def plot_upstream_side_points(self, tribs, index=7, channel_index=2):
+        '''Plot and check all upstream side points with arrow.'''
+        plt.imshow(self.river_arr)
+        self.__plot_upstream_side_points(
+            tribs, index=index, channel_index=channel_index)
+        plt.grid()
+        plt.show()
+
+    def plot_river_tribs(self, tribs, N, dinfo):
+        '''Plot and check tributaries infor.'''
         p0 = dinfo['seed']
         p1, p2, t_p = dinfo['start'], dinfo['end'], dinfo['end_trace']
         s_p, j_p, all_trace = dinfo['source'], dinfo['join'], dinfo['trace']
@@ -580,17 +659,22 @@ if __name__ == '__main__':
     dsz_kws = dict(river_tif='./dsz_river.tif',
                    direction_tif='./dszliuxiang.tif',
                    dem_tif='./dsz_demr.tif')
-    add_info = [('w', 'TODO'),
-                ('n', 0.32, 0.32, {}),
-                ('de', 'TODO'),
-                ('h', 2.0, 4.0, {})]
     rc = RiverConverter(**dsz_kws)
     p0 = (80, 100)
-    tadd_info = add_info.copy()
     width_arr = io.imread('./dsz_riverwidth.tif')
-    tadd_info[0] = ('w', width_arr)
-    tadd_info[2] = ('de', rc.dem_arr)
+    add_info = [('width', width_arr),
+                ('manning n', 0.32, 0.32, {}),
+                ('bed DE', rc.dem_arr),
+                ('dh', 1.0, 3.0, {}),
+                ('USPs', rc.find_upstream_points, dict(in_channel=False))]
     tribs, N, d = rc.get_river_tribs(
-        p0, end_in_channel=True, add_info=tadd_info)
+        p0, end_in_channel=True, add_info=add_info)
     rc.save_tribs(tribs, N, './DSZ-out-0.river')
-    rc.plot_get_river_tribs(tribs, N, d)
+    rc.plot_river_tribs(tribs, N, d)
+    CPs = rc.extract_all_channel_points(tribs)
+    USPs = rc.extract_all_upstream_side_points(tribs)
+    with open('DSZ-up-side-points.txt', 'w+t') as f:
+        for p in USPs:
+            f.write('%s\n' % (p,))
+    print(len(USPs), 'vs', len(CPs))
+    rc.plot_upstream_side_points(tribs)

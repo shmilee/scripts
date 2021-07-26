@@ -3,11 +3,11 @@
 
 # Copyright (c) 2021 shmilee
 
-import numpy as np
 import time
 import itertools
+import numpy as np
+import matplotlib.pyplot as plt
 from collections import Counter
-# from tempfile import TemporaryFile
 from skimage import io
 
 
@@ -98,7 +98,8 @@ class RiverConverter(object):
                     return yindex, i
         return None
 
-    def find_downstream_point(self, point, use='Direction', in_channel=True):
+    def find_downstream_point(self, point, use='Direction',
+                              check=True, in_channel=True):
         '''
         Return the downstream point or None.
 
@@ -107,11 +108,13 @@ class RiverConverter(object):
         point: tuple (yindex, xindex)
             point in channel
         use: 'DEM' or 'Direction'
+        check: bool
+            check if input point is in channel
         in_channel: bool
             downstream point must be in channel or not
         '''
         yindex, xindex = point
-        if self.river_arr[yindex, xindex] != self.river_value:
+        if check and self.river_arr[yindex, xindex] != self.river_value:
             print('This point%s not in channel!' % (point,))
             return None
         if use == 'Direction':
@@ -194,7 +197,7 @@ class RiverConverter(object):
 
     D8_offsets = [v for v in default_direct_dict.values() if v is not None]
 
-    def find_upstream_points(self, point, use='Direction'):
+    def find_upstream_points(self, point, use='Direction', in_channel=True):
         '''
         Return the upstream points list.
 
@@ -202,13 +205,15 @@ class RiverConverter(object):
         ----------
         point: tuple (yindex, xindex)
         use: 'DEM' or 'Direction'
+        in_channel: bool
+            upstream points in channel or not
         '''
         yindex, xindex = point
         if self.river_arr[yindex, xindex] != self.river_value:
             print('Find upstreams of point%s (not in channel)...' % (point,))
-            in_channel = False
+            this_in_channel = False
         else:
-            in_channel = True
+            this_in_channel = True
         up_points = []
         if use == 'Direction':
             for yoff, xoff in self.D8_offsets:
@@ -217,10 +222,16 @@ class RiverConverter(object):
                     continue
                 if xidx < 0 or xidx >= self.river_arr.shape[1]:
                     continue
-                if self.river_arr[yidx, xidx] != self.river_value:
-                    continue
-                dpt = self.find_downstream_point(
-                    (yidx, xidx), in_channel=in_channel)
+                if in_channel:
+                    if self.river_arr[yidx, xidx] != self.river_value:
+                        continue
+                    dpt = self.find_downstream_point(
+                        (yidx, xidx), check=True, in_channel=this_in_channel)
+                else:
+                    if self.river_arr[yidx, xidx] == self.river_value:
+                        continue
+                    dpt = self.find_downstream_point(
+                        (yidx, xidx), check=False, in_channel=this_in_channel)
                 if dpt == point:
                     up_points.append((yidx, xidx))
             return up_points
@@ -424,7 +435,7 @@ class RiverConverter(object):
               (time.time()-start_time2))
         print(' -> All Time cost: %.2fs\n' % (time.time()-start_time0))
         return tribs, Ntribs, dict(
-            start=p1, end=p2, end_trace=t_p,
+            seed=point, start=p1, end=p2, end_trace=t_p,
             source=s_p, join=j_p, trace=all_trace)
 
     def loc(self, point):
@@ -496,247 +507,90 @@ class RiverConverter(object):
             else:
                 raise NotImplementedError('%s is not implemented!' % fmt)
 
+    # plot, show, check
+    def plot_get_river_tribs(self, tribs, N, dinfo):
+        p0 = dinfo['seed']
+        p1, p2, t_p = dinfo['start'], dinfo['end'], dinfo['end_trace']
+        s_p, j_p, all_trace = dinfo['source'], dinfo['join'], dinfo['trace']
 
-# TMP
-def convert_bdy(file, out, points='all',
-                hvar=False, hvar_info=dict(v=6, w=106, be=440.576965)):
-    import pandas as pd
-    df = pd.read_csv(file)
-    with open(out, 'w+t') as f:
-      f.write('DSZ bdy\n')
-      for i in range(len(df[df.columns[0]])):
-        y, x = df[df.columns[1]][i][1:-1].split(',')
-        y, x = int(y), int(x)
-        if points == 'all':
-            pass
-        elif (y, x) in points:
-            pass
-        else:
-            continue
-        Q = df.iloc[i][2:].tolist()
-        pro = 'h' if hvar else 'q'
-        f.write('%svar%d%d\n%d\tseconds\n' % (pro, y, x, len(Q)))
-        dt = 5*60  # 5min
-        for j in range(len(Q)):
-            if hvar:
-                f.write('%f\t%d\n' % (
-                    Q[j]/hvar_info['v']/hvar_info['w']+hvar_info['be'], dt*j))
-            else:
-                f.write('%f\t%d\n' % (Q[j], dt*j))
-
-
-def plot_wd(file, dt=5, show=True,
-        zlim=[0,2], limto=[0, 2],
-        rc=None, cmaps=['gist_gray','gist_earth'], dpi=500):
-    import matplotlib.pyplot as plt
-    with open(file) as f:
-        data = f.readlines()
-        wd = [[float(p) for p in d.split()] for d in data[6:]]
-    wd_arr = np.array(wd)
-    wd_arr[np.isnan(wd_arr)] = 0.0
-    wd_arr[wd_arr<0] = 0.0
-    wd_A = (wd_arr>0).sum()
-    if zlim[0] > 0:
-        wd_lim0 = (wd_arr>=zlim[0]).sum()
-    else:
-        wd_lim0 = (wd_arr>zlim[0]).sum()
-    wd_lim1 = (wd_arr>zlim[1]).sum()
-    perc = (wd_lim0-wd_lim1)/wd_A*100
-    wd_arr[wd_arr<zlim[0]] = limto[0]
-    wd_arr[wd_arr>zlim[1]] = limto[1]
-    if rc:
-        plt.imshow(rc.river_arr, cmap=cmaps[0], alpha=0.3)
-    plt.imshow(wd_arr, cmap=cmaps[1], alpha=0.8)
-    N = int(file.split('-')[-1].split('.')[0])
-    print('T= %smin, A= %d*%.2f%%' % (N*dt, wd_A, perc))
-    plt.title("Time = %smin, A=%d*%.2f%%" % (N*dt, wd_A, perc))
-    plt.colorbar()
-    plt.savefig(file+'.jpg', dpi=dpi)
-    if show:
+        # fig 1
+        plt.imshow(self.river_arr)
+        line = np.array(t_p)
+        plt.plot(line[:, 1], line[:, 0], marker='.', markersize=3, color='c')
+        plt.plot(p0[1], p0[0], marker='*', markersize=10, label='Start')
+        plt.plot(p1[1], p1[0], marker='*',
+                 markersize=10, label='Start in channel')
+        plt.plot(p2[1], p2[0], marker='s', markersize=10, label='End')
+        plt.legend()
         plt.show()
-    else:
-        plt.close('all')
-    return wd_A
 
+        # fig 2
+        def plot_source_join(s_p, j_p, end):
+            plt.plot(end[1], end[0], 'sb', markersize=10, label='End')
+            py, px = s_p[0]
+            plt.plot(px, py, 'ok', markersize=10, label='Source')
+            for py, px in s_p[1:]:
+                plt.plot(px, py, 'ok', markersize=10)
+            if len(j_p) > 0:
+                py, px = j_p[0]
+                plt.plot(px, py, 'pr', markersize=10, label='Join')
+                for py, px in j_p[1:]:
+                    plt.plot(px, py, 'pr', markersize=10)
 
-def plot_all_wd(pre='./results_DSZ/res_DSZ-', N=300, dt=5,
-        zlim=[0,2], limto=[0, 2],
-        rc=None, cmaps=['gist_gray','gist_earth'], dpi=500):
-    import matplotlib.pyplot as plt
-    import os
-    dirname = os.path.dirname(pre)
-    for idx in ['%04d' % i for i in range(0, N+1)]:
-        if not os.path.exists(pre+idx+'.wd'):
-            continue
-        A = plot_wd(pre+idx+'.wd', dt=dt, show=False,
-                    zlim=zlim, limto=limto, rc=rc, cmaps=cmaps, dpi=dpi)
+        c_cycle = itertools.cycle(['c', 'm', 'y', 'g'])
 
-def plot_A_t(pre='./results_DSZ/res_DSZ-', N=300, dt=5,
-        hs=[0.0, 2, 5, 10, 20]):
-    import matplotlib.pyplot as plt
-    import os
-    dirname = os.path.dirname(pre)
+        def plot_all_trace(allt):
+            c = next(c_cycle)
+            line = np.array(allt[0])
+            x, y = line[:, 1], line[:, 0]
+            plt.plot(x, y, marker='.', markersize=3, color=c)
+            for subt in allt[1:]:
+                plot_all_trace(subt)
 
-    As = []
-    for idx in ['%04d' % i for i in range(0, N+1)]:
-        if not os.path.exists(pre+idx+'.wd'):
-            break
-        with open(pre+idx+'.wd') as f:
-            data = f.readlines()
-            wd = [[float(p) for p in d.split()] for d in data[6:]]
-        wd_arr = np.array(wd)
-        wd_arr[np.isnan(wd_arr)] = 0.0
-        wd_arr[np.isinf(wd_arr)] = 0.0
-        As.append([
-            (wd_arr>h).sum() for h in hs
-        ])
-    t = np.array(range(0, len(As))) * dt
-    As = np.array(As)
-    for i, h in enumerate(hs):
-        plt.plot(t, As[:,i], label='wd>%sm' % h)
-    plt.legend()
-    plt.xlabel('Time(min)')
-    plt.ylabel('Area(grids)')
-    plt.xlim([0,t.max()])
-    plt.ylim([0,As.max()])
-    plt.savefig(dirname + '/res_A-t.jpg')
-    plt.close('all')
+        plt.imshow(self.river_arr)
+        plot_all_trace(all_trace)
+        plot_source_join(s_p, j_p, p2)
+        plt.legend()
+        plt.show()
 
-# # # # TMP for DSZ # # # #
+        # fig 3
+        mlc_cycle = itertools.cycle(['%s%s%s' % (m, l, c)
+                                     for m in '.,*x'
+                                     for l in ['-', '--', '-.', ':']
+                                     for c in 'cmyg'])
+
+        def plot_tribs(tribs, skipc='k'):
+            mlc = next(mlc_cycle)
+            while mlc[-1] == skipc:
+                mlc = next(mlc_cycle)
+            line = np.array(tribs[0][2])
+            plt.plot(line[:, 1], line[:, 0], mlc, markersize=5,
+                     label='index %d' % tribs[0][0])
+            for i, subt in tribs[1]:
+                plot_tribs(subt, skipc=mlc[-1])
+
+        plt.imshow(rc.river_arr)
+        plot_source_join(s_p, j_p, p2)
+        plot_tribs(tribs)
+        plt.legend()
+        plt.show()
 
 
 if __name__ == '__main__':
-    import sys
-    import matplotlib.pyplot as plt
-
-    dsz_test = {0: (80, 100)}
     dsz_kws = dict(river_tif='./dsz_river.tif',
                    direction_tif='./dszliuxiang.tif',
                    dem_tif='./dsz_demr.tif')
-    linan_test = {
-        1: (1500, 1250),
-        2: (80, 100),
-        3: (1000, 2000),
-        4: (950, 2060),
-        5: (900, 2300),
-        6: (1000, 2800),
-        66: (1000, 2840),  # check 1050, 2840
-        7: (1000, 2900),
-        8: (700, 2800),
-        9: (300, 2800),
-    }
-    #linpath = '../../../栅格汇流编程_LBX/Grid-based_SCS_code/linan-figure/'
-    linpath = './'
-    linan_kws = dict(river_tif=linpath+'river2000New.tif',
-                     direction_tif=linpath+'directionNew.tif',
-                     dem_tif=linpath+'DEMfillNew.tif')
-
-    test = 0
     add_info = [('w', 'TODO'),
                 ('n', 0.32, 0.32, {}),
                 ('de', 'TODO'),
                 ('h', 2.0, 4.0, {})]
-    if len(sys.argv) > 1 and sys.argv[1].isdigit():
-        test = int(sys.argv[1])
-        if test == 989898:
-            rc = RiverConverter(**linan_kws)
-            start_time = time.time()
-            for test in linan_test:
-                print(' -> Test: %d' % test)
-                tadd_info = add_info.copy()
-                tadd_info[2] = ('de', rc.dem_arr)
-                _ = rc.get_river_tribs(linan_test[test], add_info=tadd_info)
-            print('==> LinAn Time cost: %.2fs' % (time.time()-start_time))
-            sys.exit()
-
-    if test not in dsz_test and test not in linan_test:
-        test = 0
-        print('Valid test index: %s, and 989898 for linan time test.' %
-              ([i for i in dsz_test] + [i for i in linan_test]))
-    if test in dsz_test:
-        # test 0 WS1
-        rc = RiverConverter(**dsz_kws)
-        p0 = dsz_test[test]
-    elif test in linan_test:
-        # test 1, 2, ...
-        rc = RiverConverter(**linan_kws)
-        p0 = linan_test[test]
-
+    rc = RiverConverter(**dsz_kws)
+    p0 = (80, 100)
     tadd_info = add_info.copy()
     width_arr = io.imread('./dsz_riverwidth.tif')
     tadd_info[0] = ('w', width_arr)
     tadd_info[2] = ('de', rc.dem_arr)
     tribs, N, d = rc.get_river_tribs(
         p0, end_in_channel=True, add_info=tadd_info)
-    p1, p2, t_p = d['start'], d['end'], d['end_trace']
-    s_p, j_p, all_trace = d['source'], d['join'], d['trace']
-
-    if test in dsz_test:
-        rc.save_tribs(tribs, N, 'DSZ-out-%d.river' % test)
-    elif test in linan_test:
-        # test 1, 2, ...
-        rc.save_tribs(tribs, N, 'LINAN-out-%d.river' % test)
-
-    convert_bdy('./river_Q_dsz.csv', './dsz_source.bdy', points=s_p)
-    convert_bdy('./river_Q_dsz.csv', './dsz_end.bdy', points=[p2], hvar=True)
-
-    # fig 1
-    plt.imshow(rc.river_arr)
-    line = np.array(t_p)
-    plt.plot(line[:, 1], line[:, 0], marker='.', markersize=3, color='c')
-    plt.plot(p0[1], p0[0], marker='*', markersize=10, label='Start')
-    plt.plot(p1[1], p1[0], marker='*',
-             markersize=10, label='Start in channel')
-    plt.plot(p2[1], p2[0], marker='s', markersize=10, label='End')
-    plt.legend()
-    plt.show()
-
-    # fig 2
-    def plot_source_join(s_p, j_p, end):
-        plt.plot(end[1], end[0], 'sb', markersize=10, label='End')
-        py, px = s_p[0]
-        plt.plot(px, py, 'ok', markersize=10, label='Source')
-        for py, px in s_p[1:]:
-            plt.plot(px, py, 'ok', markersize=10)
-        if len(j_p) > 0:
-            py, px = j_p[0]
-            plt.plot(px, py, 'pr', markersize=10, label='Join')
-            for py, px in j_p[1:]:
-                plt.plot(px, py, 'pr', markersize=10)
-
-    c_cycle = itertools.cycle(['c', 'm', 'y', 'g'])
-
-    def plot_all_trace(allt):
-        c = next(c_cycle)
-        line = np.array(allt[0])
-        plt.plot(line[:, 1], line[:, 0], marker='.', markersize=3, color=c)
-        for subt in allt[1:]:
-            plot_all_trace(subt)
-
-    plt.imshow(rc.river_arr)
-    plot_all_trace(all_trace)
-    plot_source_join(s_p, j_p, p2)
-    plt.legend()
-    plt.show()
-
-    # fig 3
-    mlc_cycle = itertools.cycle(['%s%s%s' % (m, l, c)
-                                 for m in '.,*x'
-                                 for l in ['-', '--', '-.', ':']
-                                 for c in 'cmyg'])
-
-    def plot_tribs(tribs, skipc='k'):
-        mlc = next(mlc_cycle)
-        while mlc[-1] == skipc:
-            mlc = next(mlc_cycle)
-        line = np.array(tribs[0][2])
-        plt.plot(line[:, 1], line[:, 0], mlc, markersize=5,
-                 label='index %d' % tribs[0][0])
-        for i, subt in tribs[1]:
-            plot_tribs(subt, skipc=mlc[-1])
-
-    plt.imshow(rc.river_arr)
-    plot_source_join(s_p, j_p, p2)
-    plot_tribs(tribs)
-    plt.legend()
-    plt.show()
+    rc.save_tribs(tribs, N, './DSZ-out-0.river')
+    rc.plot_get_river_tribs(tribs, N, d)

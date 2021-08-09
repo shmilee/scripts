@@ -19,6 +19,9 @@
 # -vcodec libx264； -vcodec mpeg4 指定视频解码器
 # -i image-%04d.jpg 输入文件格式，0001, 0002 ...
 
+#4)加字幕解说
+# -vf subtitles=./xxx.ass
+# -b:a 160k
 echo "example: ffmpeg -f image2 -r 5 -i "./%06d.jpg" -vcodec libx264 -r 5 -b:v 2000k -bufsize 2000k out.mp4"
 
 out="${2:-out.mp4}"

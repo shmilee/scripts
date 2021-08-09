@@ -6,9 +6,11 @@
 import time
 import itertools
 import numpy as np
-import matplotlib.pyplot as plt
 from collections import Counter
 from skimage import io
+
+import matplotlib.pyplot as plt
+import csv
 
 
 class RiverConverter(object):
@@ -455,7 +457,7 @@ class RiverConverter(object):
         '''[(a,b), (x,y)] -> ab_xy'''
         return '_'.join(['%d%d' % p for p in plist])
 
-    def _save_tribs_lisflood(self, tribs, fo):
+    def _save_tribs_lisflood(self, tribs, fo, sqvar, qvar, ehvar):
         '''
         Write each tributaries' info line by line to opend file object.
         '''
@@ -489,14 +491,18 @@ class RiverConverter(object):
             w, n, de, h = w_arr[i], n_arr[i], DE_arr[i], dh_arr[i]
             if i == 0:
                 # source point line
-                fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQVAR qvar%d%d\n'
-                         % (X, Y, w, n, de-h, p[0], p[1]))
+                fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQVAR %s%d%d\n'
+                         % (X, Y, w, n, de-h, sqvar, p[0], p[1]))
             elif i == N-1:
                 if pidx is None:
                     assert idx == 0
                     # trunk last line
-                    fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tHVAR hvar%d%d\n'
-                             % (X, Y, w, n, de-h, p[0], p[1]))
+                    if ehvar == 'hvar':
+                        bcstr = 'HVAR hvar%d%d' %(p[0], p[1])
+                    else:
+                        bcstr = 'FREE'
+                    fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\t%s\n'
+                             % (X, Y, w, n, de-h, bcstr))
                 else:
                     # tributaries' last line
                     fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQOUT %d\n'
@@ -510,19 +516,34 @@ class RiverConverter(object):
                 if side_points and side_points[i]:
                     # has upstream side points
                     # river, bdy should use same idstr
-                    idstr = self.point_list2str(sorted(side_points[i]))
-                    fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQVAR qvar%s\n'
-                             % (X, Y, w, n, de-h, idstr))
+                    idstr = self.point_list2str(side_points[i])
+                    fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\tQVAR %s%s\n'
+                             % (X, Y, w, n, de-h, qvar, idstr))
                 else:
                     fo.write('%.1f\t%.1f\t%.4f\t%.5f\t%.6f\n'
                              % (X, Y, w, n, de-h))
         # write its subtrib
         for jidx, subtrib in tribs[1]:
-            self._save_tribs_lisflood(subtrib, fo)
+            self._save_tribs_lisflood(subtrib, fo, sqvar, qvar, ehvar)
 
-    def save_tribs(self, tribs, Ntribs, outfile, fmt='lisflood'):
+    def save_tribs(self, tribs, Ntribs, outfile, fmt='lisflood',
+            fmt_kws=dict(sqvar='sqvar', qvar='qvar', ehvar='free')):
         '''
         Save one river's tributaries to a file.
+
+        Parameters
+        ----------
+        tribs: list
+            river tributaries' tree
+        Ntribs: int
+            number of tributaries
+        outfile: path
+        fmt: str, only 'lisflood' supported
+        fmt_kws: dict
+            example, keys for lisflood,
+            sqvar for source inflow identifier, QVAR sqvar***
+            qvar for lateral inflow identifier, QVAR qvar***
+            ehvar for end point Boundary Condition, 'free' or 'hvar'
 
         Notes
         -----
@@ -530,8 +551,11 @@ class RiverConverter(object):
         '''
         with open(outfile, 'w+t') as fo:
             if fmt == 'lisflood':
+                sqvar = fmt_kws.get('sqvar', 'sqvar')
+                qvar = fmt_kws.get('qvar', 'qvar')
+                ehvar = fmt_kws.get('ehvar', 'free')
                 fo.write('Tribs %d\n' % Ntribs)
-                self._save_tribs_lisflood(tribs, fo)
+                self._save_tribs_lisflood(tribs, fo, sqvar, qvar, ehvar)
             else:
                 raise NotImplementedError('%s is not implemented!' % fmt)
 
@@ -548,19 +572,22 @@ class RiverConverter(object):
             print("Warnning: No channel points found in tribs!")
             return []
 
-    def extract_all_upstream_side_points(self, tribs, index=7):
-        '''Return all upstream side points in a list'''
-        res = []
+    def extract_all_upstream_side_points(self, tribs, index=7,
+            channel_index=2):
+        '''
+        Return all upstream side points in dict. Its keys are channel points.
+        '''
+        res = {}
         if len(tribs[0]) > index:
-            for plist in tribs[0][index]:
-                res.extend(plist)
+            for cp, plist in zip(tribs[0][channel_index], tribs[0][index]):
+                res[cp] = plist
             for jidx, subtrib in tribs[1]:
-                res.extend(self.extract_all_upstream_side_points(
-                    subtrib, index=index))
+                res.update(self.extract_all_upstream_side_points(
+                    subtrib, index=index, channel_index=channel_index))
             return res
         else:
             print("Warnning: No upstream side points found in tribs!")
-            return []
+            return {}
 
     # plot, show, check
     def __plot_upstream_side_points(self, tribs, index, channel_index):
@@ -655,6 +682,178 @@ class RiverConverter(object):
         plt.show()
 
 
+
+class BDYConverter(object):
+    '''
+    Converter for time varying boundary conditions.
+    '''
+    __slots__ = ['comment', 'results']
+
+    def __init__(self, comment='BDY for test'):
+        self.comment = comment
+        self.results = {}
+
+    def add_result(self, identifier, time, value, tunit):
+        self.results[identifier] = dict(
+            time=time, value=value, tunit=tunit)
+
+    def save_bdy(self, outfile):
+        with open(outfile, 'w+t') as f:
+            f.write('%s\n' % self.comment)
+            for identifier in self.results:
+                print("Writting %s" % identifier)
+                res = self.results[identifier]
+                time, value, tunit = res['time'], res['value'], res['tunit']
+                assert len(time) == len(value)
+                f.write('%s\n%d\t%s\n' % (identifier, len(time), tunit))
+                Tisint = isinstance(time[0], (int,np.int_))
+                fmt = '%f\t%d\n' if Tisint else '%f\t%f\n'
+                for v, t in zip(value, time):
+                    f.write(fmt % (v, t))
+
+    def read_lbx_csv(self, csvfile, need_points='all',
+            start_time=0, dtime=300):
+        '''
+        Read values of *need_points* from csvfile.
+        Return values' dict whose key is point (y, x) and time list.
+        
+        Parameters
+        ----------
+        csvfile: file path
+        need_points: 'all' or points list
+        start_time: number, time of first value
+        dtime: number, interval time
+        '''
+        Q_res, N = {}, None
+        with open(csvfile, 'r') as f:
+            data = csv.reader(f)
+            desc = next(data) # rm first line
+            for line in data:
+                y, x = line[1][1:-1].split(',')
+                y, x = int(y), int(x)
+                if need_points == 'all' or (y,x) in need_points:
+                    Q_res[(y,x)] = np.array([float(q) for q in line[2:]])
+                if N is None:
+                    N = len(line[2:])
+        return Q_res, np.array([start_time + dtime*i for i in range(N)])
+
+    def merge_point_values(self, group_points, values_dict,
+            time, tunit="seconds", idstrfun=None, weights=None):
+        '''
+        The results saved in :attr:`results`
+
+        Parameters
+        ----------
+        group_points: list of grouped points (y, x)
+            [[(y1, x1), (y2, x2)], [(y3, x3)], [], ...]
+        values_dict: dict
+            key is each point, value is a array.
+            {(y1, x1): np.array([1,2,3,...]), ...}
+        time: time array
+        idstrfun: function
+            fotmat group points to idstr, as identifier in outfile
+        weights: 2D array_like, optional
+            weights[y,x] for each point
+        '''
+        for group in group_points:
+            if not group:
+                continue # skip []
+            if callable(idstrfun):
+                idstr = idstrfun(group)
+            else:
+                idstr = 'bc' + '_'.join(['%d%d' % p for p in group])
+            if len(group) == 1:
+                p =group[0]
+                value = values_dict[p]
+                if weights:
+                    value = value*weights[p[0], p[1]]
+            else:
+                value = np.array([values_dict[p] for p in group])
+                if weights:
+                    w = np.array([weights[p[0], p[1]] for p in group])
+                    value = (value.T*w).T
+                value = value.sum(axis=0)
+            self.add_result(idstr, time, value, tunit=tunit)
+
+def plot_wd(file, dt=5, show=True,
+        zlim=[0,2], limto=[0, 2],
+        rc=None, cmaps=['gist_gray','gist_earth'], dpi=500):
+    import matplotlib.pyplot as plt
+    with open(file) as f:
+        data = f.readlines()
+        wd = [[float(p) for p in d.split()] for d in data[6:]]
+    wd_arr = np.array(wd)
+    wd_arr[np.isnan(wd_arr)] = 0.0
+    wd_arr[wd_arr<0] = 0.0
+    wd_A = (wd_arr>0).sum()
+    if zlim[0] > 0:
+        wd_lim0 = (wd_arr>=zlim[0]).sum()
+    else:
+        wd_lim0 = (wd_arr>zlim[0]).sum()
+    wd_lim1 = (wd_arr>zlim[1]).sum()
+    perc = (wd_lim0-wd_lim1)/wd_A*100
+    wd_arr[wd_arr<zlim[0]] = limto[0]
+    wd_arr[wd_arr>zlim[1]] = limto[1]
+    wd_arr[0,0] = zlim[1] # for colorbar
+    if rc:
+        plt.imshow(rc.river_arr, cmap=cmaps[0], alpha=0.3)
+    plt.imshow(wd_arr, cmap=cmaps[1], alpha=0.8)
+    N = int(file.split('-')[-1].split('.')[0])
+    print('T= %smin, A= %d*%.2f%%' % (N*dt, wd_A, perc))
+    plt.title("Time = %smin, A=%d*%.2f%%" % (N*dt, wd_A, perc))
+    plt.colorbar()
+    plt.savefig(file+'.jpg', dpi=dpi)
+    if show:
+        plt.show()
+    else:
+        plt.close('all')
+    return wd_A
+
+
+def plot_all_wd(pre='./results_DSZ/res_DSZ-', N=300, dt=5,
+        zlim=[0,2], limto=[0, 2],
+        rc=None, cmaps=['gist_gray','gist_earth'], dpi=500):
+    import matplotlib.pyplot as plt
+    import os
+    dirname = os.path.dirname(pre)
+    for idx in ['%04d' % i for i in range(0, N+1)]:
+        if not os.path.exists(pre+idx+'.wd'):
+            continue
+        A = plot_wd(pre+idx+'.wd', dt=dt, show=False,
+                    zlim=zlim, limto=limto, rc=rc, cmaps=cmaps, dpi=dpi)
+
+def plot_A_t(pre='./results_DSZ/res_DSZ-', N=300, dt=5,
+        hs=[0.0, 2, 5, 10, 20]):
+    import matplotlib.pyplot as plt
+    import os
+    dirname = os.path.dirname(pre)
+
+    As = []
+    for idx in ['%04d' % i for i in range(0, N+1)]:
+        if not os.path.exists(pre+idx+'.wd'):
+            break
+        with open(pre+idx+'.wd') as f:
+            data = f.readlines()
+            wd = [[float(p) for p in d.split()] for d in data[6:]]
+        wd_arr = np.array(wd)
+        wd_arr[np.isnan(wd_arr)] = 0.0
+        wd_arr[np.isinf(wd_arr)] = 0.0
+        As.append([
+            (wd_arr>h).sum() for h in hs
+        ])
+    t = np.array(range(0, len(As))) * dt
+    As = np.array(As)
+    for i, h in enumerate(hs):
+        plt.plot(t, As[:,i], label='wd>%sm' % h)
+    plt.legend()
+    plt.xlabel('Time(min)')
+    plt.ylabel('Area(grids)')
+    plt.xlim([0,t.max()])
+    plt.ylim([0,As.max()])
+    plt.savefig(dirname + '/res_A-t.jpg')
+    plt.close('all')
+
+
 if __name__ == '__main__':
     dsz_kws = dict(river_tif='./dsz_river.tif',
                    direction_tif='./dszliuxiang.tif',
@@ -665,16 +864,92 @@ if __name__ == '__main__':
     add_info = [('width', width_arr),
                 ('manning n', 0.32, 0.32, {}),
                 ('bed DE', rc.dem_arr),
-                ('dh', 1.0, 3.0, {}),
-                ('USPs', rc.find_upstream_points, dict(in_channel=False))]
+                ('dh', 1.0, 3.0, {}),]
+    #add_info.append(('USPs', rc.find_upstream_points, dict(in_channel=False)))
     tribs, N, d = rc.get_river_tribs(
         p0, end_in_channel=True, add_info=add_info)
     rc.save_tribs(tribs, N, './DSZ-out-0.river')
-    rc.plot_river_tribs(tribs, N, d)
+    #rc.plot_river_tribs(tribs, N, d)
+    p2, s_p = d['end'], d['source']
     CPs = rc.extract_all_channel_points(tribs)
     USPs = rc.extract_all_upstream_side_points(tribs)
-    with open('DSZ-up-side-points.txt', 'w+t') as f:
-        for p in USPs:
-            f.write('%s\n' % (p,))
-    print(len(USPs), 'vs', len(CPs))
-    rc.plot_upstream_side_points(tribs)
+    flat_USPs = []
+    for l in USPs.values():
+        flat_USPs.extend(l)
+    print(len(flat_USPs), 'vs', len(CPs))
+
+    #    for p in USPs:
+    #        f.write('%s\n' % (p,))
+    with open('DSZ-need-points.py', 'w+t') as f:
+        f.write('end_point = %s\n' % (p2,))
+        f.write('source_points = [\n')
+        for p in s_p:
+            f.write('%s,\n' % (p,))
+        f.write(']\n')
+        f.write('upstream_side_points = [\n')
+        for p in flat_USPs:
+            f.write('%s,\n' % (p,))
+        f.write(']\n')        
+        f.write('upstream_side_points_dict = {\n')
+        for k in USPs:
+            f.write('%s: %s,\n' % (k,USPs[k]))
+        f.write('}\n')
+
+    bdy = BDYConverter(comment='BDY for DSZ test')
+    res, tarr = bdy.read_lbx_csv('./river_Q_dsz_shengming.csv')
+    bdy.merge_point_values([[p] for p in s_p], res, tarr,
+        idstrfun=lambda group: 'sqvar' + '_'.join(['%d%d' % p for p in group]))
+    bdy.save_bdy('only-source-DSZ.bdy')
+    bdy.merge_point_values(USPs.values(), res, tarr,
+        idstrfun=lambda group: 'qvar' + '_'.join(['%d%d' % p for p in group]))
+    #bdy.merge_point_values([p2], res, tarr)
+    bdy.save_bdy('source-lateral-DSZ.bdy')
+
+
+
+
+
+    ws1_kws = dict(river_tif='./WS1-river.tif',
+                   direction_tif='./WS1-Direction.tif',
+                   dem_tif='./WS1-DEM.tif')
+    rc = RiverConverter(**ws1_kws)
+    p0 = (80, 100)
+    add_info = [('width', 2, 10, {}),
+                ('manning n', 0.32, 0.32, {}),
+                ('bed DE', rc.dem_arr),
+                ('dh', 1.0, 3.0, {})]
+    #add_info.append(('USPs', rc.find_upstream_points, dict(in_channel=False)))
+    tribs, N, d = rc.get_river_tribs(
+        p0, end_in_channel=True, add_info=add_info)
+    rc.save_tribs(tribs, N, './WS1-out-0.river')
+    #rc.plot_river_tribs(tribs, N, d)
+    p2 = d['end']
+    s_p = d['source']
+
+    CPs = rc.extract_all_channel_points(tribs)
+    USPs = rc.extract_all_upstream_side_points(tribs)
+    with open('WS1-need-points.py', 'w+t') as f:
+        f.write('end_point = %s\n' % (p2,))
+        f.write('source_points = [\n')
+        for p in s_p:
+            f.write('%s,\n' % (p,))
+        f.write(']\n')
+        f.write('upstream_side_points = {\n')
+        for k in USPs:
+            f.write('%s: %s,\n' % (k,USPs[k]))
+        f.write('}\n')
+    flat_USPs = []
+    for l in USPs.values():
+        flat_USPs.extend(l)
+    print(len(flat_USPs), 'vs', len(CPs))
+    #rc.plot_upstream_side_points(tribs)
+
+    bdy = BDYConverter(comment='BDY for WS1 test')
+    res, tarr = bdy.read_lbx_csv('./WS1_all_river_Q-for-test.csv')
+    bdy.merge_point_values([[p] for p in s_p], res, tarr,
+        idstrfun=lambda group: 'sqvar' + '_'.join(['%d%d' % p for p in group]))
+    bdy.save_bdy('only-source-WS1.bdy')
+    bdy.merge_point_values(USPs.values(), res, tarr,
+        idstrfun=lambda group: 'qvar' + '_'.join(['%d%d' % p for p in group]))
+    #bdy.merge_point_values([p2], res, tarr)
+    bdy.save_bdy('source-lateral-WS1.bdy')

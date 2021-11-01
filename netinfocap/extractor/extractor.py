@@ -12,6 +12,7 @@ class Extractor(object):
     '''
     Choose information from some packets then bring them together as a dict.
     '''
+    display_filter = None
 
     def __init__(self, field_keys=(), workers=(), tw=None):
         '''
@@ -103,8 +104,8 @@ class StreamingExtractor(Extractor):
             self.tw.write('[Error] Cannot find player!', red=True, bold=True)
         return False
 
-    def play(self, askprompt="Play this fullurl? [y/n] "):
-        URL = self.result.get('fullurl', None)
+    def play(self, askprompt="Play this fullurl? [y/n] ", urlkey='fullurl'):
+        URL = self.result.get(urlkey, None)
         if URL:
             if self.askplay(askprompt):
                 import subprocess
@@ -112,4 +113,5 @@ class StreamingExtractor(Extractor):
                 self.tw.write("[Info] Playcmd: %s" % playcmd)
                 subprocess.run(playcmd, shell=False)
         else:
-            self.tw.write('[Error] Cannot find fullurl!', red=True, bold=True)
+            self.tw.write('[Error] Cannot find %s!' % urlkey,
+                          red=True, bold=True)

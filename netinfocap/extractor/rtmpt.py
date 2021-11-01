@@ -10,6 +10,7 @@ from .extractor import StreamingExtractor
 
 class RTMPT_Url_Extractor(StreamingExtractor):
     '''Get RTMPT connect/play url from Packet.'''
+    display_filter = 'rtmpt'
 
     def __init__(self, player=None, tw=None):
         field_keys = ('connect', 'play', 'fullurl')

@@ -7,6 +7,7 @@ from .extractor import StreamingExtractor
 
 class Bilive_Url_Extractor(StreamingExtractor):
     '''Get Bilibili live(HTTP-FLV) URI from Packet.'''
+    display_filter = 'http.request.method==GET'
 
     def __init__(self, player=None, tw=None):
         field_keys = ('fullurl',)

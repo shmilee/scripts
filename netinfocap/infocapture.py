@@ -33,7 +33,8 @@ class InfoCapture(pyshark.LiveCapture):
         for ex in self.extractors:
             ex.reset()  # reset extractor to initial state
         tw = self.extractors[0].tw
-        tw.write("Capturing on '%s'" % self.interfaces[0])
+        tw.write("Capturing on '%s'" % self.interfaces[0] + os.linesep)
+        tw.write("Using display_filter: %s" % self._display_filter)
         tw.write(os.linesep)
         for ex in self.extractors:
             tw.write("Using extractor: %s" % ex.intro)
@@ -87,21 +88,17 @@ def main():
     if isinstance(args.extractor, str):
         args.extractor = [args.extractor]
     extractors = []
-    filters = set()
     for ex in args.extractor:
         if ex == 'bilive':
             from .extractor.bilive import Bilive_Url_Extractor
             extractors.append(Bilive_Url_Extractor(player=args.player))
-            filters.add('http.request.method==GET')
-        elif ex == 'rtmpt':
-            from .extractor.rtmpt import RTMPT_Url_Extractor
-            extractors.append(RTMPT_Url_Extractor(player=args.player))
-            filters.add('rtmpt')
         elif ex == 'hls':
             from .extractor.hls import HLS_Url_Extractor
             extractors.append(HLS_Url_Extractor(player=args.player))
-            filters.add('http.request.method==GET')
-
+        elif ex == 'rtmpt':
+            from .extractor.rtmpt import RTMPT_Url_Extractor
+            extractors.append(RTMPT_Url_Extractor(player=args.player))
+    filters = set([ex.display_filter for ex in extractors])
     infocap = InfoCapture(
         tuple(extractors), interface=args.interface,
         display_filter=' or '.join(filters), debug=args.debug)

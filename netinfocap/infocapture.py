@@ -33,8 +33,10 @@ class InfoCapture(pyshark.LiveCapture):
         for ex in self.extractors:
             ex.reset()  # reset extractor to initial state
         tw = self.extractors[0].tw
-        tw.write("Capturing on '%s'" % self.interfaces[0] + os.linesep)
-        tw.write("Using display_filter: %s" % self._display_filter)
+        tw.write("Capturing on '")
+        tw.write(self.interfaces[0], bold=True)
+        tw.write("', with display_filter: ")
+        tw.write(self._display_filter, bold=True)
         tw.write(os.linesep)
         for ex in self.extractors:
             tw.write("Using extractor: %s" % ex.intro)
@@ -53,8 +55,10 @@ class InfoCapture(pyshark.LiveCapture):
                             results.append(res)
                         if show:
                             ex.pretty_print()
-                        if ex.player:  # for streaming
+                        if ex.player:  # for play streaming
                             ex.play()
+                        if ex.ffmpeg:  # for save streaming
+                            ex.convert()
                         ex.reset()
                 except Exception as e:
                     self._log.critical('Cannot extract info from packet %s'
@@ -76,6 +80,8 @@ def main():
                         help='name of interface (default: %(default)s)')
     parser.add_argument('-p', dest='player', metavar='<player>',
                         help='Stream extracted URL to a <player>')
+    parser.add_argument('-f', dest='ffmpeg', metavar='<ffmpeg>',
+                        help='<ffmpeg> used to convert streaming media')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Show debug information')
     parser.add_argument('-h', '--help', action='store_true',
@@ -91,13 +97,16 @@ def main():
     for ex in args.extractor:
         if ex == 'bilive':
             from .extractor.bilive import Bilive_Url_Extractor
-            extractors.append(Bilive_Url_Extractor(player=args.player))
+            extractors.append(Bilive_Url_Extractor(
+                player=args.player, ffmpeg=args.ffmpeg))
         elif ex == 'hls':
             from .extractor.hls import HLS_Url_Extractor
-            extractors.append(HLS_Url_Extractor(player=args.player))
+            extractors.append(HLS_Url_Extractor(
+                player=args.player, ffmpeg=args.ffmpeg))
         elif ex == 'rtmpt':
             from .extractor.rtmpt import RTMPT_Url_Extractor
-            extractors.append(RTMPT_Url_Extractor(player=args.player))
+            extractors.append(RTMPT_Url_Extractor(
+                player=args.player, ffmpeg=args.ffmpeg))
     filters = set([ex.display_filter for ex in extractors])
     infocap = InfoCapture(
         tuple(extractors), interface=args.interface,

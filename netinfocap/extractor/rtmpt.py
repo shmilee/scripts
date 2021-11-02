@@ -12,11 +12,12 @@ class RTMPT_Url_Extractor(StreamingExtractor):
     '''Get RTMPT connect/play url from Packet.'''
     display_filter = 'rtmpt'
 
-    def __init__(self, player=None, tw=None):
+    def __init__(self, player=None, ffmpeg=None):
         field_keys = ('connect', 'play', 'fullurl')
         workers = ('get_rtmpt_connect', 'get_rtmpt_play')
         super(RTMPT_Url_Extractor, self).__init__(
-            field_keys=field_keys, workers=workers, player=player, tw=tw)
+            field_keys=field_keys, workers=workers,
+            player=player, ffmpeg=ffmpeg)
 
     def get_rtmpt_connect(self, packet):
         ''' TCP/RTMPT Packet -> Layer RTMPT -> amf_string 'connect' '''

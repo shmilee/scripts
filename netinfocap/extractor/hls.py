@@ -24,14 +24,12 @@ class HLS_Url_Extractor(StreamingExtractor):
     '''Get HLS uri from Packet.'''
     display_filter = 'http.request.method==GET'
 
-    def __init__(self, player=None, tw=None):
+    def __init__(self, player=None, ffmpeg=None):
         field_keys = ('fullurl',)
         workers = ('get_http_m3u8_or_key',)
-        if player == 'mpv':
-            player += ' --demuxer-lavf-o-append=allowed_extensions=ts,key'
-            player += ' --demuxer-lavf-o-append=protocol_whitelist=http,tcp,file,crypto,data'
         super(HLS_Url_Extractor, self).__init__(
-            field_keys=field_keys, workers=workers, player=player, tw=tw)
+            field_keys=field_keys, workers=workers,
+            player=player, ffmpeg=ffmpeg)
         self.tmpdir = os.path.join(tempfile.gettempdir(), 'netinfocap-hls')
         if not os.path.exists(self.tmpdir):
             os.mkdir(self.tmpdir)
@@ -111,4 +109,21 @@ class HLS_Url_Extractor(StreamingExtractor):
             pass
 
     def play(self):
-        super(HLS_Url_Extractor, self).play(urlkey='localm3u8')
+        if 'key' in self.result and self.player == 'mpv':
+            opt = ' --demuxer-lavf-o-append=allowed_extensions=ts,key'
+            opt += ' --demuxer-lavf-o-append=protocol_whitelist=http,tcp,file,crypto,data'
+            self.player = 'mpv %s' % opt
+            super(HLS_Url_Extractor, self).play(urlkey='localm3u8')
+            self.player = 'mpv'
+        else:
+            super(HLS_Url_Extractor, self).play(urlkey='localm3u8')
+
+    def convert(self):
+        if 'key' in self.result and self.ffmpeg == 'ffmpeg':
+            opt = ' -allowed_extensions ts,key'
+            opt += ' -protocol_whitelist http,tcp,file,crypto,data'
+            self.ffmpeg = 'ffmpeg %s -i #(INPUT)#' % opt
+            super(HLS_Url_Extractor, self).convert(urlkey='localm3u8')
+            self.ffmpeg = 'ffmpeg'
+        else:
+            super(HLS_Url_Extractor, self).convert(urlkey='localm3u8')

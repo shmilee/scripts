@@ -19,9 +19,9 @@ class InfoCapture(pyshark.LiveCapture):
         super(InfoCapture, self).__init__(**kwargs)
         self.extractors = extractors
 
-    def collect(self, packet_count=None, save=True, show=True):
+    def collect(self, result_count=None, save=True, show=True):
         '''
-        :param packet_count: an amount of packets to capture, then stop.
+        :param result_count: an amount of results to capture, then stop.
         :param save: save each result dict to a list.
         :param show: show each result dict in terminal.
         '''
@@ -41,11 +41,12 @@ class InfoCapture(pyshark.LiveCapture):
         for ex in self.extractors:
             tw.write("Using extractor: %s" % ex.intro)
             tw.write(os.linesep)
-        count = 1
-        for packet in self.sniff_continuously(packet_count=packet_count):
+        packet_count = 1
+        res_count = 0
+        for packet in self.sniff_continuously(packet_count=None):
             number = int(packet.number.get_default_value())
-            self._log.debug('Packet %d, count: %d' % (number, count))
-            count += 1
+            self._log.debug('Packet %d, count: %d' % (number, packet_count))
+            packet_count += 1
             for ex in self.extractors:
                 try:
                     ex.extract(packet)
@@ -59,10 +60,14 @@ class InfoCapture(pyshark.LiveCapture):
                             ex.play()
                         if ex.ffmpeg:  # for save streaming
                             ex.convert()
+                        res_count += 1
                         ex.reset()
                 except Exception as e:
                     self._log.critical('Cannot extract info from packet %s'
                                        % number, exc_info=1)
+            if result_count and result_count > 0:
+                if res_count >= result_count:
+                    break
         if save:
             return results
 
@@ -78,6 +83,9 @@ def main():
     parser.add_argument('-i',  dest='interface', metavar='<interface>',
                         nargs=1, default='ap0', type=str,
                         help='name of interface (default: %(default)s)')
+    parser.add_argument('-n',  dest='number', metavar='<number>',
+                        nargs=1, default=-1, type=int,
+                        help='an amount of results to capture, then stop')
     parser.add_argument('-p', dest='player', metavar='<player>',
                         help='Stream extracted URL to a <player>')
     parser.add_argument('-f', dest='ffmpeg', metavar='<ffmpeg>',
@@ -111,4 +119,6 @@ def main():
     infocap = InfoCapture(
         tuple(extractors), interface=args.interface,
         display_filter=' or '.join(filters), debug=args.debug)
-    infocap.collect(show=True)
+    if isinstance(args.number, list):
+        args.number = args.number[0]
+    infocap.collect(result_count=args.number, show=True)

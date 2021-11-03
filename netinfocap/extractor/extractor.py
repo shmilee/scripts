@@ -116,11 +116,10 @@ class StreamingExtractor(Extractor):
             if not askprompt:
                 askprompt = "Play this %s? [y/n] " % urlkey
             if self.ask(askprompt, attr='player'):
-                import subprocess
                 playcmd = shlex.split(self.player) + [URL]
                 self.tw.write("[Info] Play cmd: %s" % playcmd)
                 self.tw.write(os.linesep)
-                subprocess.run(playcmd, shell=False)
+                rcode = self.subruncmd(playcmd)
         else:
             self.tw.write('[Error] Cannot find %s!' % urlkey,
                           red=True, bold=True)
@@ -132,7 +131,6 @@ class StreamingExtractor(Extractor):
             if not askprompt:
                 askprompt = "Convert this %s? [y/n] " % urlkey
             if self.ask(askprompt, attr='ffmpeg'):
-                import subprocess
                 convcmd = shlex.split(self.ffmpeg)
                 if '#(INPUT)#' in convcmd:
                     # ffmpeg inopt -i #(INPUT)# outopt OUT
@@ -150,8 +148,39 @@ class StreamingExtractor(Extractor):
                 convcmd.append(output)
                 self.tw.write("[Info] Convert cmd: %s" % convcmd)
                 self.tw.write(os.linesep)
-                subprocess.run(convcmd, shell=False)
+                rcode = self.subruncmd(convcmd)
+                if rcode == 0:
+                    # try to create thumbnails
+                    self.create_thumbnails_sheet(output)
         else:
             self.tw.write('[Error] Cannot find %s!' % urlkey,
                           red=True, bold=True)
             self.tw.write(os.linesep)
+
+    def subruncmd(self, cmd, **kwargs):
+        import subprocess
+        res = subprocess.run(cmd, shell=False)
+        return res.returncode
+
+    def create_thumbnails_sheet(self, videofile, **kwargs):
+        try:
+            import vcsi
+            import sys
+            oldargv = sys.argv
+            sys.argv = [
+                'vcsi', videofile,
+                '-t', '-w', kwargs.get('width', '850'),
+                '-g', kwargs.get('grid', '3x4'),
+                '--grid-spacing', kwargs.get('grid_spacing', '8'),
+                '--start-delay-percent', kwargs.get(
+                    'start_delay_percent', '8'),
+                '--end-delay-percent', kwargs.get('end_delay_percent', '8'),
+                #'--timestamp-font', '/usr/share/fonts/TTF/DejaVuSans.ttf',
+                '--metadata-font', kwargs.get(
+                    'metadata_font',
+                    '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
+            ]
+            vcsi.main()
+            sys.argv = oldargv
+        except Exception as e:
+            pass

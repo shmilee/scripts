@@ -157,10 +157,28 @@ class StreamingExtractor(Extractor):
                           red=True, bold=True)
             self.tw.write(os.linesep)
 
-    def subruncmd(self, cmd, **kwargs):
+    def _bk_subruncmd(self, cmd, **kwargs):
         import subprocess
         res = subprocess.run(cmd, shell=False)
         return res.returncode
+
+    def subruncmd(self, cmd, **kwargs):
+        import subprocess
+        with subprocess.Popen(cmd, **kwargs) as process:
+            try:
+                #print('start sub')
+                stdout, stderr = process.communicate()
+                #print('end sub')
+            except KeyboardInterrupt:
+                # process.kill()
+                process.terminate()
+                # We don't call process.wait() as .__exit__ does that for us.
+                # raise # ctrl-c stop here
+                process.wait()
+                #print('term sub')
+            retcode = process.poll()
+        #print('finish sub')
+        return retcode
 
     def create_thumbnails_sheet(self, videofile, **kwargs):
         try:

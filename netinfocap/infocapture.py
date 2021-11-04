@@ -6,6 +6,7 @@ import os
 import sys
 import pyshark
 import argparse
+import json
 
 
 class InfoCapture(pyshark.LiveCapture):
@@ -18,18 +19,6 @@ class InfoCapture(pyshark.LiveCapture):
         # (interface, tshark_path, display_filter, debug, etc.)
         super(InfoCapture, self).__init__(**kwargs)
         self.extractors = extractors
-
-    def collect(self, result_count, save=True, show=True):
-        '''
-        :param result_count: an amount of results to capture, then stop.
-        :param save: save each result dict to a list.
-        :param show: show each result dict in terminal.
-        '''
-        if save:
-            results = []
-        if len(self.extractors) == 0:
-            self._log.critical('No extractors!')
-            return
         for ex in self.extractors:
             ex.reset()  # reset extractor to initial state
         tw = self.extractors[0].tw
@@ -41,41 +30,53 @@ class InfoCapture(pyshark.LiveCapture):
         for ex in self.extractors:
             tw.write("Using extractor: %s" % ex.intro)
             tw.write(os.linesep)
-        pac_count = 1
-        res_count = 0
+
+    def collect(self, result_count, show=True):
+        '''
+        :param result_count: an amount of results to capture, then stop.
+        :param show: show each result dict in terminal.
+        '''
+        if len(self.extractors) == 0:
+            self._log.critical('No extractors!')
+            return
+        results = []
         try:
             for packet in self.sniff_continuously(packet_count=None):
                 number = int(packet.number.get_default_value())
-                self._log.debug('Packet %d, count: %d' % (number, pac_count))
-                pac_count += 1
+                self._log.debug('Packet %d' % number)
                 for ex in self.extractors:
                     try:
                         ex.extract(packet)
                         if ex.complete:  # extractor complete state
-                            res = ex.result
-                            if save:
-                                results.append(res)
-                            if show:
-                                ex.pretty_print()
-                            if ex.player:  # for play streaming
-                                ex.play()
-                            if ex.ffmpeg:  # for save streaming
-                                ex.convert()
-                            res_count += 1
-                            ex.reset()
+                            results.append(ex.result)
+                            try:
+                                if show:
+                                    ex.pretty_print()
+                                if ex.player:  # for play streaming
+                                    ex.play()
+                                if ex.ffmpeg:  # for save streaming
+                                    ex.convert()
+                            except KeyboardInterrupt:
+                                self._log.critical("[Interrupt] Extractor!")
+                            finally:
+                                ex.reset()
                     except Exception as e:
                         self._log.critical("Can't extract info from packet %s"
                                            % number, exc_info=1)
                 if result_count and result_count > 0:
-                    if res_count >= result_count:
+                    if len(results) >= result_count:
                         break
-        except pyshark.capture.capture.TSharkCrashException as e:
-            if result_count and result_count > 0:
-                result_count = result_count - res_count
-                if result_count > 0:
-                    self.collect(result_count, save=save, show=show)
-        if save:
+        except KeyboardInterrupt:
+            # mv to ? _packets_from_tshark_sync
+            self._log.critical("[Interrupt] InfoCapture!")
             return results
+        except EOFError:
+            self._log.critical("[EOFError]!")
+            return results
+        except pyshark.capture.capture.TSharkCrashException:
+            self._log.critical("[Error] TShark seems to have crashed!")
+            return results
+        return results
 
 
 def main():
@@ -96,6 +97,8 @@ def main():
                         help='Stream extracted URL to a <player>')
     parser.add_argument('-f', dest='ffmpeg', metavar='<ffmpeg>',
                         help='<ffmpeg> used to convert streaming media')
+    parser.add_argument('-o', dest='output', metavar='<output>',
+                        default='output', help='save to <output>.json file')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Show debug information')
     parser.add_argument('-h', '--help', action='store_true',
@@ -125,9 +128,18 @@ def main():
     if isinstance(args.number, list):
         args.number = args.number[0]
     try:
+        res = []
+        interrupt = 0
         with InfoCapture(
                 tuple(extractors), interface=args.interface,
                 display_filter=filters, debug=args.debug) as infocap:
-            infocap.collect(args.number, show=True)
-    except KeyboardInterrupt:
-        sys.exit(130)
+            while len(res) < args.number and interrupt < args.number:
+                start = 'Restart' if interrupt > 0 else 'Start'
+                print("\n[Main Info] %s collecting ...\n" % start)
+                res.extend(infocap.collect(args.number-len(res), show=True))
+                interrupt += 1
+    except pyshark.capture.capture.TSharkCrashException:
+        print("\n[Main Error] TShark seems to have crashed!\n")
+    finally:
+        with open('%s.json' % args.output, 'w') as out:
+            json.dump(res, out)

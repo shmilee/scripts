@@ -67,8 +67,7 @@ class InfoCapture(pyshark.LiveCapture):
                     if len(results) >= result_count:
                         break
         except KeyboardInterrupt:
-            # mv to ? _packets_from_tshark_sync
-            self._log.critical("[Interrupt] InfoCapture!")
+            self._log.critical("[Interrupt] InfoCapture (collect)!")
             return results
         except EOFError:
             self._log.critical("[EOFError]!")
@@ -77,6 +76,38 @@ class InfoCapture(pyshark.LiveCapture):
             self._log.critical("[Error] TShark seems to have crashed!")
             return results
         return results
+
+    def _packets_from_tshark_sync(self, packet_count=None, existing_process=None):
+        tshark_process = existing_process or self.eventloop.run_until_complete(
+            self._get_tshark_process())
+        psml_structure, data = self.eventloop.run_until_complete(
+            self._get_psml_struct(tshark_process.stdout))
+        packets_captured = 0
+
+        data = b""
+        try:
+            while True:
+                try:
+                    packet, data = self.eventloop.run_until_complete(
+                        self._get_packet_from_stream(tshark_process.stdout, data, psml_structure=psml_structure,
+                                                     got_first_packet=packets_captured > 0))
+
+                except EOFError:
+                    self._log.debug("EOF reached (sync)")
+                    self._eof_reached = True
+                    break
+                except KeyboardInterrupt:  # add this
+                    self._log.critical("[Interrupt] Capture (sync)!")
+                    break
+                if packet:
+                    packets_captured += 1
+                    yield packet
+                if packet_count and packets_captured >= packet_count:
+                    break
+        finally:
+            if tshark_process in self._running_processes:
+                self.eventloop.run_until_complete(
+                    self._cleanup_subprocess(tshark_process))
 
 
 def main():

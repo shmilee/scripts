@@ -149,7 +149,7 @@ class StreamingExtractor(Extractor):
                 self.tw.write("[Info] Convert cmd: %s" % convcmd)
                 self.tw.write(os.linesep)
                 rcode = self.subruncmd(convcmd)
-                if rcode == 0:
+                if rcode == 0 or rcode == 255:
                     # try to create thumbnails
                     self.create_thumbnails_sheet(output)
         else:

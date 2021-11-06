@@ -110,26 +110,29 @@ class InfoCapture(pyshark.LiveCapture):
                     self._cleanup_subprocess(tshark_process))
 
 
+allextractors = ['bilive', 'hls', 'rtmpt']
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Netinfo Capture v0.1 by shmilee",
         add_help=False,
         formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('extractor', nargs='*', default='bilive',
-                        choices=['bilive', 'hls', 'rtmpt'],
-                        help='Extractors to use (default: %(default)s)\n')
-    parser.add_argument('-i',  dest='interface', metavar='<interface>',
+    parser.add_argument('extractor', nargs='*', default='all',
+                        choices=['all'] + allextractors,
+                        help='Extractors to use (default: all)\n')
+    parser.add_argument('-i', dest='interface', metavar='<interface>',
                         nargs=1, default='ap0', type=str,
                         help='name of interface (default: %(default)s)')
-    parser.add_argument('-n',  dest='number', metavar='<number>',
-                        nargs=1, default=999, type=int,
-                        help='an amount of results to capture, then stop')
+    parser.add_argument('-n', dest='number', metavar='<number>',
+                        nargs=1, default=99, type=int,
+                        help='an amount of results to capture, then stop (default: 99)')
     parser.add_argument('-p', dest='player', metavar='<player>',
                         help='Stream extracted URL to a <player>')
     parser.add_argument('-f', dest='ffmpeg', metavar='<ffmpeg>',
                         help='<ffmpeg> used to convert streaming media')
-    parser.add_argument('-o', dest='output', metavar='<output>',
-                        default='output', help='save to <output>.json file')
+    parser.add_argument('-o', dest='output', metavar='<output>', default='output',
+                        help='save to <output>.json file (default: %(default)s)')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Show debug information')
     parser.add_argument('-h', '--help', action='store_true',
@@ -139,8 +142,8 @@ def main():
         parser.print_help()
         sys.exit()
 
-    if isinstance(args.extractor, str):
-        args.extractor = [args.extractor]
+    if args.extractor == 'all' or 'all' in args.extractor:
+        args.extractor = allextractors
     extractors = []
     for ex in args.extractor:
         if ex == 'bilive':

@@ -22,7 +22,11 @@ class Extractor(object):
         self.field_keys = field_keys
         self.workers = workers
         self.tw = py.io.TerminalWriter()
-        self.result = {'Number': 0}
+        self.result = {
+            'Number': 0,
+            'Family': type(self).__name__,
+            'Field_Keys': field_keys
+        }
 
     @property
     def intro(self):
@@ -30,7 +34,11 @@ class Extractor(object):
 
     def reset(self):
         num = self.result['Number'] + 1
-        self.result = {'Number': num}
+        self.result = {
+            'Number': num,
+            'Family': type(self).__name__,
+            'Field_Keys': self.field_keys
+        }
 
     @property
     def complete(self):
@@ -56,10 +64,11 @@ class Extractor(object):
         ''':param tw: py.io.TerminalWriter instance'''
         res = self.result
         self.tw.write(os.linesep + '*'*50 + os.linesep*2)
-        self.tw.write('(%s) ' % type(self).__name__, yellow=True, bold=True)
+        self.tw.write('(%s) ' % res['Family'], yellow=True, bold=True)
         self.tw.write('Number: %d' % res['Number'], yellow=True, bold=True)
         self.tw.write(os.linesep)
-        extra = [k for k in res if k not in self.field_keys and k != 'Number']
+        extra = [k for k in res if k not in self.field_keys and k not in (
+            'Number', 'Family', 'Field_Keys')]
         for k in list(self.field_keys) + extra:
             val = res.get(k, None)
             self.tw.write('\t%s: ' % k, green=True, bold=True)

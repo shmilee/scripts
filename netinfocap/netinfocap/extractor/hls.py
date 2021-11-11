@@ -84,6 +84,7 @@ class HLS_Url_Extractor(StreamingExtractor):
             self.result['localm3u8'] = localm3u8
             # need key
             self.field_keys = ('fullurl', 'key')
+            self.result['Field_Keys'] = ('fullurl', 'key')
             # mark localkey file
             self.result['localkey'] = os.path.join(
                 os.path.dirname(localm3u8), newkey)

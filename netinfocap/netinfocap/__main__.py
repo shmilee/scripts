@@ -7,6 +7,7 @@ import argparse
 
 from .extractor import all_extractors
 from .infocapture import InfoCapture
+from .server import InfoServer
 
 
 def main():
@@ -29,6 +30,9 @@ def main():
                         help='<ffmpeg> used to convert streaming media')
     parser.add_argument('-o', dest='output', metavar='<output>', default='output',
                         help='save to <output>.json file (default: %(default)s)')
+    parser.add_argument('--port', dest='port', metavar='<port>',
+                        nargs=1, default=8000, type=int,
+                        help='port of InfoServer (default: %(default)d)')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='Show debug information')
     parser.add_argument('-h', '--help', action='store_true',
@@ -42,15 +46,14 @@ def main():
         args.extractor = all_extractors
     ex_kws = dict(player=args.player, ffmpeg=args.ffmpeg)
     extractors = {ex: ex_kws for ex in args.extractor}
-    if isinstance(args.number, list):
-        args.number = args.number[0]
+    number = args.number[0] if isinstance(args.number, list) else args.number
+    port = args.port[0] if isinstance(args.port, list) else args.port
     try:
-        with InfoCapture(extractors, mresult=args.number, debug=args.debug,
+        with InfoCapture(extractors, mresult=number, debug=args.debug,
                          interface=args.interface) as infocap:
-            from .server import InfoServer
             server = InfoServer()
             while not infocap.collect_isfull():
-                server.start(infocap.Info_Results, port=8000)
+                server.start(infocap.Info_Results, port=port)
                 infocap.collect(output=args.output)
                 server.stop()
     except Exception as e:

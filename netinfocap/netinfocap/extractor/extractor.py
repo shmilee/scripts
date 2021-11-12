@@ -4,6 +4,7 @@
 
 import os
 import py
+import time
 import shutil
 import shlex
 
@@ -59,6 +60,8 @@ class Extractor(object):
         for worker in self.workers:
             method = getattr(self, worker)
             method(packet)
+        if self.complete:
+            self.result['time'] = time.asctime()
 
     def pretty_print(self):
         ''':param tw: py.io.TerminalWriter instance'''

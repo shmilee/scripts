@@ -12,7 +12,7 @@ from .server import InfoServer
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Netinfo Capture v0.1 by shmilee",
+        description="Netinfo Capture v0.2 by shmilee",
         add_help=False,
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('extractor', nargs='*', default='all',
@@ -28,8 +28,8 @@ def main():
                         help='Stream extracted URL to a <player>')
     parser.add_argument('-f', dest='ffmpeg', metavar='<ffmpeg>',
                         help='<ffmpeg> used to convert streaming media')
-    parser.add_argument('-o', dest='output', metavar='<output>', default='output',
-                        help='save to <output>.json file (default: %(default)s)')
+    parser.add_argument('-o', dest='output', metavar='<output>',
+                        help='save to <output>.json file')
     parser.add_argument('--port', dest='port', metavar='<port>',
                         nargs=1, default=8000, type=int,
                         help='port of InfoServer (default: %(default)d)')
@@ -38,6 +38,7 @@ def main():
     parser.add_argument('-h', '--help', action='store_true',
                         help='Show this help message and exit')
     args = parser.parse_args()
+    # print(args)
     if args.help:
         parser.print_help()
         sys.exit()

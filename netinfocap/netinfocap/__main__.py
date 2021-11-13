@@ -12,7 +12,7 @@ from .server import InfoServer
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Netinfo Capture v0.2 by shmilee",
+        description="Netinfo Capture v0.3 by shmilee",
         add_help=False,
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('extractor', nargs='*', default='all',

@@ -54,59 +54,79 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 data = list(li)
         return {
-            'Num': Num, 'n': n,
+            'Num': Num, 'n': n, 'last': 1 if last == '1' else 0,
             'data': data,
         }
 
+    HTML_template = '''<!DOCTYPE html>
+    <html>
+    <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <title>NetInfo results list</title>
+    <style type="text/css">
+    li {
+        width: 720px;
+        word-break: break-all;
+    }
+    li.fix-n > p {
+        margin: 4px 8px;
+        width: 400px;
+        font-weight: bold;
+    }
+    </style>
+    </head>
+    <body>
+    <div id="ALL" style="margin-left:8px;width:100%%;">
+        <h2>NetInfo results list (%d of %d)</h2>%s
+    </div>
+    </body>
+    </html>
+    '''  # % n, Num, results div
+    HTML_result_template = '''
+        %s
+        <div class="panel-primary">
+            <div class="panel-heading" id="%s"><b>%s</b></div>
+            <div class="panel-body" style="margin-left:8px;">
+            <ul>%s
+            </ul>
+            </div>
+        </div>
+    '''  # % starsep, id, title, ul
+
     def _list_d_to_html(self, data):
-        Num, n, data = data['Num'], data['n'], data['data']
-        html = '''<!DOCTYPE html>
-        <html>
-        <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <link rel="icon" href="data:;base64,iVBORw0KGgo=">
-        <title>NetInfo results list</title>
-        </head>
-        <body>
-        <div id="ALL" style="margin-left:8px;">
-        <h2>NetInfo results list (%d of %d)</h2>
-        ''' % (n, Num)
+        Num, n, lst, data = data['Num'], data['n'], data['last'], data['data']
         linesep = '<br>'
-        for res in data:
-            html += linesep + '*'*50 + linesep
-            title = '(%s) Number: %d' % (res['Family'], res['Number'])
-            html += '''
-            <div class="panel panel-primary">
-                <div class="panel-heading" id="%s"><b>%s</b></div>
-                <div class="panel-body list-group" style="margin-left:8px;">
-            ''' % (res['Number'], title)
+        starsep = linesep + '*'*50 + linesep
+        div_res = ''
+        for i, res in enumerate(data):
+            if lst == 1:  # reverse
+                count = Num - i
+            else:
+                count = i + 1
+            _id = res['Number']
+            title = '(%s) Number: %d, Count: %d' % (res['Family'], _id, count)
             extra = [k for k in res if k not in res['Field_Keys']
                      and k not in ('Number', 'Family', 'Field_Keys')]
-            html += '\n<ul>'
+            li = ''
             for k in list(res['Field_Keys']) + extra:
                 v = res.get(k, None)
                 if v and (
                         v.startswith('http') or
                         v.startswith('rtmp') or
                         os.path.isfile(v)):
-                    html += '\n<li>%s: <a href="%s">%s</a></li>' % (k, v, v)
+                    li += '\n<li>%s: <a href="%s">%s</a></li>' % (k, v, v)
                 else:
-                    html += '\n<li>%s: %s</li>' % (k, v)
+                    li += '\n<li>%s: %s</li>' % (k, v)
                 # try to fix some keys in html
                 if v and v.endswith(os.linesep):
                     m = re.match('(rtmp.*live/s.*wsSecret.*sign=.{3}).*', v)
                     if m:
-                        v = m.groups()[0] + linesep
-                        html += '\n<li> fix-%s: %s@@</li>' % (k, v)
-            html += '''\n</ul>\n
-                </div>
-            </div>'''
-        html += '''
-        </div>
-        </body>
-        </html>
-        '''
-        return html
+                        v = '<p>%s%s@@<p>' % (m.groups()[0], linesep)
+                        li += '\n<li class="fix-n"> fix-%s: %s</li>' % (k, v)
+            div_res += self.HTML_result_template % (starsep, _id, title, li)
+        return self.HTML_template % (n, Num, div_res)
 
     def do_GET(self):
         '''

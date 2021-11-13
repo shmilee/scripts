@@ -63,12 +63,14 @@ class Extractor(object):
         if self.complete:
             self.result['time'] = time.asctime()
 
-    def pretty_print(self):
-        ''':param tw: py.io.TerminalWriter instance'''
+    def pretty_print(self, count=None):
+        ''':param count: add count index of this result'''
         res = self.result
         self.tw.write(os.linesep + '*'*50 + os.linesep*2)
         self.tw.write('(%s) ' % res['Family'], yellow=True, bold=True)
         self.tw.write('Number: %d' % res['Number'], yellow=True, bold=True)
+        if count:
+            self.tw.write(', Count: %s' % count, yellow=True, bold=True)
         self.tw.write(os.linesep)
         extra = [k for k in res if k not in self.field_keys and k not in (
             'Number', 'Family', 'Field_Keys')]

@@ -78,7 +78,7 @@ class InfoCapture(pyshark.LiveCapture):
                         if ex.complete:  # extractor complete state
                             self.Info_Results.append(ex.result)
                             try:
-                                ex.pretty_print()
+                                ex.pretty_print(count=len(self.Info_Results))
                                 if ex.player:  # for play streaming
                                     ex.play()
                                 if ex.ffmpeg:  # for save streaming

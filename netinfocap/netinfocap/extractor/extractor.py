@@ -7,6 +7,7 @@ import py
 import time
 import shutil
 import shlex
+import readline
 
 
 class Extractor(object):

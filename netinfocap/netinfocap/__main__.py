@@ -31,6 +31,8 @@ def main():
                         help='<ffmpeg> used to convert streaming media')
     parser.add_argument('-o', dest='output', metavar='<output>',
                         help='save to <output>.json file')
+    parser.add_argument('-s', '--server', action='store_true',
+                        help='Start an InfoServer')
     parser.add_argument('--port', dest='port', metavar='<port>',
                         nargs=1, default=8000, type=int,
                         help='port of InfoServer (default: %(default)d)')
@@ -58,11 +60,14 @@ def main():
         with InfoCapture(
                 extractors, mresult=number, debug=args.debug,
                 interface=args.interface, override_prefs=prefs) as infocap:
-            server = InfoServer()
+            if args.server:
+                server = InfoServer()
             while not infocap.collect_isfull():
-                server.start(infocap.Info_Results, port=port)
+                if args.server:
+                    server.start(infocap.Info_Results, port=port)
                 infocap.collect(output=args.output)
-                server.stop()
+                if args.server:
+                    server.stop()
     except Exception as e:
         print("\n[Main Error] %s!\n" % e)
 

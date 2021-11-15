@@ -2,6 +2,7 @@
 
 # Copyright (c) 2021 shmilee
 
+import os
 import sys
 import argparse
 
@@ -49,9 +50,14 @@ def main():
     extractors = {ex: ex_kws for ex in args.extractor}
     number = args.number[0] if isinstance(args.number, list) else args.number
     port = args.port[0] if isinstance(args.port, list) else args.port
+    prefs = {}
+    sslkeylog = os.getenv("SSLKEYLOGFILE", None)
+    if sslkeylog and os.path.isfile(sslkeylog):
+        prefs['ssl.keylog_file'] = sslkeylog
     try:
-        with InfoCapture(extractors, mresult=number, debug=args.debug,
-                         interface=args.interface) as infocap:
+        with InfoCapture(
+                extractors, mresult=number, debug=args.debug,
+                interface=args.interface, override_prefs=prefs) as infocap:
             server = InfoServer()
             while not infocap.collect_isfull():
                 server.start(infocap.Info_Results, port=port)

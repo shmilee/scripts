@@ -9,6 +9,7 @@ import mimetypes
 import json
 import urllib.parse as urlparse
 import multiprocessing
+import traceback
 
 
 class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -156,9 +157,16 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._set_ok_headers(path='html')
                 self.wfile.write(self._list_d_to_html(data).encode())
+        except BrokenPipeError as e:
+            traceback.print_exc()
+            try:
+                estr = '%s. HTTPServer may need to restart now!' % e
+                self.send_error(500, 'INTERNAL SERVER ERROR: %s' % estr)
+            except Exception:
+                pass
         except Exception as e:
             self.send_error(500, 'INTERNAL SERVER ERROR: %s' % e)
-            print(e)
+            traceback.print_exc()
         return
 
 
@@ -175,6 +183,10 @@ class InfoServer(object):
         print('[Info] Start running server on port %d ...' % port)
         try:
             self.httpd.serve_forever()
+        # except BrokenPipeError:
+        #    print("[BrokenPipe] InfoServer (restarting)!")
+        #    self.stop()
+        #    self.start()
         except KeyboardInterrupt:
             print("[Interrupt] InfoServer (serve_forever)!")
 
@@ -186,6 +198,8 @@ class InfoServer(object):
     def stop(self):
         if self.httpd:
             self.httpd.shutdown()
+        self.httpd = None
         if self.process:
             self.process.terminate()
             # self.process.close()
+        self.process = None

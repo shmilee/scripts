@@ -8,6 +8,8 @@ import time
 import shutil
 import shlex
 import readline
+import json
+import subprocess
 
 
 class Extractor(object):
@@ -94,15 +96,19 @@ class StreamingExtractor(Extractor):
         Note:
         1. *fullurl* is necessary!
         2. ffmpeg can add "-i #(INPUT)#" to set options order.
+        3. :attr:`ffprobe` is optional.
         '''
         if type(player) is str and shutil.which(shlex.split(player)[0]):
             self.player = player
         else:
             self.player = None
+        self.ffmpeg, self.ffprobe = None, None
         if type(ffmpeg) is str and shutil.which(shlex.split(ffmpeg)[0]):
             self.ffmpeg = ffmpeg
-        else:
-            self.ffmpeg = None
+            ffprobe = shlex.split(ffmpeg)[0][:-4] + 'probe'
+            if shutil.which(ffprobe):
+                ffprobe += ' -v quiet -print_format json -show_streams'
+                self.ffprobe = ffprobe
         super(StreamingExtractor, self).__init__(**kwargs)
 
     @property
@@ -140,6 +146,32 @@ class StreamingExtractor(Extractor):
                           red=True, bold=True)
             self.tw.write(os.linesep)
 
+    def _add_default_out_opts(self, URL, convcmd):
+        '''set output file in convcmd and return'''
+        output, ext = os.path.splitext(input('[ASK] Set output file: '))
+        output = output or 'stream-output-%d' % self.result['Number']
+        if not ext and self.ffprobe:
+            cmd = shlex.split(self.ffprobe) + [URL]
+            try:
+                info = json.loads(self.check_cmd_output(cmd))
+                for s in info['streams']:
+                    if s['codec_type'] == 'video' and s['codec_name'] == 'h264':
+                        ext = '.mp4'
+                        break
+            except Exception:
+                pass
+        ext = ext or '.flv'
+        if '-vcodec' not in convcmd:
+            convcmd.extend(['-vcodec', 'copy'])
+        if '-acodec' not in convcmd:
+            convcmd.extend(['-acodec', 'copy'])
+        output = '%s%s' % (output, ext)
+        prefix = time.strftime('%F')
+        if not output.startswith(prefix):
+            output = '%s-%s' % (prefix, output)
+        convcmd.append(output)
+        return output
+
     def convert(self, askprompt=None, urlkey='fullurl'):
         URL = self.result.get(urlkey, None)
         if URL:
@@ -157,10 +189,7 @@ class StreamingExtractor(Extractor):
                     # ffmpeg -i URL opt OUT
                     convcmd.insert(1, '-i')
                     convcmd.insert(2, URL)
-                output = input('[ASK] Set output file: ')
-                if not output:
-                    output = 'stream-output-%d.ts' % self.result['Number']
-                convcmd.append(output)
+                output = self._add_default_out_opts(URL, convcmd)
                 self.tw.write("[Info] Convert cmd: %s" % convcmd)
                 self.tw.write(os.linesep)
                 rcode = self.subruncmd(convcmd)
@@ -172,13 +201,16 @@ class StreamingExtractor(Extractor):
                           red=True, bold=True)
             self.tw.write(os.linesep)
 
+    def check_cmd_output(self, cmd, **kwargs):
+        kwargs['universal_newlines'] = True
+        res = subprocess.check_output(cmd, **kwargs)
+        return res
+
     def _bk_subruncmd(self, cmd, **kwargs):
-        import subprocess
         res = subprocess.run(cmd, shell=False)
         return res.returncode
 
     def subruncmd(self, cmd, **kwargs):
-        import subprocess
         with subprocess.Popen(cmd, **kwargs) as process:
             try:
                 #print('start sub')

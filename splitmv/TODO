@@ -1,3 +1,12 @@
 只要添加-allowed_extensions ALL就可以直接使用本地的key.key文件了，完整代码如下
 
 ffmpeg -allowed_extensions ALL -protocol_whitelist "file,http,crypto,tcp" -i index.m3u8 -c copy out.mp4
+
+旋转 0123,
+0 = 90CounterCLockwise and Vertical Flip (default)
+1 = 90Clockwise
+2 = 90CounterClockwise
+3 = 90Clockwise and Vertical Flip
+
+缩放scale, -1 auto
+-vf "transpose=1,scale=720:-1"

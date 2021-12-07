@@ -1,0 +1,56 @@
+# pandoc + citeproc + crossref + pip3 + make + ...
+#   pandoc-{codeblock-include,include,minted,mustache} + ...
+#   pandoc-{xnos,latex-extensions,numbering} + ...
+#
+# docker build --network=host --force-rm --no-cache --rm -t shmilee/pandoc:2.16.2 .
+# docker run --rm -i -t -v $PWD:/home/pandoc/work shmilee/pandoc:2.16.2 CMD
+#
+
+FROM pandoc/alpine-crossref:2.16.2
+
+LABEL maintainer="shmilee <shmilee.zju@gmail.com>" version="1.0"
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
+    TIMEZONE=Asia/Shanghai \
+    TERM=xterm-color \
+    PIP_INDEX_URL=https://mirrors.ustc.edu.cn/pypi/web/simple
+
+RUN VER=`awk -F'[=.]' '/VERSION_ID/{print $2"."$3}' /etc/os-release` \
+ && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v${VER}/main > /etc/apk/repositories \
+ && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v${VER}/community >> /etc/apk/repositories \
+ && echo "==> tini py3-pip ..." \
+ && apk --no-cache add tini py3-pip bash make tzdata \
+        py3-psutil \
+ && cp /usr/share/zoneinfo/${TIMEZONE} /etc/localtime \
+ && echo "${TIMEZONE}" > /etc/timezone \
+ && pip3 --no-cache-dir install -i ${PIP_INDEX_URL} \
+        pandocfilters==1.5.0 \
+        panflute==2.1.3 \
+        pypandoc==1.6.4 \
+        pandoc-codeblock-include==0.1.1 \
+        pandoc-include==1.2.0 \
+        pandoc-minted==0.2 \
+        pandoc-mustache==0.1 \
+        pandoc-fignos==2.4.0 \
+        pandoc-eqnos==2.5.0 \
+        pandoc-tablenos==2.3.0 \
+        pandoc-secnos==2.2.2 \
+        pandoc-xnos==2.5.0 \
+        pandoc-latex-extensions==0.2.2 \
+        pandoc-numbering==3.4.0.0 \
+ && adduser -u 1000 -D -G users -s /bin/bash pandoc \
+ && su pandoc -c "mkdir -p /home/pandoc/work" \
+ && echo "==> clean ..." \
+ && pip3 freeze > /py3-requirements.txt \
+ && find /usr/lib/python3* \
+		\( -type d -a -name test -o -name tests \) \
+		-exec rm -rf '{}' + ; \
+    rm -rf /usr/share/man/ /usr/share/doc/ /root /tmp \
+ && install -d -m1777 /tmp \
+ && install -d -m0700 /root
+
+ADD ./bash.bashrc /home/pandoc/.bashrc
+WORKDIR /home/pandoc/work
+USER pandoc
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/usr/local/bin/pandoc"]

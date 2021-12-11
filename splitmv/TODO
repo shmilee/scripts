@@ -10,3 +10,7 @@ ffmpeg -allowed_extensions ALL -protocol_whitelist "file,http,crypto,tcp" -i ind
 
 缩放scale, -1 auto
 -vf "transpose=1,scale=720:-1"
+
+录屏
+ffmpeg -video_size 1024x768 -framerate 25 -f x11grab -i :0.0+100,200 output.mp4
+https://wiki.archlinux.org/title/FFmpeg#Screen_capture

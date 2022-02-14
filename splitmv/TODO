@@ -14,3 +14,7 @@ ffmpeg -allowed_extensions ALL -protocol_whitelist "file,http,crypto,tcp" -i ind
 录屏
 ffmpeg -video_size 1024x768 -framerate 25 -f x11grab -i :0.0+100,200 output.mp4
 https://wiki.archlinux.org/title/FFmpeg#Screen_capture
+
+去水印
+ffmpeg -i in.mp4  -vf "delogo=x=23:y=12:w=200:h=45:show=0, delogo=x=780:y=18:w=152:h=28:show=0" -c:a copy out.mp4
+https://stackoverflow.com/questions/67552620/how-can-i-apply-delogo-for-a-duration-of-video-in-ffmpeg-or-apply-delogo-in-muti

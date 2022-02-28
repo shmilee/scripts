@@ -2,7 +2,7 @@
 
 _pkgname=wps-office
 _pkgver='11.1.0.10920'
-_srcurl='https://wdl1.pcfg.cache.wpscdn.com/wpsdl/wpsoffice/download/linux/10920'
+_srcurl='https://wdl1.cache.wps.cn/wps/download/ep/Linux2019/10920'
 _common_dirs=(
     ./etc
     ./usr
@@ -23,10 +23,10 @@ license=('custom:Kingsoft')
 url='http://wps-community.org/'
 conflicts=('wps-office' 'kingsoft-office')
 options=(!emptydirs !strip)
-source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}.XA_amd64.deb")
+source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
 sha1sums=('0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
           '1819bae14fa888f92c29c9fd01b59246f53e6937'
-          '2c08fd9b25f79e7c9bc3d934a189714686a3fd40')
+          '5748fec427c5c1dab2b356c2f058dcce22f15212')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 

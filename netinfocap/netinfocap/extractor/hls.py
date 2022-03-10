@@ -55,8 +55,7 @@ class HLS_Url_Extractor(StreamingExtractor):
         key = None
         if localm3u8:
             with open(localm3u8, 'r') as file:
-                for i in range(20):  # check 20 lines
-                    line = file.readline()
+                for line in file.readlines():  # check every lines
                     if line.startswith('#EXT-X-KEY:'):
                         m = re.match('''.*URI=["'](?P<key>.*)["'].*''', line)
                         if m:
@@ -110,21 +109,23 @@ class HLS_Url_Extractor(StreamingExtractor):
             pass
 
     def play(self):
-        if 'key' in self.result and self.player == 'mpv':
-            opt = ' --demuxer-lavf-o-append=allowed_extensions=ts,key'
-            opt += ' --demuxer-lavf-o-append=protocol_whitelist=http,tcp,file,crypto,data'
-            self.player = 'mpv %s' % opt
+        if 'key' in self.result:
+            if self.player == 'mpv':
+                opt = ' --demuxer-lavf-o-append=allowed_extensions=ts,key'
+                opt += ' --demuxer-lavf-o-append=protocol_whitelist=http,tcp,file,crypto,data'
+                self.player = 'mpv %s' % opt
             super(HLS_Url_Extractor, self).play(urlkey='localm3u8')
             self.player = 'mpv'
         else:
-            super(HLS_Url_Extractor, self).play(urlkey='localm3u8')
+            super(HLS_Url_Extractor, self).play(urlkey='fullurl')
 
     def convert(self):
-        if 'key' in self.result and self.ffmpeg == 'ffmpeg':
-            opt = ' -allowed_extensions ts,key'
-            opt += ' -protocol_whitelist http,tcp,file,crypto,data'
-            self.ffmpeg = 'ffmpeg %s -i #(INPUT)#' % opt
+        if 'key' in self.result:
+            if self.ffmpeg == 'ffmpeg':
+                opt = ' -allowed_extensions ts,key'
+                opt += ' -protocol_whitelist http,tcp,file,crypto,data'
+                self.ffmpeg = 'ffmpeg %s -i #(INPUT)#' % opt
             super(HLS_Url_Extractor, self).convert(urlkey='localm3u8')
             self.ffmpeg = 'ffmpeg'
         else:
-            super(HLS_Url_Extractor, self).convert(urlkey='localm3u8')
+            super(HLS_Url_Extractor, self).convert(urlkey='fullurl')

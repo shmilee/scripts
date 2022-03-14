@@ -2,6 +2,7 @@
 
 # Copyright (c) 2021 shmilee
 
+import re
 from .extractor import StreamingExtractor
 
 
@@ -16,13 +17,32 @@ class Bilive_Url_Extractor(StreamingExtractor):
             field_keys=field_keys, workers=workers,
             player=player, ffmpeg=ffmpeg)
 
+    def __match_uri(self, request_uri):
+        uri = request_uri.split('?')[0]
+        if re.match('^/live-bvc/.*flv$', uri):
+            return True
+        elif re.match('^/live/.*flv$', uri):
+            return True
+        else:
+            return False
+
+    def __get_id(self, request_full_uri):
+        for pat in (
+                '.*/live-bvc/(.*)/live_([_\d]+)\.flv\?.*',
+                '.*/live/flv\?.*stream=(\d+)_.*',
+                '.*/live/(.*)\.flv.*',
+        ):
+            m = re.match(pat, request_full_uri)
+            if m:
+                return '-'.join(m.groups())
+        return '/'.join(request_full_uri.split('?')[0].split('/')[-2:])
+
     def get_http_live(self, packet):
         '''Get fullurl from packet'''
         try:
-            if packet.http.request_uri_path.startswith('/live-bvc/'):
+            if self.__match_uri(packet.http.request_uri):
                 fulluri = packet.http.request_full_uri
-                path = fulluri.split('?')[0]
-                self.result['id'] = '/'.join(path.split('/')[-2:])
+                self.result['id'] = self.__get_id(fulluri)
                 self.result['fullurl'] = fulluri
         except Exception:
             pass

@@ -24,21 +24,26 @@ class RTMPT_Url_Extractor(StreamingExtractor):
         try:
             if packet.rtmpt.amf_string == 'connect':
                 alt = packet.rtmpt.amf_string.alternate_fields
-                if alt[2].get_default_value() == 'tcUrl':
-                    self.result['connect'] = alt[3].get_default_value()
-                    self.join_connect_play()
+                for i in range(len(alt)):
+                    if alt[i].get_default_value() == 'tcUrl':
+                        self.result['connect'] = alt[i+1].get_default_value()
+                        self.join_connect_play()
+                        break
         except Exception:
             pass
 
     def get_rtmpt_play(self, packet):
         ''' TCP/RTMPT Packet -> Layer RTMPT -> amf_string 'play' '''
         try:
-            if packet.rtmpt.amf_string == 'play':
-                alt = packet.rtmpt.amf_string.alternate_fields
-                self.result['play'] = alt[0].get_default_value()
-                play = self.result['play'].split('?')[0]
-                self.result['id'] = play.split('_')[0]
-                self.join_connect_play()
+            for l in packet.layers:
+                if l.layer_name == 'rtmpt' and 'amf_string' in l.field_names:
+                    if l.amf_string == 'play':
+                        alt = l.amf_string.alternate_fields
+                        self.result['play'] = alt[0].get_default_value()
+                        play = self.result['play'].split('?')[0]
+                        self.result['id'] = play.split('_')[0]
+                        self.join_connect_play()
+                        break
         except Exception:
             pass
 

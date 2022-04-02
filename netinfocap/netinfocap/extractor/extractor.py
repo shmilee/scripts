@@ -140,6 +140,7 @@ class StreamingExtractor(Extractor):
                 playcmd = shlex.split(self.player) + [URL]
                 self.tw.write("[Info] Play cmd: %s" % playcmd)
                 self.tw.write(os.linesep)
+                self.result['playcmd'] = shlex.join(playcmd)
                 rcode = self.subruncmd(playcmd)
         else:
             self.tw.write('[Error] Cannot find %s!' % urlkey,
@@ -192,6 +193,7 @@ class StreamingExtractor(Extractor):
                 output = self._add_default_out_opts(URL, convcmd)
                 self.tw.write("[Info] Convert cmd: %s" % convcmd)
                 self.tw.write(os.linesep)
+                self.result['convcmd'] = shlex.join(convcmd)
                 rcode = self.subruncmd(convcmd)
                 if rcode == 0 or rcode == 255:
                     # try to create thumbnails

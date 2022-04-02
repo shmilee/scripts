@@ -76,9 +76,9 @@ class InfoCapture(pyshark.LiveCapture):
                     try:
                         ex.extract(packet)
                         if ex.complete:  # extractor complete state
-                            self.Info_Results.append(ex.result)
+                            ex_res = ex.result
                             try:
-                                ex.pretty_print(count=len(self.Info_Results))
+                                ex.pretty_print(count=len(self.Info_Results)+1)
                                 if ex.player:  # for play streaming
                                     ex.play()
                                 if ex.ffmpeg:  # for save streaming
@@ -87,6 +87,7 @@ class InfoCapture(pyshark.LiveCapture):
                                 self._log.critical("[Interrupt] Extractor!")
                             finally:
                                 ex.reset()
+                            self.Info_Results.append(ex_res)
                     except Exception as e:
                         self._log.critical("Can't extract info from packet %s"
                                            % number, exc_info=1)
@@ -99,10 +100,10 @@ class InfoCapture(pyshark.LiveCapture):
         except pyshark.capture.capture.TSharkCrashException:
             self._log.critical("[Error] TShark seems to have crashed!")
         if output:
-            with open('%s.json' % output, 'w') as out:
+            with open('%s.json' % output, 'w', encoding='utf8') as out:
                 tw.write(os.linesep)
                 tw.write("[Info] Save results to %s.json ..." % output)
-                json.dump(list(self.Info_Results), out)
+                json.dump(list(self.Info_Results), out, ensure_ascii=False)
                 tw.write(os.linesep)
 
     def _packets_from_tshark_sync(self, packet_count=None, existing_process=None):

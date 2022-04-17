@@ -1,20 +1,24 @@
-只要添加-allowed_extensions ALL就可以直接使用本地的key.key文件了，完整代码如下
+# 只要添加-allowed_extensions ALL就可以直接使用本地的key.key文件了，完整代码如下
 
 ffmpeg -allowed_extensions ALL -protocol_whitelist "file,http,crypto,tcp" -i index.m3u8 -c copy out.mp4
 
-旋转 0123,
+# 旋转 0123,
 0 = 90CounterCLockwise and Vertical Flip (default)
 1 = 90Clockwise
 2 = 90CounterClockwise
 3 = 90Clockwise and Vertical Flip
 
-缩放scale, -1 auto
+# 缩放scale, -1 auto
 -vf "transpose=1,scale=720:-1"
 
-录屏
+# 录屏
 ffmpeg -video_size 1024x768 -framerate 25 -f x11grab -i :0.0+100,200 output.mp4
 https://wiki.archlinux.org/title/FFmpeg#Screen_capture
 
-去水印
+# 去水印
 ffmpeg -i in.mp4  -vf "delogo=x=23:y=12:w=200:h=45:show=0, delogo=x=780:y=18:w=152:h=28:show=0" -c:a copy out.mp4
 https://stackoverflow.com/questions/67552620/how-can-i-apply-delogo-for-a-duration-of-video-in-ffmpeg-or-apply-delogo-in-muti
+
+# Hanging M3U8 downloads in ffmpeg
+ffmpeg has a flag named "rw_timeout" in microseconds, 10,000,000
+ffmpeg -rw_timeout 10000000 -i ...

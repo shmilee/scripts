@@ -7,6 +7,7 @@ import re
 import tempfile
 import contextlib
 import requests
+import urllib.parse
 
 from .extractor import StreamingExtractor
 
@@ -52,41 +53,57 @@ class HLS_Url_Extractor(StreamingExtractor):
 
     def check_need_key(self, m3u8):
         localm3u8 = self.download_tmpfile(m3u8)
-        key = None
+        key, method = None, None
         if localm3u8:
             with open(localm3u8, 'r') as file:
                 for line in file.readlines():  # check every lines
                     if line.startswith('#EXT-X-KEY:'):
+                        m = re.match('.*METHOD=(?P<method>(?:NONE|AES-128))',
+                                     line)
+                        if m:
+                            method = m.groupdict()['method']
                         m = re.match('''.*URI=["'](?P<key>.*)["'].*''', line)
                         if m:
                             key = m.groupdict()['key']
                             break
+        newkey = None
         if key:
             prefix = os.path.splitext(os.path.basename(localm3u8))[0]
             newkey = '%s-%s' % (prefix, key)
-            # edit localm3u8
-            with open(localm3u8, 'r') as file:
-                datalines = file.readlines()
-            with open(localm3u8, 'w') as file:
-                for line in datalines:
-                    if line.startswith('#EXT-X-KEY:'):
-                        # edit key name
-                        file.write(line.replace(key, newkey))
-                    else:
-                        if (line.startswith('#') or line.startswith('http')
-                                or re.match('\s*\n', line)):
-                            file.write(line)
-                        else:
-                            # relative path -> URL
-                            file.write(os.path.dirname(m3u8))
-                            file.write('/' + line)
-            self.result['localm3u8'] = localm3u8
             # need key
             self.field_keys = ('fullurl', 'key')
             self.result['Field_Keys'] = ('fullurl', 'key')
             # mark localkey file
             self.result['localkey'] = os.path.join(
                 os.path.dirname(localm3u8), newkey)
+        # edit localm3u8
+        u = urllib.parse.urlparse(m3u8)
+        hosturl = '%s://%s' % (u.scheme, u.hostname)
+        with open(localm3u8, 'r') as file:
+            datalines = file.readlines()
+        with open(localm3u8, 'w') as file:
+            for line in datalines:
+                if line.startswith('#EXT-X-KEY:'):
+                    # edit key name
+                    if key and newkey:
+                        file.write(line.replace(key, newkey))
+                    else:
+                        if method != 'NONE':
+                            self.tw.write('[Error] Lost EXT-X-KEY: %s' % line,
+                                          red=True, bold=True)
+                        file.write(line)
+                else:
+                    if (line.startswith('#') or line.startswith('http')
+                            or re.match('\s*\n', line)):
+                        file.write(line)
+                    elif line.startswith('/'):
+                        # root, add host url
+                        file.write(hosturl + line)
+                    else:
+                        # relative path -> URL
+                        file.write(os.path.dirname(m3u8))
+                        file.write('/' + line)
+        self.result['localm3u8'] = localm3u8
 
     def get_http_m3u8_or_key(self, packet):
         '''Get full uri from packet'''

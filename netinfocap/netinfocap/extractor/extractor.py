@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021 shmilee
+# Copyright (c) 2021-2022 shmilee
 
 import os
 import py
@@ -17,6 +17,7 @@ class Extractor(object):
     Choose information from some packets then bring them together as a dict.
     '''
     display_filter = None
+    control_keys = ('Index', 'Number', 'Family', 'Field_Keys')
 
     def __init__(self, field_keys=(), workers=()):
         '''
@@ -27,7 +28,8 @@ class Extractor(object):
         self.workers = workers
         self.tw = py.io.TerminalWriter()
         self.result = {
-            'Number': 0,
+            'Index': None,
+            'Number': 1,
             'Family': type(self).__name__,
             'Field_Keys': field_keys
         }
@@ -39,6 +41,7 @@ class Extractor(object):
     def reset(self):
         num = self.result['Number'] + 1
         self.result = {
+            'Index': None,
             'Number': num,
             'Family': type(self).__name__,
             'Field_Keys': self.field_keys
@@ -66,17 +69,18 @@ class Extractor(object):
         if self.complete:
             self.result['time'] = time.asctime()
 
-    def pretty_print(self, count=None):
-        ''':param count: add count index of this result'''
+    def pretty_print(self, index=None):
+        ''':param index: add index of this result'''
         res = self.result
         self.tw.write(os.linesep + '*'*50 + os.linesep*2)
         self.tw.write('(%s) ' % res['Family'], yellow=True, bold=True)
         self.tw.write('Number: %d' % res['Number'], yellow=True, bold=True)
-        if count:
-            self.tw.write(', Count: %s' % count, yellow=True, bold=True)
+        if index:
+            self.tw.write(', Index: %s' % index, yellow=True, bold=True)
+            self.result['Index'] = index
         self.tw.write(os.linesep)
-        extra = [k for k in res if k not in self.field_keys and k not in (
-            'Number', 'Family', 'Field_Keys')]
+        extra = [k for k in res
+                 if k not in self.field_keys and k not in self.control_keys]
         for k in list(self.field_keys) + extra:
             val = res.get(k, None)
             self.tw.write('\t%s: ' % k, green=True, bold=True)

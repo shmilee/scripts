@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Copyright (c) 2015-2019 amietn
+# The MIT License (MIT)
 
 """Create a video contact sheet.
 """
@@ -38,9 +41,7 @@ import parsedatetime
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-with open(os.path.join(here, "VERSION")) as f:
-    VERSION = f.readline().strip()
-__version__ = VERSION
+__version__ = '7.0.13.g264f894-r2'
 __author__ = "Nils Amiet"
 
 
@@ -296,13 +297,16 @@ class MediaInfo(object):
             self.duration_seconds = float(self.video_stream["duration"])
         except (KeyError, AttributeError):
             # otherwise fallback to format duration
-            self.duration_seconds = float(format_dict["duration"])
+            self.duration_seconds = float(format_dict.get("duration", 0))
 
         self.duration = MediaInfo.pretty_duration(self.duration_seconds)
 
-        self.filename = os.path.basename(format_dict["filename"])
+        if format_dict["filename"].startswith('http'):
+            self.filename = format_dict["filename"]
+        else:
+            self.filename = os.path.basename(format_dict["filename"])
 
-        self.size_bytes = int(format_dict["size"])
+        self.size_bytes = int(format_dict.get("size", 0))
         self.size = self.human_readable_size(self.size_bytes)
 
     @staticmethod
@@ -867,7 +871,9 @@ def prepare_metadata_text_lines(media_info, header_font, header_margin, width, t
     template = ""
     if template_path is None:
         template = """{{filename}}
+        {% if size_bytes>0 %}
         File size: {{size}}
+        {% endif %}
         Duration: {{duration}}
         Dimensions: {{sample_width}}x{{sample_height}}"""
     else:
@@ -1278,7 +1284,7 @@ def error_exit(message):
     sys.exit(-1)
 
 
-def main():
+def main(argv=None):
     """Program entry point
     """
     # Argument parser before actual argument parser to let the user overwrite the config path
@@ -1604,7 +1610,7 @@ def main():
         dest="timestamp_format"
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=argv)
 
     if args.list_template_attributes:
         print_template_attributes()
@@ -1649,7 +1655,7 @@ def process_file(path, args):
 
     args = deepcopy(args)
 
-    if not os.path.exists(path):
+    if not path.startswith('http') and not os.path.exists(path):
         if args.ignore_errors:
             print("File does not exist, skipping: {}".format(path))
             return

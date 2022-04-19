@@ -11,7 +11,7 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='netinfocap',
-    version='0.6',
+    version='0.8',
     description='Netinfo Capture',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -43,15 +43,18 @@ setup(
         'pyshark>=0.4.0',
         'py>=1.11.0',
         'requests>=2.0.0',
+    ] + [
+        # video-thumbnails,
+        # for sub package vcsi from 'https://github.com/amietn/vcsi'
+        'numpy', 'pillow', 'jinja2', 'texttable', 'parsedatetime',
     ],
-    extras_require={
-        'video-thumbnails': ['vcsi>=7.0.0'],
-    },
+    extras_require={},
     package_data={},
     data_files=[],
     entry_points={
         'console_scripts': [
             'netinfocap = netinfocap.__main__:main',
+            'netinfocap-vcsi = netinfocap.vcsi:main',
         ],
     },
 )

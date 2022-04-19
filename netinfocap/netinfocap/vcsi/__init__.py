@@ -1,3 +1,3 @@
 def main():
-    import vcsi.vcsi
-    vcsi.vcsi.main()
+    from . import vcsi
+    vcsi.main()

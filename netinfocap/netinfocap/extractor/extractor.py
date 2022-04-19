@@ -235,11 +235,10 @@ class StreamingExtractor(Extractor):
 
     def create_thumbnails_sheet(self, videofile, **kwargs):
         try:
-            import vcsi
-            import sys
-            oldargv = sys.argv
-            sys.argv = [
-                'vcsi', videofile,
+            from ..vcsi import vcsi
+            self.tw.write("[Info] Create thumbnails for '%s'. " % videofile)
+            vcsi.main(argv=[
+                videofile,
                 '-t', '-w', kwargs.get('width', '850'),
                 '-g', kwargs.get('grid', '3x4'),
                 '--grid-spacing', kwargs.get('grid_spacing', '8'),
@@ -250,8 +249,6 @@ class StreamingExtractor(Extractor):
                 '--metadata-font', kwargs.get(
                     'metadata_font',
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
-            ]
-            vcsi.main()
-            sys.argv = oldargv
+            ])
         except Exception as e:
             pass

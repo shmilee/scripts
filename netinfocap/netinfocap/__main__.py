@@ -15,7 +15,7 @@ from .server import InfoServer
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Netinfo Capture v0.6 by shmilee",
+        description="Netinfo Capture v0.8 by shmilee",
         add_help=False,
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('extractor', nargs='*', default='all',
@@ -65,16 +65,19 @@ def main():
         old_results = []
         if output and os.path.exists(output):  # os.path.isfile
             if args.overwrite:
-                print("[WARNING] Results in %s will be overwritten!" % output)
+                print("[WARNING] Results in %s will be overwritten, "
+                      "if we get new results!" % output)
             else:
                 with open(output, 'r', encoding='utf8') as out:
-                    old_results = json.load(out)
+                    old_results = json.load(out)['results']
         L_old = len(old_results)
         if L_old > 0:
             print("[Info] Reload %d results in '%s'." % (L_old, output))
+        control_keys = ('Index', 'Number', 'Family', 'Field_Keys')  # default
         with InfoCapture(
                 extractors, max_result=number, debug=args.debug,
                 interface=args.interface, override_prefs=prefs) as infocap:
+            control_keys = infocap.extractors[0].control_keys
             if args.server:
                 server = InfoServer()
             while not infocap.collect_isfull():
@@ -94,7 +97,11 @@ def main():
             with open(output, 'w', encoding='utf8') as out:
                 print()
                 print("[Info] Save %d results to %s ..." % (L_all, output))
-                json.dump(old_results, out, ensure_ascii=False)
+                json.dump(dict(
+                    version=1,
+                    control_keys=control_keys,
+                    results=old_results,
+                ), out, ensure_ascii=False)
     except Exception as e:
         print("\n[Main Error] %s!\n" % e)
 

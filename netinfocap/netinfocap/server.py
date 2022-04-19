@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2021 shmilee
+# Copyright (c) 2021-2022 shmilee
 
 import os
 import re
@@ -96,6 +96,8 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
         </div>
     '''  # % starsep, id, title, ul
 
+    control_keys = ('Index', 'Number', 'Family', 'Field_Keys')  # default
+
     def _list_d_to_html(self, data):
         Num, n, lst, data = data['Num'], data['n'], data['last'], data['data']
         linesep = '<br>'
@@ -106,10 +108,10 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
                 count = Num - i
             else:
                 count = i + 1
-            _id = res['Number']
-            title = '(%s) Number: %d, Count: %d' % (res['Family'], _id, count)
+            _idx = res['Index']
+            title = '(%s) Index: %d, Count: %d' % (res['Family'], _idx, count)
             extra = [k for k in res if k not in res['Field_Keys']
-                     and k not in ('Number', 'Family', 'Field_Keys')]
+                     and k not in self.control_keys]
             li = ''
             for k in list(res['Field_Keys']) + extra:
                 v = res.get(k, None)
@@ -126,7 +128,7 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
                     if m:
                         v = '<p>%s%s@@<p>' % (m.groups()[0], linesep)
                         li += '\n<li class="fix-n"> fix-%s: %s</li>' % (k, v)
-            div_res += self.HTML_result_template % (starsep, _id, title, li)
+            div_res += self.HTML_result_template % (starsep, _idx, title, li)
         return self.HTML_template % (n, Num, div_res)
 
     def do_GET(self):
@@ -171,7 +173,7 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
 
 
 class InfoServer(object):
-    '''Server info results as json/html'''
+    '''Serve info results as json/html'''
 
     def __init__(self):
         self.httpd = None

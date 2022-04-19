@@ -3,10 +3,10 @@
 # Copyright (c) 2021 shmilee
 
 import re
-from .extractor import StreamingExtractor
+from .extractor import Streaming_Extractor
 
 
-class Bilive_Url_Extractor(StreamingExtractor):
+class Bilive_Url_Extractor(Streaming_Extractor):
     '''Get Bilibili live(HTTP-FLV) URI from Packet.'''
     display_filter = 'http.request.method==GET'
 

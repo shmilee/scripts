@@ -5,10 +5,10 @@
 import os
 import re
 
-from .extractor import StreamingExtractor
+from .extractor import Streaming_Extractor
 
 
-class RTMPT_Url_Extractor(StreamingExtractor):
+class RTMPT_Url_Extractor(Streaming_Extractor):
     '''Get RTMPT connect/play url from Packet.'''
     display_filter = 'rtmpt'
 

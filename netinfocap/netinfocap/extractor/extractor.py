@@ -8,6 +8,7 @@ import time
 import shutil
 import shlex
 import readline
+import tempfile
 import json
 import subprocess
 
@@ -17,7 +18,10 @@ class Extractor(object):
     Choose information from some packets then bring them together as a dict.
     '''
     display_filter = None
-    control_keys = ('Index', 'Number', 'Family', 'Field_Keys')
+    control_keys = ('Index', 'Number', 'UniqID', 'Family', 'Field_Keys')
+    TMPDIR = os.path.join(tempfile.gettempdir(), 'netinfocap')
+    if not os.path.exists(TMPDIR):
+        os.mkdir(TMPDIR)
 
     def __init__(self, field_keys=(), workers=()):
         '''
@@ -30,7 +34,8 @@ class Extractor(object):
         self.result = {
             'Index': None,
             'Number': 1,
-            'Family': type(self).__name__,
+            'UniqID': tempfile.mktemp(prefix='', dir=''),
+            'Family': type(self).__name__.replace('_Extractor', ''),
             'Field_Keys': field_keys
         }
 
@@ -43,7 +48,8 @@ class Extractor(object):
         self.result = {
             'Index': None,
             'Number': num,
-            'Family': type(self).__name__,
+            'UniqID': tempfile.mktemp(prefix='', dir=''),
+            'Family': type(self).__name__.replace('_Extractor', ''),
             'Field_Keys': self.field_keys
         }
 
@@ -74,6 +80,7 @@ class Extractor(object):
         res = self.result
         self.tw.write(os.linesep + '*'*50 + os.linesep*2)
         self.tw.write('(%s) ' % res['Family'], yellow=True, bold=True)
+        self.tw.write('UniqID: %s, ' % res['UniqID'], yellow=True, bold=True)
         self.tw.write('Number: %d' % res['Number'], yellow=True, bold=True)
         if index:
             self.tw.write(', Index: %s' % index, yellow=True, bold=True)
@@ -89,7 +96,7 @@ class Extractor(object):
         self.tw.write(os.linesep)
 
 
-class StreamingExtractor(Extractor):
+class Streaming_Extractor(Extractor):
     '''Streaming media extractor with player, ffmpeg'''
 
     def __init__(self, player=None, ffmpeg=None, **kwargs):
@@ -113,7 +120,7 @@ class StreamingExtractor(Extractor):
             if shutil.which(ffprobe):
                 ffprobe += ' -v quiet -print_format json -show_streams'
                 self.ffprobe = ffprobe
-        super(StreamingExtractor, self).__init__(**kwargs)
+        super(Streaming_Extractor, self).__init__(**kwargs)
 
     @property
     def intro(self):
@@ -154,7 +161,7 @@ class StreamingExtractor(Extractor):
     def _add_default_out_opts(self, URL, convcmd):
         '''set output file in convcmd and return'''
         output, ext = os.path.splitext(input('[ASK] Set output file: '))
-        output = output or 'stream-output-%d' % self.result['Number']
+        output = output or 'stream-output-%d' % self.result['UniqID']
         if not ext and self.ffprobe:
             cmd = shlex.split(self.ffprobe) + [URL]
             try:

@@ -9,7 +9,7 @@ import contextlib
 import requests
 import urllib.parse
 
-from .extractor import StreamingExtractor
+from .extractor import Streaming_Extractor
 
 
 REQUESTS_KWS = dict(
@@ -21,7 +21,7 @@ REQUESTS_KWS = dict(
 )
 
 
-class HLS_Url_Extractor(StreamingExtractor):
+class HLS_Url_Extractor(Streaming_Extractor):
     '''Get HLS uri from Packet.'''
     display_filter = 'http.request.method==GET'
 
@@ -31,15 +31,15 @@ class HLS_Url_Extractor(StreamingExtractor):
         super(HLS_Url_Extractor, self).__init__(
             field_keys=field_keys, workers=workers,
             player=player, ffmpeg=ffmpeg)
-        self.tmpdir = os.path.join(tempfile.gettempdir(), 'netinfocap-hls')
+        self.tmpdir = os.path.join(self.TMPDIR, 'HLS')
         if not os.path.exists(self.tmpdir):
             os.mkdir(self.tmpdir)
 
     def download_tmpfile(self, url, fpath=None):
         if fpath is None:
             suffix = os.path.splitext(url.split('?')[0])[-1]
-            fpath = tempfile.mktemp(prefix='%d-' % self.result['Number'],
-                                    suffix=suffix, dir=self.tmpdir)
+            fpath = os.path.join(self.tmpdir, '%d-%s%s' % (
+                self.result['Number'], self.result['UniqID'], suffix))
         try:
             with contextlib.closing(requests.get(url, **REQUESTS_KWS)) as rp:
                 with open(fpath, "wb") as file:

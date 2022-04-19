@@ -2,6 +2,7 @@
 
 # Copyright (c) 2021 shmilee
 
+from .extractor import Extractor
 all_extractors = ['bilive', 'hls', 'rtmpt']
 
 

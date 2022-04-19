@@ -8,7 +8,7 @@ import json
 import argparse
 import readline
 
-from .extractor import all_extractors
+from .extractor import Extractor, all_extractors
 from .infocapture import InfoCapture
 from .server import InfoServer
 
@@ -73,11 +73,9 @@ def main():
         L_old = len(old_results)
         if L_old > 0:
             print("[Info] Reload %d results in '%s'." % (L_old, output))
-        control_keys = ('Index', 'Number', 'Family', 'Field_Keys')  # default
         with InfoCapture(
                 extractors, max_result=number, debug=args.debug,
                 interface=args.interface, override_prefs=prefs) as infocap:
-            control_keys = infocap.extractors[0].control_keys
             if args.server:
                 server = InfoServer()
             while not infocap.collect_isfull():
@@ -99,7 +97,7 @@ def main():
                 print("[Info] Save %d results to %s ..." % (L_all, output))
                 json.dump(dict(
                     version=1,
-                    control_keys=control_keys,
+                    control_keys=Extractor.control_keys,
                     results=old_results,
                 ), out, ensure_ascii=False)
     except Exception as e:

@@ -176,6 +176,14 @@ class Config:
             cls.fallback_fonts = comma_separated_string_type(fallback_fonts)
 
 
+def _if_localm3u8_opt(path):
+    if os.path.isfile(path) and path.endswith('.m3u8'):
+        return ['-allowed_extensions', 'ts,key',
+                '-protocol_whitelist', 'http,tcp,file,crypto,data']
+    else:
+        return []
+
+
 class MediaInfo(object):
     """Collect information about a video file
     """
@@ -199,7 +207,7 @@ class MediaInfo(object):
         """Probe video file using ffprobe
         """
         ffprobe_command = [
-            "ffprobe",
+            "ffprobe", *_if_localm3u8_opt(path),
             "-v", "quiet",
             "-print_format", "json",
             "-show_format",
@@ -301,7 +309,7 @@ class MediaInfo(object):
 
         self.duration = MediaInfo.pretty_duration(self.duration_seconds)
 
-        if format_dict["filename"].startswith('http'):
+        if is_online_file(format_dict["filename"]):
             self.filename = format_dict["filename"]
         else:
             self.filename = os.path.basename(format_dict["filename"])
@@ -511,7 +519,7 @@ class MediaCapture(object):
         skip_delay = MediaInfo.pretty_duration(self.skip_delay_seconds, show_millis=True)
 
         ffmpeg_command = [
-            "ffmpeg",
+            "ffmpeg", *_if_localm3u8_opt(self.path),
             "-ss", time,
             "-i", self.path,
             "-vframes", "1",
@@ -542,7 +550,7 @@ class MediaCapture(object):
 
             if skip_time_seconds < 0:
                 ffmpeg_command = [
-                    "ffmpeg",
+                    "ffmpeg", *_if_localm3u8_opt(self.path),
                     "-i", self.path,
                     "-ss", time,
                     "-vframes", "1",
@@ -559,7 +567,7 @@ class MediaCapture(object):
             else:
                 skip_time = MediaInfo.pretty_duration(skip_time_seconds, show_millis=True)
                 ffmpeg_command = [
-                    "ffmpeg",
+                    "ffmpeg", *_if_localm3u8_opt(self.path),
                     "-ss", skip_time,
                     "-i", self.path,
                     "-ss", skip_delay,
@@ -1281,7 +1289,10 @@ def error(message):
 def error_exit(message):
     """Print an error message and exit"""
     error(message)
-    sys.exit(-1)
+    if 'vcsi' in sys.argv[0]:
+        sys.exit(-1)
+    else:
+        raise Exception("Exit vcsi!")
 
 
 def main(argv=None):
@@ -1647,6 +1658,11 @@ def main(argv=None):
                     process_file_or_ignore(filename, args)
 
 
+def is_online_file(path):
+    return (path.startswith('http://') or path.startswith('https://')
+            or path.startswith('rtmp://'))
+
+
 def process_file(path, args):
     """Generate a video contact sheet for the file at given path
     """
@@ -1655,7 +1671,7 @@ def process_file(path, args):
 
     args = deepcopy(args)
 
-    if not path.startswith('http') and not os.path.exists(path):
+    if not is_online_file(path) and not os.path.exists(path):
         if args.ignore_errors:
             print("File does not exist, skipping: {}".format(path))
             return

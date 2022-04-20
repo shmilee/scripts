@@ -17,6 +17,7 @@ from argparse import ArgumentTypeError
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from typing import List, Iterable
+import urllib.parse as urlparse
 
 try:
     from subprocess import DEVNULL
@@ -184,6 +185,26 @@ def _if_localm3u8_opt(path):
         return []
 
 
+def is_online_file(path):
+    return (path.startswith('http://') or path.startswith('https://')
+            or path.startswith('rtmp://'))
+
+
+def short_online_file(url, qv_cut=6):
+    u = urlparse.urlparse(url)
+    sq, haslong = [], False
+    for k, v in urlparse.parse_qsl(u.query):
+        if len(v) > qv_cut:
+            sq.append('%s=%s...' % (k, v[:qv_cut]))
+            haslong = True
+        else:
+            sq.append('%s=%s' % (k, v))
+    if haslong:
+        return u._replace(query='&'.join(sq)).geturl()
+    else:
+        return url
+
+
 class MediaInfo(object):
     """Collect information about a video file
     """
@@ -310,7 +331,7 @@ class MediaInfo(object):
         self.duration = MediaInfo.pretty_duration(self.duration_seconds)
 
         if is_online_file(format_dict["filename"]):
-            self.filename = format_dict["filename"]
+            self.filename = short_online_file(format_dict["filename"])
         else:
             self.filename = os.path.basename(format_dict["filename"])
 
@@ -1656,11 +1677,6 @@ def main(argv=None):
                     files_to_process = [path]
                 for filename in files_to_process:
                     process_file_or_ignore(filename, args)
-
-
-def is_online_file(path):
-    return (path.startswith('http://') or path.startswith('https://')
-            or path.startswith('rtmp://'))
 
 
 def process_file(path, args):

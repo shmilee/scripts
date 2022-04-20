@@ -38,7 +38,7 @@ class HLS_Url_Extractor(Streaming_Extractor):
     def download_tmpfile(self, url, fpath=None):
         if fpath is None:
             suffix = os.path.splitext(url.split('?')[0])[-1]
-            fpath = os.path.join(self.tmpdir, '%d-%s%s' % (
+            fpath = os.path.join(self.tmpdir, 'hls-%d-%s%s' % (
                 self.result['Number'], self.result['UniqID'], suffix))
         try:
             with contextlib.closing(requests.get(url, **REQUESTS_KWS)) as rp:

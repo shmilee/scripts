@@ -95,11 +95,11 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                 li += '\n<li class="fix-n"> fix-%s: %s</li>' % (k, v)
     if (thumbnails_dest and os.path.isdir(thumbnails_dest)
             and res['Family'] in ['Bilive_Url', 'HLS_Url', 'RTMPT_Url']):
-        tfile = '%d-%s.jpg' % (res['Index'], res['UniqID'])
+        tfile = 'thumb-%d-%s.jpg' % (res['Index'], res['UniqID'])
         tpath = os.path.join(thumbnails_dest, tfile)
         text = 'snapshot:' + linesep
         if os.path.isfile(tpath):
-            print("[Info] Use created thumbnails '%s'" % tfile)
+            print("[Info] Use created thumbnail '%s'" % tfile)
             li += '\n<li>%s<img src="%s" width="400" alt="%s"></li>' % (
                 text, tpath, tpath)
         else:
@@ -116,7 +116,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
             ]
             try:
-                print("[Info] Creating thumbnails '%s' ..." % tfile)
+                print("[Info] Creating thumbnail '%s' ..." % tfile)
                 vcsi.main(argv=args+[res['fullurl'], '-o', tpath])
             except Exception:
                 if 'localm3u8' in res:

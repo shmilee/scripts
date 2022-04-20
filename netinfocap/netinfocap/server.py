@@ -67,7 +67,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
     linesep = '<br>'
     starsep = linesep + '*'*50 + linesep
     _idx = res['Index']
-    title = '(%s) UniqID: %s, Index: %d, Count: %d' % (
+    title = '(%s) UID: %s, Index: %d, Count: %d' % (
         res['Family'], res['UniqID'], _idx, count)
     extra = [k for k in res if k not in res['Field_Keys']
              and k not in control_keys]
@@ -95,14 +95,17 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                 li += '\n<li class="fix-n"> fix-%s: %s</li>' % (k, v)
     if (thumbnails_dest and os.path.isdir(thumbnails_dest)
             and res['Family'] in ['Bilive_Url', 'HLS_Url', 'RTMPT_Url']):
-        tpath = os.path.join(thumbnails_dest, '%d-%s.jpg' %
-                             (res['Index'], res['UniqID']))
+        tfile = '%d-%s.jpg' % (res['Index'], res['UniqID'])
+        tpath = os.path.join(thumbnails_dest, tfile)
+        text = 'snapshot:' + linesep
         if os.path.isfile(tpath):
-            li += '\n<li><img src="%s" alt="%s"></li>' % (tpath, tpath)
+            print("[Info] Use created thumbnails '%s'" % tfile)
+            li += '\n<li>%s<img src="%s" width="400" alt="%s"></li>' % (
+                text, tpath, tpath)
         else:
             kwargs = thumbnails_kwargs or {}
             args = [
-                '-t', '-w', kwargs.get('width', '800'),
+                '-t', '-w', kwargs.get('width', '600'),
                 '-g', kwargs.get('grid', '1x1'),
                 '--grid-spacing', kwargs.get('grid_spacing', '8'),
                 '--start-delay-percent', kwargs.get(
@@ -113,12 +116,14 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
             ]
             try:
+                print("[Info] Creating thumbnails '%s' ..." % tfile)
                 vcsi.main(argv=args+[res['fullurl'], '-o', tpath])
             except Exception:
                 if 'localm3u8' in res:
                     vcsi.main(argv=args+[res['localm3u8'], '-o', tpath])
             if os.path.isfile(tpath):
-                li += '\n<li><img src="%s" alt="%s"></li>' % (tpath, tpath)
+                li += '\n<li>%s<img src="%s" width="400" alt="%s"></li>' % (
+                    text, tpath, tpath)
     return HTML_result_template % (starsep, _idx, title, li)
 
 

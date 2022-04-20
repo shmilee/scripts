@@ -54,6 +54,7 @@ setup(
     entry_points={
         'console_scripts': [
             'netinfocap = netinfocap.__main__:main',
+            'netinfocap-json2html = netinfocap.convert_json:main',
             'netinfocap-vcsi = netinfocap.vcsi:main',
         ],
     },

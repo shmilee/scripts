@@ -102,6 +102,8 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
             print("[Info] Use created thumbnail '%s'" % tfile)
             li += '\n<li>%s<img src="%s" width="400" alt="%s"></li>' % (
                 text, tpath, tpath)
+        elif os.path.exists(tpath+'.mask'):
+            print("[Info] Skip to create thumbnail '%s'" % tfile)
         else:
             kwargs = thumbnails_kwargs or {}
             args = [
@@ -116,7 +118,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
             ]
             try:
-                print("[Info] Creating thumbnail '%s' ..." % tfile)
+                print("[Info] Creating thumbnail '%s' ..." % tpath)
                 vcsi.main(argv=args+[res['fullurl'], '-o', tpath])
             except Exception:
                 if 'localm3u8' in res:
@@ -124,6 +126,10 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
             if os.path.isfile(tpath):
                 li += '\n<li>%s<img src="%s" width="400" alt="%s"></li>' % (
                     text, tpath, tpath)
+            else:
+                print("[Error] Failed to create '%s'! Mask it!" % tfile)
+                with open(tpath+'.mask', 'w') as fp:
+                    fp.write('')
     return HTML_result_template % (starsep, _idx, title, li)
 
 

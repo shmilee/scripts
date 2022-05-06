@@ -70,7 +70,7 @@ def json2html(file, select_filter=('HLS_Url',)):
         res, Num-i, control_keys=control_keys,
         copy_dest=outdir,
         thumbnails_dest=outdir,
-        thumbnails_kwargs=dict(width='800', grid='3x4'))
+        thumbnails_kwargs=dict(width='800', grid='2x3'))
         for i, res in enumerate(results[::-1])
     ]
     # outdir relative to html

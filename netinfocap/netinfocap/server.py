@@ -110,6 +110,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                 '-t', '-w', kwargs.get('width', '600'),
                 '-g', kwargs.get('grid', '1x1'),
                 '--grid-spacing', kwargs.get('grid_spacing', '8'),
+                '--quality', kwargs.get('quality', '80'),
                 '--start-delay-percent', kwargs.get(
                     'start_delay_percent', '8'),
                 '--end-delay-percent', kwargs.get('end_delay_percent', '8'),

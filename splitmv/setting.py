@@ -22,4 +22,6 @@ Tlist = (
 
 Template = 0
 
+tmpsuffix = None
+
 outfile = './test.f4v'

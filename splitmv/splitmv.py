@@ -30,7 +30,8 @@ Templates = [TemplateHead + temp + TemplateTail for temp in TemplateBody]
 
 class Splitmv(object):
 
-    def __init__(self, infile, Tlist, *, outfile=None, template=None):
+    def __init__(self, infile, Tlist,
+            tmpsuffix=None, outfile=None, template=None):
         if not os.path.exists(infile):
             raise IOError("%s not exist" % infile)
         self.infile = infile
@@ -46,13 +47,14 @@ class Splitmv(object):
                 if not isinstance(t, (tuple, list)):
                     raise NameError("%s is not a list." % str(t))
         self.Tlist = Tlist
-
+        # useful for too long duration
+        # https://segmentfault.com/a/1190000040994402
+        self.tmpsuffix = tmpsuffix or self.suffix
         if outfile:
             self.outfile = outfile
         else:
             self.outfile = '%s/%s-SplitOut%s' % (
                 self.indir, self.name, self.suffix)
-
         if template:
             self.template = template
         else:
@@ -65,7 +67,7 @@ class Splitmv(object):
 
         ptmplist = []
         for i, t in enumerate(self.Tlist):
-            ptmp = '%s/split-p%s%s' % (workdir, str(i), self.suffix)
+            ptmp = '%s/split-p%s%s' % (workdir, str(i), self.tmpsuffix)
             cmd = self.template % (t[0], self.infile, t[1], ptmp)
             print(' -> %s' % cmd)
             if not os.system(cmd):
@@ -87,5 +89,6 @@ if __name__ == "__main__":
     video = Splitmv(s.File,
                     s.Tlist,
                     template=Templates[s.Template],
+                    tmpsuffix=s.tmpsuffix,
                     outfile=s.outfile)
     video.run('./tmpdir')

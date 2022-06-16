@@ -60,7 +60,13 @@ def main():
     sslkeylog = os.getenv("SSLKEYLOGFILE", None)
     if sslkeylog and os.path.isfile(sslkeylog):
         prefs['ssl.keylog_file'] = sslkeylog
-    output = '%s.json' % args.output if args.output else None
+    if args.output:
+        if args.output.endswith('.json'):
+            output = args.output
+        else:
+            output = '%s.json' % args.output
+    else:
+        output = None
     try:
         old_results = []
         if output and os.path.exists(output):  # os.path.isfile

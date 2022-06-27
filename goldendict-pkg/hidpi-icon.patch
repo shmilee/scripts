@@ -1,0 +1,22 @@
+--- a/main.cc	2022-06-27 00:01:13.000000000 +0800
++++ b/main.cc	2022-06-26 23:59:48.000000000 +0800
+@@ -235,6 +235,19 @@
+ #endif
+   #endif
+ 
++// test AA_EnableHighDpiScaling
++// https://doc.qt.io/qt-5/highdpi.html#high-dpi-support-in-qt
++#if QT_VERSION >= QT_VERSION_CHECK( 5, 6, 0 )
++    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
++#endif
++// test AA_UseHighDpiPixmaps
++// https://www.qt.io/blog/2013/04/25/retina-display-support-for-mac-os-ios-and-x11
++// https://github.com/goldendict/goldendict/issues/1441
++#if QT_VERSION >= QT_VERSION_CHECK( 5, 1, 0 )
++    //gdWarning("!!!!! test AA_UseHighDpiPixmaps");
++    QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
++#endif
++
+   // The following clause fixes a race in the MinGW runtime where throwing
+   // exceptions for the first time in several threads simultaneously can cause
+   // an abort(). This code throws first exception in a safe, single-threaded

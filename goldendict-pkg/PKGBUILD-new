@@ -4,8 +4,8 @@
 
 _pkgname=goldendict
 pkgname="${_pkgname}"
-_commit=7fa7ad6e529a58173d0f3f2b0b73f12a316b5cc8
-_commit_ver="r$((2547-2016)).g${_commit:0:8}"
+_commit=d9e25834b2841860056fed92c09f8f837598480d
+_commit_ver="r$((3470-2016)).g${_commit:0:8}"
 pkgver="1.5.0rc2.${_commit_ver}"
 pkgrel=1
 pkgdesc='A feature-rich dictionary lookup program, supporting multiple dictionary formats and online dictionaries'
@@ -22,18 +22,18 @@ depends=('libvorbis' 'zlib' 'hunspell' 'libxtst' 'lzo' 'bzip2'
 )
 provides=("stardict" "${_pkgname}")
 conflicts=("${_pkgname}")
-source=("${_pkgname}-${pkgver}.tar.gz::https://github.com/${_pkgname}/${_pkgname}/archive/${_commit}.tar.gz" hidpi-icon.patch)
-sha256sums=('f31f9f3b5d6800a260f54e77680372e3516666d302e5237c5d7015ac00c4ec81'
-            '635759e4e4e3049bd5cb2f8b72878826266a62446cf85737f490789b808c9b5d')
+source=("${_pkgname}-${pkgver}.tar.gz::https://github.com/xiaoyifang/${_pkgname}/archive/${_commit}.tar.gz")
+sha256sums=('6b76c954a3e0cfd5354bc6c6c27345eb38da2135de98f1e977858e8cc88fb497')
 
 prepare() {
     cd "${_pkgname}-${_commit}"
-    patch -Np1 -i "$srcdir"/hidpi-icon.patch
+    msg "Remove winlibs/ "
+    rm -r winlibs/
     msg "Fixing QMake in goldendict.pro file..."
     echo "QMAKE_CXXFLAGS_RELEASE = ${CFLAGS}" >> goldendict.pro
     echo "QMAKE_CFLAGS_RELEASE = ${CXXFLAGS}" >> goldendict.pro
     msg "Setting default version string..."
-    sed -i "s/^\(VERSION = .*-RC2\).*/\1-${_commit_ver}/" goldendict.pro
+    sed -i "s/^\(VERSION = \).*/\1-${pkgver}/" goldendict.pro
     qmake-qt5 PREFIX='/usr' \
         'CONFIG+=no_epwing_support' \
         'CONFIG+=chinese_conversion_support' \

@@ -108,6 +108,7 @@ class Streaming_Extractor(Extractor):
         1. *fullurl* is necessary!
         2. ffmpeg can add "-i #(INPUT)#" to set options order.
         3. :attr:`ffprobe` is optional.
+        4. Set `input of [ASK]`=='MoreInfo' to toggle more-info-print on/off.
         '''
         if type(player) is str and shutil.which(shlex.split(player)[0]):
             self.player = player
@@ -120,6 +121,7 @@ class Streaming_Extractor(Extractor):
             if shutil.which(ffprobe):
                 ffprobe += ' -v quiet -print_format json -show_streams'
                 self.ffprobe = ffprobe
+        self.MoreInfo = bool(os.getenv("MOREINFO", False))
         super(Streaming_Extractor, self).__init__(**kwargs)
 
     @property
@@ -134,8 +136,10 @@ class Streaming_Extractor(Extractor):
     def ask(self, prompt, attr='player'):
         if getattr(self, attr, None):
             askyes = input('[ASK] ' + prompt)
-            if askyes in ('y', 'yes', 'Y', 'YES'):
+            if askyes.lower() in ('y', 'yes'):
                 return True
+            if askyes.lower() == 'moreinfo':
+                self.MoreInfo = not self.MoreInfo
         else:
             self.tw.write('[Error] Cannot find %s!' % attr,
                           red=True, bold=True)

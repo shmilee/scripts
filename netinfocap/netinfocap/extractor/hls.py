@@ -105,6 +105,13 @@ class HLS_Url_Extractor(Streaming_Extractor):
                         file.write('/' + line)
         self.result['localm3u8'] = localm3u8
 
+    def _more_print_segments(self, fullurl):
+        '''print segments '.ts' url'''
+        if fullurl.endswith('.ts'):
+            self.tw.write('[More] ', green=True, bold=True)
+            self.tw.write('segment: %s' % fullurl, bold=True)
+            self.tw.write(os.linesep)
+
     def get_http_m3u8_or_key(self, packet):
         '''Get full uri from packet'''
         try:
@@ -122,6 +129,8 @@ class HLS_Url_Extractor(Streaming_Extractor):
                             fullurl, fpath=self.result['localkey'])
                         if localkey:
                             self.result['key'] = fullurl
+                if self.MoreInfo:
+                    self._more_print_segments(fullurl)
         except Exception:
             pass
 

@@ -53,5 +53,5 @@ class RTMPT_Url_Extractor(Streaming_Extractor):
             fullurl = '/'.join((self.result['connect'], self.result['play']))
             if (re.match('rtmp.*live/s.*wsSecret=.*wsTime=.*sign.*', fullurl)
                     and len(fullurl) > 250):
-                fullurl = fullurl + os.linesep
+                fullurl = fullurl.split(' ')[0] + os.linesep
             self.result['fullurl'] = fullurl

@@ -7,6 +7,7 @@ import sys
 import re
 import json
 import tempfile
+import argparse
 
 from .server import HTML_template, _result2div
 
@@ -99,15 +100,63 @@ def json2html(file, select_filter=('HLS_Url',)):
             json.dump(sorted(all_keys), out, ensure_ascii=False)
         print("[Info] Saved '%d +1' keys." % (len(all_keys)-1))
     print("[Info] DONE.")
+    return keys_file
+
+
+def cmds_for_upload_share_jsons(keysjson, dest, destkeys='keys.json'):
+    '''
+    Show cmds to upload netinfocap-share-keys.json, xxx-share.json, xxx.files
+    to *dest*.
+    dest example: user@host:http/data/json-datas
+    '''
+    print("\n[Info] Get upload cmds:\n")
+    scp_cmds = []
+    with open(keysjson, 'r', encoding='utf8') as f:
+        keys = json.load(f)
+    scp_cmds.append('scp %s %s/%s' % (keysjson, dest, destkeys))
+    locdir = os.path.dirname(keysjson)
+    for key in keys:  # xxx-share
+        scp_cmds.append('')
+        share = '%s.json' % key
+        locshare = os.path.join(locdir, share)
+        if os.path.isfile(locshare):
+            scp_cmds.append('scp %s %s/' % (locshare, dest))
+        else:
+            print("!!! lost %s!" % locshare)
+        files = '%s.files' % key[:-6]
+        locfiles = os.path.join(locdir, files)
+        if os.path.isdir(locfiles):
+            scp_cmds.append('scp -r %s/ %s/' % (locfiles, dest))
+        else:
+            print("!!! lost %s/!" % locfiles)
+    print('\n'.join(scp_cmds))
 
 
 def main():
-    if len(sys.argv) == 2:
-        json2html(sys.argv[1])
-    elif len(sys.argv) > 2:
-        json2html(sys.argv[1], select_filter=sys.argv[2:])
+    parser = argparse.ArgumentParser(
+        description="Netinfocap json2html by shmilee",
+        add_help=False,
+        formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('json', type=str,
+                        help='path of json file')
+    parser.add_argument('--filter', nargs='*',
+                        help='results Family filters\n')
+    parser.add_argument('--dest', metavar='<vps path>', type=str,
+                        help='for share data upload cmds')
+    parser.add_argument('-h', '--help', action='store_true',
+                        help='Show this help message and exit')
+    args = parser.parse_args()
+    # print(args)
+    if args.help:
+        parser.print_help()
+        sys.exit()
+
+    if args.filter:
+        keysjson = json2html(args.json, select_filter=args.filter)
     else:
-        print("Usage: %s json-file [select_filter ...]" % sys.argv[0])
+        keysjson = json2html(args.json)
+    if args.dest:
+        cmds_for_upload_share_jsons(keysjson, args.dest)
 
 
 if __name__ == '__main__':

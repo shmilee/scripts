@@ -11,7 +11,7 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='netinfocap',
-    version='0.9.1',
+    version='0.9.5',
     description='Netinfo Capture',
     long_description=long_description,
     long_description_content_type='text/x-rst',

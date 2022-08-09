@@ -15,7 +15,7 @@ from .server import InfoServer
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Netinfo Capture v0.9.1 by shmilee",
+        description="Netinfo Capture v0.9.5 by shmilee",
         add_help=False,
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('extractor', nargs='*', default='all',

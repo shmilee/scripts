@@ -4,3 +4,6 @@ Md_Tex_pandoc/*.pdf
 docker/*.tar*
 easyconnect-in-docker/ECDATA/*
 __pycache__/
+*.src.tar.gz
+*.pkg.tar.xz
+*.pkg.tar.zst

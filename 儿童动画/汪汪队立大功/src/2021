@@ -1,0 +1,30 @@
+https://www.olevod.com/index.php/vod/play/id/31566/sid/1/nid/1.html
+
+URL='https://europe.olemovienews.com/hlstimeofffmp4/20211117/ekiGwgui/mp4/ekiGwgui.mp4/index-v1-a1.m3u8'
+
+
+mpv $URL
+
+[ffmpeg] https: HTTP error 502 Cannot find server.
+[ffmpeg/demuxer] hls: Failed to open an initialization section in playlist 0
+
+[ffmpeg/demuxer] mov,mp4,m4a,3gp,3g2,mj2: could not find corresponding trex (id 1)
+[ffmpeg/demuxer] mov,mp4,m4a,3gp,3g2,mj2: could not find corresponding track id 0
+[ffmpeg/demuxer] mov,mp4,m4a,3gp,3g2,mj2: trun track id unknown, no tfhd was found
+
+ffmpeg -i $URL out.mp4
+
+[https @ 0x55920b3ab6c0] HTTP error 502 Cannot find server.
+[hls @ 0x55920afe1940] Failed to open an initialization section in playlist 0
+
+
+FIX:
+
+m3u8 EXT-X-MAP ffmpeg
+
+ffmpeg Range header download m3u8 seekable
+
+"""
+mpv --demuxer-lavf-o-append=http_seekable=0 $URL
+ffmpeg -http_seekable 0 -i $URL out.mp4
+"""

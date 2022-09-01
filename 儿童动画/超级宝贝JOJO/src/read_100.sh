@@ -3,11 +3,13 @@
 # https://www.iqiyi.com/a_19rrhzqjm9.html
 
 #src="1-50.html"
-src="51-69.html"
+#src="51-69.html"
+src="70-95.html"
 cmd="you-get %s -O 超级宝贝JOJO-%s-%s.mp4"
 
 #for i in `seq 1 50`; do
-for i in `seq 51 69`; do
+#for i in `seq 51 69`; do
+for i in `seq 70 95`; do
     urls=($(grep "第$i集" $src | sed 's|.*<a.*href="//\(.*.html\)" .*|\1|g'))
     if [[ ${#urls[@]} -ge 2 ]] && [[ ${urls[0]} != ${urls[1]} ]]; then
         echo "-----------> 第$i集 url 出错 <----------"

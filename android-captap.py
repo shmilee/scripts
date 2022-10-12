@@ -145,7 +145,11 @@ def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
             print(f' >> [{i}] Get wrong text: {text}. {refresh_str}.')
         tt.touch_screen('tap', X1, Y1)
         time.sleep(sleep)
-        img = tt.capture_screen()
+        try:
+            img = tt.capture_screen()
+        except Exception as e:
+            print(' !! Error when capture screen!', e)
+            break
         if i < 2 and not re.match(check_pat, text):
             print(' >> Getting new X2, Y2 for the second time ...')
             X2, Y2, _, _ = tt.locate_xy(img, zhan, partial=1)
@@ -205,8 +209,8 @@ def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0]):
     print('\t'.join(['KEY:'] + [f'{int(k)//10000}w' for k in all_K] + ['ALL']))
     for it, _, _ in interval:
         print(f'{it}\t'
-              + '\t'.join([f'{count[k][it]}' for k in all_K])
-              + f'\t{all_count[it]}')
+              + '\t'.join([f' {count[k][it]}' for k in all_K])
+              + f'\t{all_count[it]}\t{all_count[it]/all_N:.2%}')
 
 
 if __name__ == '__main__':

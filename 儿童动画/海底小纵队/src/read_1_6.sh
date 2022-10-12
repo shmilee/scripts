@@ -1,11 +1,11 @@
 #!/bin/bash
 
-src=${1:-"第1季.html"}
+src=${1:-"第1季.html.gz"}
 season=${src%.*}
 cmd="you-get %s -O 海底小纵队-${season}-%s" # rm .mp4?
 
 n=1
-sed -n "/href=.*html/p" $src | while read line; do
+zcat $src | sed -n "/href=.*html/p" | while read line; do
     url=$(echo $line | sed "s|.*href=\"\(https://.*.html\)\".*title=.*|\1|g")
     if [[ x$url == x ]]; then
         echo "-----------> $line  No url <----------"

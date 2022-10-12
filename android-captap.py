@@ -10,8 +10,10 @@ input tap
 
 import io
 import os
+import re
 import sys
 import time
+import json
 import numpy as np
 import random
 import subprocess
@@ -38,18 +40,22 @@ class Task(object):
 
     def find_text(self, im, x, y, w, h, greyscale=False):
         '''Return text get from Box(x,y,w,h) in image *im*'''
-        img = im if isinstance(im, Image.Image) else Image.open(im)
-        region = img.crop((x, y, x+w, y+h))
-        if greyscale:
-            region = region.convert('L')
-        text = pytesseract.image_to_string(region, lang='chi_sim').strip()
-        print(f' >> Find text: {text}')
+        try:
+            img = im if isinstance(im, Image.Image) else Image.open(im)
+            region = img.crop((x, y, x+w, y+h))
+            if greyscale:
+                region = region.convert('L')
+            text = pytesseract.image_to_string(region, lang='chi_sim').strip()
+            print(f' >> Find text: {text}')
+        except Exception as e:
+            print(' !! Error when find text!', e)
+            text = ''
         return text
 
-    def locate_xy(self, im, pat, samples=9, partial=1):
+    def locate_xy(self, im, pat, samples=9, partial=0):
         '''
         Find position of *pat* image over *im* image, return x,y,w,h
-        partial: search area.
+        partial: search area. default 0 for all
              1 | 2
             ---|---
              3 | 4
@@ -67,10 +73,13 @@ class Task(object):
 
         def diff(a, b):
             return sum((a - b) ** 2 for a, b in zip(a, b))
+        if partial in (1, 2, 3, 4):
+            x, y = img.size
+            xrange = range(x//2) if partial in (1, 3) else range(x//2, x)
+            yrange = range(y//2) if partial in (1, 2) else range(y//2, y)
+        else:
+            xrange, yrange = range(x), range(y)
         best = []
-        x, y = img.size
-        xrange = range(x//2) if partial in (1, 3) else range(x//2, x)
-        yrange = range(y//2) if partial in (1, 2) else range(y//2, y)
         for x in xrange:
             for y in yrange:
                 d = 0
@@ -101,8 +110,8 @@ class Task(object):
             print('Invalid cmd:', cmd)
 
 
-def task1(limit=1600e4//2, sleep=1, max_try=100):
-    print('==TEST TASK 1==')
+def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
+    print(f'=== TEST TASK 1: key={key}, limit={limit:.2f} ===')
     refresh = os.path.expanduser('~/图片/sswd/1-refresh.png')
     zhan = os.path.expanduser('~/图片/sswd/2-zhan.png')
     tt = Task()
@@ -110,28 +119,101 @@ def task1(limit=1600e4//2, sleep=1, max_try=100):
     print(' >> Getting X1, Y1 ...')
     x, y, w, h = tt.locate_xy(img, refresh, partial=4)
     X1, Y1 = x+w//2, y+h//2
-    print(' >> Getting X2, Y2 ...')
+    print(' >> Getting X2, Y2 ...')  # top-left, 30
     X2, Y2, w, H2 = tt.locate_xy(img, zhan, partial=1)
     W2 = w*5
     print('>>>> Start ...')
+    limit = key*limit
+    check_pat = r'^战\s*.\s+\d+$'
+    refresh_str = f'Auto-refresh after {sleep}s'
+    if save:
+        coll_N = []
     for i in range(1, max_try+1):
-        text = tt.find_text(img, X2, Y2, W2, H2).split()
-        n = text[-1] if text and len(text) > 1 else (' '*8)
-        if n.isdigit() and int(n) < limit:
-            print(f' >> [{i}] Get number: {n}. STOP!')
-            ask = input('Enter to continue. "y" to break. ')
-            if ask in ('y', 'Y'):
-                break
+        text = tt.find_text(img, X2, Y2, W2, H2)
+        if re.match(check_pat, text):
+            n = int(text.split()[-1])
+            if save:
+                coll_N.append(n)
+            if n < limit:
+                print(f' >> [{i}] Get number: {n}. STOP!')
+                ask = input('Enter to continue. "y" to break. ')
+                if ask in ('y', 'Y'):
+                    break
+            else:
+                print(f' >> [{i}] Get number: {n}. {refresh_str}.')
         else:
-            print(f' >> [{i}] Get number: {n}. Auto-refresh after {sleep}s.')
+            print(f' >> [{i}] Get wrong text: {text}. {refresh_str}.')
         tt.touch_screen('tap', X1, Y1)
         time.sleep(sleep)
         img = tt.capture_screen()
-        if n == (' '*8):
-            # reset X2,Y2
-            print(' >> Getting new X2, Y2 ...')
+        if i < 2 and not re.match(check_pat, text):
+            print(' >> Getting new X2, Y2 for the second time ...')
             X2, Y2, _, _ = tt.locate_xy(img, zhan, partial=1)
+    if save:
+        realsave = os.path.expanduser(save)
+        if os.path.isfile(realsave):
+            print("[Info] Reload results from %s ..." % save)
+            with open(realsave, 'r', encoding='utf8') as out:
+                results = json.load(out)
+        else:
+            results = {}
+        key = str(key)  # str keys for json github python/cpython/issues/79153
+        if key in results:
+            results[key].extend(coll_N)
+            # results[key].sort()
+        else:
+            results[key] = coll_N  # sorted(coll_N)
+        with open(realsave, 'w', encoding='utf8') as out:
+            print("[Info] Add %d new results to %s." % (len(coll_N), save))
+            json.dump(results, out, ensure_ascii=False)
+
+
+def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0]):
+    with open(os.path.expanduser(save), 'r', encoding='utf8') as out:
+        results = json.load(out)
+    # pre interval
+    interval = []
+    for i in range(len(split)):
+        if i == 0:
+            interval.append((f' <{split[i]:.1f}', -np.inf, split[i]))
+        if i == len(split) - 1:
+            interval.append((f'>={split[i]:.1f}', split[i], np.inf))
+        else:
+            interval.append(
+                (f'{split[i]:.1f}~{split[i+1]:.1f}', split[i], split[i+1]))
+    count = {}
+    N = {}
+    for key, value in results.items():
+        k = int(key)
+        count[key] = {i[0]: 0 for i in interval}
+        N[key] = len(value)
+        for v in value:
+            r = v/k
+            ADD = False
+            for itv in interval:
+                if r >= itv[1] and r < itv[2]:
+                    count[key][itv[0]] += 1
+                    ADD = True
+                    break
+            if not ADD:
+                print(f"!!! Incomplete interval for r={r:.2f}!")
+    all_count = {itv[0]: sum([count[key][itv[0]] for key in results])
+                 for itv in interval}
+    all_N = sum(N.values())
+    # show
+    all_K = list(results.keys())
+    print('\t'.join(['KEY:'] + [f'{int(k)//10000}w' for k in all_K] + ['ALL']))
+    for it, _, _ in interval:
+        print(f'{it}\t'
+              + '\t'.join([f'{count[k][it]}' for k in all_K])
+              + f'\t{all_count[it]}')
 
 
 if __name__ == '__main__':
-    task1()
+    if len(sys.argv) > 1 and sys.argv[1].isdigit():
+        key = int(sys.argv[1])
+        task1(key, save='~/.cache/nAeNSpViOp.json')
+        task1_hist1('~/.cache/nAeNSpViOp.json',
+                    split=[0.1*i for i in range(1, 16)])
+    else:
+        print(f"usage: {sys.argv[0]} int-key")

@@ -38,11 +38,16 @@ class Task(object):
                 s = s.replace(b'\r\n', b'\n')
             return Image.open(io.BytesIO(s))
 
-    def find_text(self, im, x, y, w, h, greyscale=False):
+    def crop(self, img, xywh):
+        '''*img*: Image instance'''
+        x, y, w, h = xywh
+        return img.crop((x, y, x+w, y+h))
+
+    def find_text(self, im, xywh=None, greyscale=False):
         '''Return text get from Box(x,y,w,h) in image *im*'''
         try:
             img = im if isinstance(im, Image.Image) else Image.open(im)
-            region = img.crop((x, y, x+w, y+h))
+            region = self.crop(img, xywh) if xywh else img
             if greyscale:
                 region = region.convert('L')
             text = pytesseract.image_to_string(region, lang='chi_sim').strip()
@@ -51,6 +56,54 @@ class Task(object):
             print(' !! Error when find text!', e)
             text = ''
         return text
+
+    def save_img(self, im, path, xywh=None):
+        '''Save Box(x,y,w,h) in image *im* to *path*. If no xywh, save all.'''
+        try:
+            img = im if isinstance(im, Image.Image) else Image.open(im)
+            region = self.crop(img, xywh) if xywh else img
+            region.save(path, 'PNG')
+            print(f' >> Save image to {path}. Done.')
+        except Exception as e:
+            print(f' !! Error when save image to {path}!', e)
+
+    def highlight(self, im, color=(0, 0, 0), delta=(9, 9, 9),
+                  xywh=None, binarize=False):
+        '''
+        Highlight selected RGB color and edit background in image *im*.
+        Return Box(x,y,w,h) part or whole image.
+
+        Note:
+        -----
+        1. Get *color* by GIMP pick color info.
+        2. Test mean color, std delta
+           and (maxColor+minColor)//2, (maxColor-minColor)//2
+        '''
+        try:
+            # ref: https://stackoverflow.com/questions/1616767
+            img = im if isinstance(im, Image.Image) else Image.open(im)
+            region = self.crop(img, xywh) if xywh else img
+            data = np.array(region.convert('RGB'))
+            ysize, xsize, _ = data.shape
+            (rc, gc, bc), (rd, gd, bd) = color, delta
+            dis = rd**2 + gd**2 + bd**2
+            a2 = rc**2 + gc**2 + bc**2
+            for y in range(ysize):
+                for x in range(xsize):
+                    r, g, b = data[y, x, :]
+                    # if abs(r-rc)<=rd and abs(g-gc)<=gd and abs(b-bc)<=bd:
+                    if (r-rc)**2 + (g-gc)**2 + (b-bc)**2 <= dis:
+                        if binarize:
+                            data[y, x, :] = 0
+                    else:
+                        if binarize:
+                            data[y, x, :] = 255
+                        else:
+                            data[y, x, :] = 0 if a2 > 48768 else 255
+            return Image.fromarray(data, mode='RGB')
+        except Exception as e:
+            print(f' !! Error when highlight image!', e)
+            return None
 
     def locate_xy(self, im, pat, samples=9, partial=0):
         '''
@@ -110,7 +163,7 @@ class Task(object):
             print('Invalid cmd:', cmd)
 
 
-def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
+def task1(key, limit=1/2, sleep=0.5, max_try=200, save=None):
     print(f'=== TEST TASK 1: key={key}, limit={limit:.2f} ===')
     refresh = os.path.expanduser('~/图片/sswd/1-refresh.png')
     zhan = os.path.expanduser('~/图片/sswd/2-zhan.png')
@@ -121,7 +174,7 @@ def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
     X1, Y1 = x+w//2, y+h//2
     print(' >> Getting X2, Y2 ...')  # top-left, 30
     X2, Y2, w, H2 = tt.locate_xy(img, zhan, partial=1)
-    W2 = w*5
+    W2 = w*4
     print('>>>> Start ...')
     limit = key*limit
     check_pat = r'^战\s*.\s+\d+$'
@@ -129,7 +182,9 @@ def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
     if save:
         coll_N = []
     for i in range(1, max_try+1):
-        text = tt.find_text(img, X2, Y2, W2, H2)
+        text = tt.find_text(tt.highlight(
+            img, color=(215, 160, 16), delta=(40, 60, 16),
+            xywh=(X2, Y2, W2, H2), binarize=True))
         if re.match(check_pat, text):
             n = int(text.split()[-1])
             if save:
@@ -143,6 +198,8 @@ def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
                 print(f' >> [{i}] Get number: {n}. {refresh_str}.')
         else:
             print(f' >> [{i}] Get wrong text: {text}. {refresh_str}.')
+            tt.save_img(img, f'/tmp/captap-{i}-tocheck.png',
+                        xywh=(X2-W2, Y2-H2, W2*2, H2*7//2))
         tt.touch_screen('tap', X1, Y1)
         time.sleep(sleep)
         try:
@@ -152,7 +209,8 @@ def task1(key, limit=1/2, sleep=0.7, max_try=200, save=None):
             break
         if i < 2 and not re.match(check_pat, text):
             print(' >> Getting new X2, Y2 for the second time ...')
-            X2, Y2, _, _ = tt.locate_xy(img, zhan, partial=1)
+            X2, Y2, w, H2 = tt.locate_xy(img, zhan, partial=1)
+            W2 = w*4
     if save:
         realsave = os.path.expanduser(save)
         if os.path.isfile(realsave):

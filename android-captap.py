@@ -108,7 +108,7 @@ class Task(object):
     def locate_xy(self, im, pat, samples=9, partial=0):
         '''
         Find position of *pat* image over *im* image, return x,y,w,h
-        partial: search area. default 0 for all
+        partial: search area. int or Box(x,y,w,h). default 0 for all
              1 | 2
             ---|---
              3 | 4
@@ -130,6 +130,9 @@ class Task(object):
             x, y = img.size
             xrange = range(x//2) if partial in (1, 3) else range(x//2, x)
             yrange = range(y//2) if partial in (1, 2) else range(y//2, y)
+        elif isinstance(partial, (tuple, list)) and len(partial) == 4:
+            x, y, w, h = partial
+            xrange, yrange = range(x, x+w+1), range(y, y+h+1)
         else:
             xrange, yrange = range(x), range(y)
         best = []
@@ -183,7 +186,7 @@ def task1(key, limit=1/2, sleep=0.5, max_try=200, save=None):
         coll_N = []
     for i in range(1, max_try+1):
         text = tt.find_text(tt.highlight(
-            img, color=(215, 160, 16), delta=(40, 60, 16),
+            img, color=(215, 175, 16), delta=(40, 80, 16),
             xywh=(X2, Y2, W2, H2), binarize=True))
         if re.match(check_pat, text):
             n = int(text.split()[-1])

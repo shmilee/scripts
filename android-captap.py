@@ -233,7 +233,7 @@ def task1(key, limit=1/2, sleep=0.5, max_try=200, save=None):
             json.dump(results, out, ensure_ascii=False)
 
 
-def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0]):
+def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0], group_by_magnitude='auto'):
     with open(os.path.expanduser(save), 'r', encoding='utf8') as out:
         results = json.load(out)
     # pre interval
@@ -265,12 +265,32 @@ def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0]):
     all_count = {itv[0]: sum([count[key][itv[0]] for key in results])
                  for itv in interval}
     all_N = sum(N.values())
+    if group_by_magnitude == 'auto':
+        group_by_magnitude = True if len(results.keys()) > 8 else False
+    if group_by_magnitude == True:
+        srcK = sorted(map(int, results.keys()))
+        magK = list(map(lambda x: int(np.log10(int(x))), srcK))
+        group_keys = {}
+        for sk, mag in zip(srcK, magK):
+            k = '~%.1fe%dW' % (sk/10**mag, mag-4)
+            if k in group_keys:
+                group_keys[k].append(sk)
+            else:
+                group_keys[k] = [sk]
+        show_keys = list(group_keys.keys())
+        show_count = {
+            mk: {it[0]: sum([count[str(k)][it[0]] for k in keys])
+                 for it in interval} for mk, keys in group_keys.items()}
+        head = show_keys
+    else:
+        show_keys = list(results.keys())
+        head = [f'{int(k)//10000}W' for k in show_keys]
+        show_count = count
     # show
-    all_K = list(results.keys())
-    print('\t'.join(['KEY:'] + [f'{int(k)//10000}w' for k in all_K] + ['ALL']))
+    print('\t'.join(['KEY:'] + head + ['ALL']))
     for it, _, _ in interval:
         print(f'{it}\t'
-              + '\t'.join([f' {count[k][it]}' for k in all_K])
+              + '\t'.join([f' {show_count[k][it]}' for k in show_keys])
               + f'\t{all_count[it]}\t{all_count[it]/all_N:.2%}')
 
 

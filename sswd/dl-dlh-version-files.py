@@ -44,7 +44,7 @@ class ProgressBar(object):
 
 def dl_file(url, out, order, name=None, overwrite=False):
     '''return PASS, DONE, or failed (url,out)'''
-    title = '(%s) %s' % (order, name or out)
+    title = '(%s) %s -> %s' % (order, url, name or out)
     if not overwrite and os.path.exists(out):
         print('\033[32m[%s]\033[0m exists, pass.' % title)
         return 'PASS'
@@ -84,18 +84,26 @@ def mkdirs(dirpath):
                 os.mkdir(thisdir)
 
 
-def download_versionzip(host, zfile='version.zip'):
+def download_versionzip(host, zfile='version.zip', CDir='sswd-static',
+                        others=()):
     start = time.time()
-    r = dl_file(f'{host}/{zfile}', zfile, '#', overwrite=True)
+    now = int(start*1000)
+
+    def cdir(path):
+        return os.path.join(CDir, path)
+
+    mkdirs(CDir)
+    r = dl_file(f'{host}/{zfile}?{now}', cdir(zfile), '#', overwrite=True)
     if r == 1:
         return
-    with zipfile.ZipFile(zfile, mode='r') as z:
+    with zipfile.ZipFile(cdir(zfile), mode='r') as z:
         with z.open('version.json') as f:
             data = json.load(f)
     # pre dirs
-    for keydir in {os.path.dirname(key) for key in data}:
+    for keydir in [os.path.dirname(key)
+                   for key in list(data.keys()) + list(others)]:
         if keydir:  # not ''
-            mkdirs(keydir)
+            mkdirs(cdir(keydir))
     input('Enter to start downloading ... ')
     p = Pool(10)
     N = len(data)
@@ -104,10 +112,10 @@ def download_versionzip(host, zfile='version.zip'):
     for i, key in enumerate(data, 1):
         ver = data[key]
         name, ext = os.path.splitext(key)
-        out = f'{name}{ver}{ext}'
-        url = f'{host}/{out}'
+        path = f'{name}{ver}{ext}'
+        url = f'{host}/{path}'
         order = order_tmp % i
-        result.append(p.apply_async(dl_file, args=(url, out, order)))
+        result.append(p.apply_async(dl_file, args=(url, cdir(path), order)))
     p.close()
     p.join()
     failed = f"dl-{zfile.replace('/','-')}.failed"
@@ -119,11 +127,19 @@ def download_versionzip(host, zfile='version.zip'):
     print('==> [%s] Task runs %0.2f seconds.' % (zfile, (end - start)))
     if not os.path.getsize(failed):
         os.remove(failed)
+    for f in others:
+        dl_file(f'{host}/{f}', cdir(f.split('?')[0]), '#')
 
 
 if __name__ == '__main__':
-    # /favicon.ico  # /process.png  # /code.js?2407
-    # /version.zip?1666179211583
+    # /favicon.ico  # /process.png  # /version.zip?1666179211583
+    # 1. /code.js?2407  # js-beautify -o sswd-new.js code.js
     import base64
     bstr = 'aHR0cDovL2RsaC1oNS56aHVvaHVhbWcuY29t'.encode()
-    download_versionzip(base64.b64decode(bstr).decode())
+    download_versionzip(base64.b64decode(bstr).decode(),
+                        others=('process.png', 'code.js?2407'))
+    # 2./mengdan_app3.js?2022092703 # js-beautify -o md-new.js mengdan_app3.js
+    #bstr = 'aHR0cHM6Ly94aGwtc3RhdGljLmJvb21lZ2cuY24vd2ViL21kc3N3ZDM2X2FwcC5odG1sP2JaSE1pbmkmY2hhbm5lbGlkPTExMDA1MTE2MDE='.encode()
+    # download_versionzip(os.path.dirname(base64.b64decode(bstr).decode()),
+    #                    CDir='md-static',
+    #                    others=('process.png', 'mengdan_app3.js?2022092703'))

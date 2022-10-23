@@ -18,6 +18,7 @@ import numpy as np
 import random
 import subprocess
 import pytesseract
+import pprint
 from PIL import Image, ImageDraw
 
 
@@ -217,7 +218,7 @@ def task1(key, limit=1/2, sleep=0.5, max_try=200, save=None):
     if save:
         realsave = os.path.expanduser(save)
         if os.path.isfile(realsave):
-            print("[Info] Reload results from %s ..." % save)
+            print("[Info] Reload results from '%s'." % save)
             with open(realsave, 'r', encoding='utf8') as out:
                 results = json.load(out)
         else:
@@ -229,7 +230,7 @@ def task1(key, limit=1/2, sleep=0.5, max_try=200, save=None):
         else:
             results[key] = coll_N  # sorted(coll_N)
         with open(realsave, 'w', encoding='utf8') as out:
-            print("[Info] Add %d new results to %s." % (len(coll_N), save))
+            print("[Info] Add %d new results to '%s'." % (len(coll_N), save))
             json.dump(results, out, ensure_ascii=False)
 
 
@@ -270,13 +271,21 @@ def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0], group_by_magnitude='auto'):
     if group_by_magnitude == True:
         srcK = sorted(map(int, results.keys()))
         magK = list(map(lambda x: int(np.log10(int(x))), srcK))
-        group_keys = {}
+        group_keys, group_heads = {}, {}
         for sk, mag in zip(srcK, magK):
-            k = '~%.1fe%dW' % (sk/10**mag, mag-4)
+            h = '~%.2fe%dW' % (sk/10**mag, mag-4)
+            if mag >= 7:
+                k = '~%.1fe%dW' % (sk/10**mag, mag-4)
+            else:
+                k = '~%.0fe%dW' % (sk/10**mag, mag-4)
             if k in group_keys:
                 group_keys[k].append(sk)
+                group_heads[k].append(h)
             else:
                 group_keys[k] = [sk]
+                group_heads[k] = [h]
+        print('[Info] Check KEY heads: ')
+        pprint.pprint(group_heads)
         show_keys = list(group_keys.keys())
         show_count = {
             mk: {it[0]: sum([count[str(k)][it[0]] for k in keys])

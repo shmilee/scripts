@@ -5,6 +5,7 @@
 
 import os
 import time
+import shutil
 import requests
 import zipfile
 import json
@@ -94,16 +95,26 @@ def download_versionzip(host, zfile='version.zip', CDir='sswd-static',
 
     mkdirs(CDir)
     r = dl_file(f'{host}/{zfile}?{now}', cdir(zfile), '#', overwrite=True)
-    if r == 1:
+    if r != 'DONE':
         return
     with zipfile.ZipFile(cdir(zfile), mode='r') as z:
         with z.open('version.json') as f:
             data = json.load(f)
-    # pre dirs
+        zipdate = '-'.join(map(str, z.getinfo('version.json').date_time[:3]))
+    backup = f"{cdir(zfile)}-backup-{zipdate}.zip"
+    if os.path.exists(backup):
+        ask = input(f' >> Find backup: {backup}. No update, continue? [y|n] ')
+        if ask not in ('y', 'Y', 'yes'):
+            return
+    else:
+        print(f' >> Make backup: {backup}')
+        shutil.copy2(cdir(zfile), backup)
+    print(' >> Prepare dirs ...', end=' ')
     for keydir in [os.path.dirname(key)
                    for key in list(data.keys()) + list(others)]:
         if keydir:  # not ''
             mkdirs(cdir(keydir))
+    print('Done.')
     input('Enter to start downloading ... ')
     p = Pool(10)
     N = len(data)

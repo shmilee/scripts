@@ -20,9 +20,15 @@ class Gameini(object):
         else:
             raise ValueError(f'Invalid zipfile {path}!')
         data = self.ParseData()
-        self.data_keys = [f'k_{k}' for k in data.keys()]
+        self.data = data
+        self.attr_keys = [f'k_{k}' for k in data.keys()]
         for k in data:
             setattr(self, f'k_{k}', data[k])
+
+    def pretty_dump(self, path):
+        with open(path, "w") as f:
+            json.dump(self.data, f, sort_keys=True, ensure_ascii=False,
+                      indent=2)
 
     def ParseData(self):
         with zipfile.ZipFile(self.path, mode='r') as z:
@@ -73,7 +79,7 @@ class Gameini(object):
             print(f' >> Error: {n} 空数据!')
 
     def get(self, n):
-        d = getattr(self, f'k_{n}', {})
+        d = getattr(self, n if n.startswith('k_') else f'k_{n}', {})
         if not d:
             print(f' >> Error: {n} 空数据!')
         return d
@@ -114,21 +120,33 @@ class Gameini(object):
     def show_role_info(self, name=None):
         base, desc = self.get('role_base'), self.get('RoleDesc')
         fett = self.get('role_fetter')
+        biog = self.get('k_RoleBiography')
         for i in base:
             n, sn = base[i]['RoleName'], base[i]['SubName']
-            did = str(base[i]['RoleDesc'])
+            rid, did = str(base[i]['RoleID']), str(base[i]['RoleDesc'])
             if self._match_name(n, sn, name) and did != '0':
-                print(f"\n> ID={base[i]['RoleID']} {n} {sn}")
-                fid = str(base[i]['FetterID'])
+                print(f"\n> ID={rid} {n} {sn}")
                 print(f" >> Desc: {desc[did]['Desc']}")
+                moredesc = biog.get(rid, None)
+                if moredesc:
+                    for j in map(str, range(1, 6)):
+                        if f'Des{j}' not in moredesc:
+                            continue
+                        print(f"    {moredesc['Des'+j]}")
+                fid = str(base[i]['FetterID'])
                 for j in map(str, range(1, 7)):
                     if f'{fid}&{j}' not in fett:
                         continue
                     print(f" >> Fetter{j} {fett[fid+'&'+j]['FetterName']}:",
                           f"{fett[fid+'&'+j]['FetterDesc']}")
 
+    def show_develop_info(self):
+        ''' other: faction_upgrade, '''
+        pass
+
 
 if __name__ == '__main__':
     ini = Gameini('./sswd-static/res/config/gameini6d74e2e0.zip')
     #ini.show_item_base(search='称号', exclude=('收集', '活动'))
-    ini.show_role_info('赵')
+    ini.show_role_info('蓝')
+    # ini.pretty_dump('./Parsed-gameini.json')

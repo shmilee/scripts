@@ -110,10 +110,12 @@ class Gameini(object):
             price, icon = ib[i]['ItemPrice'], ib[i]['ItemIcon']
             print(f'{tn} {n} (绑定{bind}, 价格{price}): {desc}')
 
-    def _match_name(self, n, sn, name=None):
+    def _match_name(self, n, sn, rid, name=None):
         if name is None:
             return True
         if name in (n, sn) or re.search(name, n) or re.search(name, sn):
+            return True
+        if name == rid or re.search(name, rid):
             return True
         return False
 
@@ -124,7 +126,7 @@ class Gameini(object):
         for i in base:
             n, sn = base[i]['RoleName'], base[i]['SubName']
             rid, did = str(base[i]['RoleID']), str(base[i]['RoleDesc'])
-            if self._match_name(n, sn, name) and did != '0':
+            if self._match_name(n, sn, rid, name) and did != '0':
                 print(f"\n> ID={rid} {n} {sn}")
                 print(f" >> Desc: {desc[did]['Desc']}")
                 moredesc = biog.get(rid, None)
@@ -148,5 +150,5 @@ class Gameini(object):
 if __name__ == '__main__':
     ini = Gameini('./sswd-static/res/config/gameini6d74e2e0.zip')
     #ini.show_item_base(search='称号', exclude=('收集', '活动'))
-    ini.show_role_info('蓝')
+    ini.show_role_info('601')
     # ini.pretty_dump('./Parsed-gameini.json')

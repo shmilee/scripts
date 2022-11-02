@@ -22,14 +22,20 @@ class FileInfo(object):
     # YYYY-MM-DD or YYYYMMDD
     time_pattern = re.compile(r'''
         .*
-        [_-]{1} # ignore weixin str: 133020020818cd81c7e7206.mp4
+        [_-]{,1} # ignore weixin str: 133020020818cd81c7e7206.mp4
         (?P<Y>19\d{2}|20\d{2}) #Year, 19XX, 20XX
         -{,1}
         (?P<M>0[1-9]|1[012]) # Month
         -{,1}
         (?P<D>0[1-9]|[12]\d|3[01]) # Day
-        [_-]{1}
+        [_-]{,1}
         .*
+        ''', re.VERBOSE)
+    # mmexport{Epoch seconds*1000} or wx_camera_
+    wx_pattern = re.compile(r'''
+        (?:mmexport|wx_camera_)
+        (?P<Epoch>\d{13})  # 2011 1295539200*1000 -> 22XX 9---
+        (?:\.jpg|\.mp4)
         ''', re.VERBOSE)
 
     def __init__(self, path, group):
@@ -37,14 +43,24 @@ class FileInfo(object):
         self.name = os.path.basename(self.path)
         # use timezone infor
         t = time.localtime(os.stat(self.path).st_mtime)
+        et = time.localtime(0)
         self.st_mtime = (
             str(t.tm_year),
             '%02d' % t.tm_mon,
             '%02d' % t.tm_mday)
         m = self.time_pattern.match(self.name)
         self.fl_ntime = m.groups() if m else None
+        if not self.fl_ntime:
+            m = self.wx_pattern.match(self.name)
+            if m:
+                epoch = int(m.groups()[0])//1000
+                ep_t = time.localtime(epoch)
+                self.fl_ntime = (
+                    str(ep_t.tm_year),
+                    '%02d' % ep_t.tm_mon,
+                    '%02d' % ep_t.tm_mday)
         if self.fl_ntime:
-            if self.st_mtime != self.fl_ntime:
+            if self.st_mtime != self.fl_ntime and t != et:
                 print("Warning: %s mtime to check!\n\t%s != %s" %
                       (self.path, self.st_mtime, self.fl_ntime))
                 nt = time.localtime(time.mktime(t)-t.tm_gmtoff)  # t - 8h
@@ -57,6 +73,10 @@ class FileInfo(object):
             prefix_s = '%s%s%s' % self.fl_ntime
             newname = self.name.replace(prefix, '').replace(
                 prefix_s, '').replace('--', '-').replace('__', '_')
+            if newname.startswith('_'):
+                newname = newname.strip('_')
+            if newname.startswith('-'):
+                newname = newname.strip('-')
         else:
             self.group = self.__group(group, self.st_mtime)
             prefix = '%s-%s-%s' % self.st_mtime

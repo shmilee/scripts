@@ -7,3 +7,4 @@ __pycache__/
 *.src.tar.gz
 *.pkg.tar.xz
 *.pkg.tar.zst
+create-ap/transocks

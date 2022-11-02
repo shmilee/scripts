@@ -52,7 +52,8 @@ def dl_file(url, out, order, name=None, overwrite=False):
     try:
         with closing(requests.get(
                 url, stream=True, timeout=30,
-                headers={'User-Agent': 'Wget/1.21.3 (linux-gnu)'})) as rp:
+                headers={'User-Agent': 'Wget/1.21.3 (linux-gnu)',
+                         'Accept-Encoding': None})) as rp:
             chunk_size = 1024
             content_size = int(rp.headers['content-length'])
             progress = ProgressBar(title, total=content_size, unit="KB",
@@ -64,13 +65,13 @@ def dl_file(url, out, order, name=None, overwrite=False):
                     file.write(data)
                     progress.refresh(count=len(data))
     except Exception as err:
-        print('\033[31m[Download %s Error]\033[0m' % name, err)
+        print('\033[31m[Download %s Error]\033[0m' % (name or out), err)
         if os.path.exists(out):
             os.remove(out)
         return url, out
     finally:
         if not os.path.exists(out):
-            print('\033[31m[%s]\033[0m Download failed!' % name)
+            print('\033[31m[%s]\033[0m Download failed!' % (name or out))
             return url, out
         return 'DONE'
 
@@ -154,3 +155,9 @@ if __name__ == '__main__':
     # download_versionzip(os.path.dirname(base64.b64decode(bstr).decode()),
     #                    CDir='md-static',
     #                    others=('process.png', 'mengdan_app3.js?2022092703'))
+    # 3./code.js?1901
+    #bstr = 'aHR0cHM6Ly95b25nc295YS1jZG4ud2l0aGh1Zy5rcg=='.encode()
+    # download_versionzip(base64.b64decode(bstr).decode(),
+    #                    CDir='kr-static',
+    #                    others=('process.png', 'code.js?1901',
+    #                            'res/lang.lang'))

@@ -1,8 +1,8 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.10920'
-_srcurl='https://wdl1.cache.wps.cn/wps/download/ep/Linux2019/10920'
+_pkgver='11.1.0.11664'
+_srcurl='https://wps-linux-personal.wpscdn.cn/wps/download/ep/Linux2019/11664'
 _common_dirs=(
     ./etc
     ./usr
@@ -26,7 +26,7 @@ options=(!emptydirs !strip)
 source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
 sha1sums=('0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
           '1819bae14fa888f92c29c9fd01b59246f53e6937'
-          '5748fec427c5c1dab2b356c2f058dcce22f15212')
+          '4cd45a776ab31fef01281eac45cb3aca080249df')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -104,6 +104,7 @@ package_wpsoffice() {
     depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
              'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
              'glu' 'openssl-1.0' 'sdl2' 'libpulse' 'hicolor-icon-theme'
+             'libxss' 'sqlite' 'libtool' 'libxslt' 'qt5-base'
              "wpsoffice-common=${pkgver}")
     optdepends=('cups: for printing support'
                 'libjpeg-turbo: JPEG image codec support'
@@ -114,6 +115,9 @@ package_wpsoffice() {
     cd "${srcdir}"
     tar xv -C "${pkgdir}" -f data.tar.xz ${_common_dirs[@]/\.\//--exclude=\.\/} \
         --exclude='./opt/kingsoft/wps-office/office6/document theme'
+
+    # fix libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /usr/lib/libicuuc.so.72)
+    rm "${pkgdir}"/opt/kingsoft/wps-office/office6/libstdc++.so*
 
     clean_startpage_qing "${pkgdir}/opt/kingsoft/wps-office/office6/"
 }
@@ -127,13 +131,25 @@ clean_startpage_qing() {
     # office6_path="$1"
     cd "$1"
     rm -rf libcef.so addons/cef/
-    if [ -f 'addons/krecentfile/libkrecentfile.so' ]; then
-        cp -v addons/krecentfile/libkrecentfile.so ./
+    # addons/k* qing
+    mkdir ./keep_sodir_tmp  # keep_sodir
+    for sodir in krecentfile kfpccomb kmodule knetwork konlinefileconfig; do
+        if [ -d "addons/${sodir}" ]; then
+            cp -rv "addons/${sodir}" ./keep_sodir_tmp/
+        fi
+    done
+    rm -rf addons/{k*,qing,pdfbatchcompression,wpsbox}
+    if [ -n "$(ls -A ./keep_sodir_tmp)" ]; then
+        mv -v ./keep_sodir_tmp/* addons/
     fi
-    rm -rf addons/{k*,qing}
-    rm -rf wpsoffice wpsoffice-off
+    rmdir ./keep_sodir_tmp
     find . -name qing.qm -exec rm {} \;
-    if [ -f 'transerr' ]; then
-        mv -v transerr transerr.bk
-    fi
+    # others
+    rm -rf wpsoffice wpsoffice-off
+    for back in transerr wpscloudsvr; do
+        if [ -f "${back}" ]; then
+            chmod -x "${back}"
+            mv -v "${back}" "${back}.bk"
+        fi
+    done
 }

@@ -45,10 +45,13 @@ class HandlerClass(SimpleHTTPRequestHandler):
             finally:
                 f.close()
 
-    def _response_ok(self):
+    def _response_msg_received(self):
+        body = json.dumps({"code": 200, "Message": "OK"}).encode('utf-8')
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
         self.end_headers()
+        self.wfile.write(body)
 
     error_message_format = ('{"code": %(code)d,"Message": "%(message)s",'
                             '"explanation": "%(code)s - %(explain)s"}')
@@ -76,9 +79,9 @@ class HandlerClass(SimpleHTTPRequestHandler):
             with open(self.local_msg_file, 'a') as f:
                 f.write('[{0}] - {1} - {2} - {3}\n'.format(
                     time, addr, who, msg))
-            self._response_ok()
+            self._response_msg_received()
         except Exception as e:
-            self.send_error(INTERNAL_ERROR, "Msg file write-err")
+            self.send_error(INTERNAL_ERROR, "Msg file write-err: %r" % e)
             return False
         return True
 

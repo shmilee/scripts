@@ -274,10 +274,11 @@ def task1_hist1(save, split=[0.5, 1.0, 1.5, 2.0], group_by_magnitude='auto'):
         group_keys, group_heads = {}, {}
         for sk, mag in zip(srcK, magK):
             h = '~%.2fe%dW' % (sk/10**mag, mag-4)
-            if mag >= 7:
-                k = '~%.1fe%dW' % (sk/10**mag, mag-4)
+            i = sk//1e7
+            if i >=10:
+                k = '>=10e3W'
             else:
-                k = '~%.0fe%dW' % (sk/10**mag, mag-4)
+                k = '%d~%de3W' % (i, i+1)
             if k in group_keys:
                 group_keys[k].append(sk)
                 group_heads[k].append(h)

@@ -69,7 +69,7 @@ class HLS_Url_Extractor(Streaming_Extractor):
         newkey = None
         if key:
             prefix = os.path.splitext(os.path.basename(localm3u8))[0]
-            newkey = '%s-%s' % (prefix, key)
+            newkey = '%s.key' % prefix
             # need key
             self.field_keys = ('fullurl', 'key')
             self.result['Field_Keys'] = ('fullurl', 'key')
@@ -136,22 +136,26 @@ class HLS_Url_Extractor(Streaming_Extractor):
 
     def play(self):
         if 'key' in self.result:
-            if self.player == 'mpv':
+            old_player = self.player
+            if self.player.endswith('mpv'):
                 opt = ' --demuxer-lavf-o-append=allowed_extensions=ts,key'
                 opt += ' --demuxer-lavf-o-append=protocol_whitelist=http,tcp,file,crypto,data'
-                self.player = 'mpv %s' % opt
+                self.player = '%s %s' % (self.player, opt)
             super(HLS_Url_Extractor, self).play(urlkey='localm3u8')
-            self.player = 'mpv'
+            self.player = old_player
         else:
             super(HLS_Url_Extractor, self).play(urlkey='fullurl')
 
     def convert(self):
         if 'key' in self.result:
-            if self.ffmpeg == 'ffmpeg':
+            old_ffmpeg, old_ffprobe = self.ffmpeg, self.ffprobe
+            if self.ffmpeg.endswith('ffmpeg'):
                 opt = ' -allowed_extensions ts,key'
                 opt += ' -protocol_whitelist http,tcp,file,crypto,data'
-                self.ffmpeg = 'ffmpeg %s -i #(INPUT)#' % opt
+                self.ffmpeg = '%s %s -i #(INPUT)#' % (self.ffmpeg, opt)
+                if self.ffprobe:
+                    self.ffprobe = '%s %s' % (self.ffprobe, opt)
             super(HLS_Url_Extractor, self).convert(urlkey='localm3u8')
-            self.ffmpeg = 'ffmpeg'
+            self.ffmpeg, self.ffprobe = old_ffmpeg, old_ffprobe
         else:
             super(HLS_Url_Extractor, self).convert(urlkey='fullurl')

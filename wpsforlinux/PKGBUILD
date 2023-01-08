@@ -16,7 +16,7 @@ pkgbase=wpsforlinux
 pkgname=('wpsoffice-common'
          'wpsoffice')
 pkgver=${_pkgver/\~/_}
-pkgrel=1
+pkgrel=2
 arch=('x86_64')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
@@ -103,7 +103,7 @@ package_wpsoffice() {
     pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
     depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
              'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
-             'glu' 'openssl-1.0' 'sdl2' 'libpulse' 'hicolor-icon-theme'
+             'glu' 'openssl-1.1' 'sdl2' 'libpulse' 'hicolor-icon-theme'
              'libxss' 'sqlite' 'libtool' 'libxslt' 'qt5-base'
              "wpsoffice-common=${pkgver}")
     optdepends=('cups: for printing support'

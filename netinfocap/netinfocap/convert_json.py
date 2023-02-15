@@ -8,7 +8,10 @@ import re
 import json
 import tempfile
 import argparse
-
+try:
+    from gdpy3._json import JsonLines
+except:
+    JsonLines = None
 from .server import HTML_template, _result2div
 
 
@@ -16,8 +19,7 @@ def json2html(file, select_filter=('HLS_Url',)):
     '''
     Convert useful info results from *file*.json, *file*.desc to *file*.html
     and create thumbnails if can access url.
-    Create *file*-share.json, netinfocap-share-keys.json
-    and save div content results to share(insert) in other html.
+    Write div content (can insert into other html) to netinfocap-share.jsonl.
 
     file: str
         file path, like './aaa.json', the desc file './aaa.desc'
@@ -79,50 +81,42 @@ def json2html(file, select_filter=('HLS_Url',)):
     outhtml = '%s.html' % file
     with open(outhtml, 'w', encoding='utf8') as out:
         out.write(HTML_template % (Num, Num, div_res))
-    # share json with div content results
-    sharejson = '%s-share.json' % file
-    filename = os.path.splitext(os.path.basename(sharejson))[0]
-    with open(sharejson, 'w', encoding='utf8') as out:
-        json.dump(dict(version=1, key=filename, content=div_res,
-                       title='NetInfo Results(%d)' % Num),
-                  out, ensure_ascii=False)
     print("[Info] Saved %d results." % Num)
-    # update share keys
-    keys_file = os.path.join(
-        os.path.dirname(sharejson), 'netinfocap-share-keys.json')
-    all_keys = []
-    if os.path.exists(keys_file):
-        with open(keys_file, 'r', encoding='utf8') as out:
-            all_keys = json.load(out)
-    if filename not in all_keys:
-        all_keys.append(filename)
-        with open(keys_file, 'w', encoding='utf8') as out:
-            json.dump(sorted(all_keys), out, ensure_ascii=False)
-        print("[Info] Saved '%d +1' keys." % (len(all_keys)-1))
+    # share jsonl with div content results
+    if JsonLines:
+        jl = JsonLines(os.path.join(
+            os.path.dirname(file), 'netinfocap-share.jsonl'))
+        jsonl = jl.path
+        key = os.path.basename(file) + '-share'
+        jl.update({key: dict(version=1, key=key, content=div_res,
+                             title='NetInfo Results(%d)' % Num)})
+        N, M = len(jl.keys()), len(jl.keys_without_backup())
+        if N != M:
+            # rm backup records
+            tmp = jl.path + '-ttt-mmm-ppp.jsonl'
+            jl.slim(tmp, overwrite=True)
+            os.remove(jl.path)
+            os.rename(tmp, jl.path)
+            N = M
+        print("[Info] Saved '%d +1' keys." % (N-1))
+    else:
+        jsonl = None
     print("[Info] DONE.")
-    return keys_file
+    return jsonl
 
 
-def cmds_for_upload_share_jsons(keysjson, dest, destkeys='keys.json'):
+def cmds_for_upload_share_jsonl(jsonl, dest, destkeys='share.jsonl'):
     '''
-    Show cmds to upload netinfocap-share-keys.json, xxx-share.json, xxx.files
-    to *dest*.
+    Show cmds to upload netinfocap-share.jsonl, xxx.files to *dest*.
     dest example: user@host:http/data/json-datas
     '''
     print("\n[Info] Get upload cmds:\n")
     scp_cmds = []
-    with open(keysjson, 'r', encoding='utf8') as f:
-        keys = json.load(f)
-    scp_cmds.append('scp %s %s/%s' % (keysjson, dest, destkeys))
-    locdir = os.path.dirname(keysjson)
-    for key in keys:  # xxx-share
+    jl = JsonLines(jsonl)
+    scp_cmds.append('scp %s %s/%s' % (jsonl, dest, destkeys))
+    locdir = os.path.dirname(jsonl)
+    for key in jl.keys_without_backup():  # xxx-share
         scp_cmds.append('')
-        share = '%s.json' % key
-        locshare = os.path.join(locdir, share)
-        if os.path.isfile(locshare):
-            scp_cmds.append('scp %s %s/' % (locshare, dest))
-        else:
-            print("!!! lost %s!" % locshare)
         files = '%s.files' % key[:-6]
         locfiles = os.path.join(locdir, files)
         if os.path.isdir(locfiles):
@@ -152,11 +146,11 @@ def main():
         sys.exit()
 
     if args.filter:
-        keysjson = json2html(args.json, select_filter=args.filter)
+        jsonl = json2html(args.json, select_filter=args.filter)
     else:
-        keysjson = json2html(args.json)
-    if args.dest:
-        cmds_for_upload_share_jsons(keysjson, args.dest)
+        jsonl = json2html(args.json)
+    if args.dest and jsonl:
+        cmds_for_upload_share_jsonl(jsonl, args.dest)
 
 
 if __name__ == '__main__':

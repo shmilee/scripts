@@ -72,6 +72,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
     extra = [k for k in res if k not in res['Field_Keys']
              and k not in control_keys]
     li = ''
+    FIX_rtmp_url = False
     for k in list(res['Field_Keys']) + extra:
         v = res.get(k, None)
         if not v:
@@ -91,6 +92,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
         if v.endswith(os.linesep):
             m = re.match('(rtmp.*live/s.*wsSecret.*sign=.{3}).*', v)
             if m:
+                FIX_rtmp_url = True
                 v = '<p>%s%s@@<p>' % (m.groups()[0], linesep)
                 li += '\n<li class="fix-n"> fix-%s: %s</li>' % (k, v)
     if (thumbnails_dest and os.path.isdir(thumbnails_dest)
@@ -118,6 +120,9 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                     'metadata_font',
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
             ]
+            if FIX_rtmp_url:  # and ffprobe res['fullurl'] HEVC?
+                # FIX ffmpeg -ss : could not seek to position 0.000
+                args.append('-a')
             try:
                 print("[Info] Creating thumbnail '%s' ..." % tpath)
                 vcsi.main(argv=args+[res['fullurl'], '-o', tpath])
@@ -162,7 +167,7 @@ class InfoRequestHandler(http.server.BaseHTTPRequestHandler):
         n = int(query.get('n', ['10'])[0])
         last = query.get('last', ['1'])[0]
         li = self.RESULTS
-        #print('SERVER:', li)
+        # print('SERVER:', li)
         Num = len(li)
         if n <= 0:
             n = Num

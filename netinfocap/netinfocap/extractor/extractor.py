@@ -171,7 +171,9 @@ class Streaming_Extractor(Extractor):
             try:
                 info = json.loads(self.check_cmd_output(cmd))
                 for s in info['streams']:
-                    if s['codec_type'] == 'video' and s['codec_name'] == 'h264':
+                    if s['codec_type'] == 'video' and s['codec_name'] in (
+                            # 'hevc',
+                            'h264',):
                         ext = '.mp4'
                         break
             except Exception:
@@ -230,18 +232,18 @@ class Streaming_Extractor(Extractor):
     def subruncmd(self, cmd, **kwargs):
         with subprocess.Popen(cmd, **kwargs) as process:
             try:
-                #print('start sub')
+                # print('start sub')
                 stdout, stderr = process.communicate()
-                #print('end sub')
+                # print('end sub')
             except KeyboardInterrupt:
                 # process.kill()
                 process.terminate()
                 # We don't call process.wait() as .__exit__ does that for us.
                 # raise # ctrl-c stop here
                 process.wait()
-                #print('term sub')
+                # print('term sub')
             retcode = process.poll()
-        #print('finish sub')
+        # print('finish sub')
         return retcode
 
     def create_thumbnails_sheet(self, videofile, **kwargs):
@@ -256,7 +258,7 @@ class Streaming_Extractor(Extractor):
                 '--start-delay-percent', kwargs.get(
                     'start_delay_percent', '8'),
                 '--end-delay-percent', kwargs.get('end_delay_percent', '8'),
-                #'--timestamp-font', '/usr/share/fonts/TTF/DejaVuSans.ttf',
+                # '--timestamp-font', '/usr/share/fonts/TTF/DejaVuSans.ttf',
                 '--metadata-font', kwargs.get(
                     'metadata_font',
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),

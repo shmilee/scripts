@@ -4,8 +4,8 @@
 
 _pkgname=goldendict
 pkgname="${_pkgname}"
-_commit=7fa7ad6e529a58173d0f3f2b0b73f12a316b5cc8
-_commit_ver="r$((2547-2016)).g${_commit:0:8}"
+_commit=8834e4a2924d143751870f4b943c3ce608b10a7d
+_commit_ver="r$((2633-2016)).g${_commit:0:8}"
 pkgver="1.5.0rc2.${_commit_ver}"
 pkgrel=1
 pkgdesc='A feature-rich dictionary lookup program, supporting multiple dictionary formats and online dictionaries'
@@ -23,7 +23,7 @@ depends=('libvorbis' 'zlib' 'hunspell' 'libxtst' 'lzo' 'bzip2'
 provides=("stardict" "${_pkgname}")
 conflicts=("${_pkgname}")
 source=("${_pkgname}-${pkgver}.tar.gz::https://github.com/${_pkgname}/${_pkgname}/archive/${_commit}.tar.gz" hidpi-icon.patch)
-sha256sums=('f31f9f3b5d6800a260f54e77680372e3516666d302e5237c5d7015ac00c4ec81'
+sha256sums=('4662b9e41d13439313efac2997b8323a30206e96e66c1958335707763b6eb4c3'
             '635759e4e4e3049bd5cb2f8b72878826266a62446cf85737f490789b808c9b5d')
 
 prepare() {

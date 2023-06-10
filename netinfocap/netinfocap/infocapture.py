@@ -59,6 +59,7 @@ class InfoCapture(pyshark.LiveCapture):
         tw.write(os.linesep + "[Info] Start collecting ..." + os.linesep)
         _run = self.eventloop.run_until_complete
         index, count, process, packet = start_index, mrpp, None, None
+        parser = self._setup_tshark_output_parser()
         try:
             while not self.collect_isfull():
                 if count >= mrpp:  # reset process
@@ -66,11 +67,10 @@ class InfoCapture(pyshark.LiveCapture):
                         tw.write("Restarting tshark process ..." + os.linesep)
                         _run(self._cleanup_subprocess(process))
                     process = _run(self._get_tshark_process())
-                    psml, data = _run(self._get_psml_struct(process.stdout))
                     count, packets_captured, data = 0, 0, b""
                 try:
-                    packet, data = _run(self._get_packet_from_stream(
-                        process.stdout, data, psml_structure=psml,
+                    packet, data = _run(parser.get_packets_from_stream(
+                        process.stdout, data,
                         got_first_packet=packets_captured > 0))
                 except EOFError:
                     self._log.debug("EOF reached (sync)")

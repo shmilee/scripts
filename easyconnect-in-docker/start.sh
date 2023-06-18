@@ -41,30 +41,28 @@ watch_url() {
     rm "${HOSTECDIR}"/tmp-url
 }
 
+common_opts="--rm --device /dev/net/tun \
+    --cap-add NET_ADMIN \
+    --ulimit nofile=65535:65535 \
+    -v ${HOSTECDIR}:${EasyConnectDir}"
 # params, like -p, -e etc.
 params="-e USEUI=$USEUI ${@}"
 if [ x"$USEUI" = xVNC ]; then
     watch_url &
-    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -t \
-        -v ${HOSTECDIR}:${EasyConnectDir} \
-        $params \
+    docker run $common_opts $params -t \
         shmilee/easyconnect:$TAG
     echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url
 elif [ x"$USEUI" = xCLI ]; then
-    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN -i -t \
-        -v ${HOSTECDIR}:${EasyConnectDir} \
-        $params \
+    docker run $common_opts $params -i -t \
         shmilee/easyconnect:$TAG
 else
     # default USEUI=X11
     watch_url &
     xhost +LOCAL:
-    docker run --rm --device /dev/net/tun --cap-add NET_ADMIN \
-        -v ${HOSTECDIR}:${EasyConnectDir} \
+    docker run $common_opts $params \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
         -v $HOME/.Xauthority:/root/.Xauthority \
         -e DISPLAY=$DISPLAY \
-        $params \
         shmilee/easyconnect:$TAG
     xhost -LOCAL:
     echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url

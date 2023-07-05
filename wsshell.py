@@ -16,12 +16,30 @@ import subprocess
 import websockets
 print(websockets)
 
+VERSION = '0.1'
+DESCRIPTION = "A simple websocket shell v%s by shmilee." % VERSION
+
 USER = getpass.getuser()
 HOST = subprocess.getoutput('hostname')
 if USER == 'root':
     PS1 = '[%s@%s]# ' % (USER, HOST)
 else:
     PS1 = '[%s@%s]$ ' % (USER, HOST)
+
+OSNAME = subprocess.getoutput('uname -o')
+KERNEL = subprocess.getoutput('uname -r')
+DATE = subprocess.getoutput('date')
+UPTIME = subprocess.getoutput('uptime')
+welcome_msg = """Welcome to %s (%s %s)
+
+ * Date: %s
+ * Uptime: %s
+
+%s
+ * Only support non-interactive commands!
+ * Complicated shell commands should be: bash -c 'XX | YY >a.out'
+
+""" % (HOST, OSNAME, KERNEL, DATE, UPTIME, DESCRIPTION)
 
 
 def info(msg):
@@ -31,6 +49,7 @@ def info(msg):
 
 async def ws_shell(ws, path):
     info("Client connection from %s:%s" % ws.remote_address)
+    await ws.send(welcome_msg)
     await ws.send(PS1)
     while True:
         try:
@@ -61,8 +80,7 @@ async def ws_shell(ws, path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="A simple websocket shell v0.1 by shmilee",
-        add_help=False,
+        description=DESCRIPTION, add_help=False,
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('-b', dest='bind', metavar='<address>',
                         default='127.0.0.1',

@@ -11,8 +11,10 @@ import argparse
 import asyncio
 import signal
 import functools
+import shlex
 import subprocess
 import websockets
+print(websockets)
 
 USER = getpass.getuser()
 HOST = subprocess.getoutput('hostname')
@@ -33,11 +35,26 @@ async def ws_shell(ws, path):
     while True:
         try:
             cmd = await ws.recv()
-            info("Client %s:%s run cmd:  %s"
-                 % (*ws.remote_address, cmd.decode().strip()))
-            output = subprocess.getoutput(cmd) + '\n'
-            await ws.send(output + PS1)
-        except websockets.exceptions.ConnectionClosedError as e:
+            try:
+                cmd = cmd.decode().strip()
+                cmdlist = shlex.split(cmd)
+                cmd = shlex.join(cmdlist)
+                if cmdlist:
+                    info("Client %s:%s run cmd: %s"
+                         % (*ws.remote_address, cmd))
+                    # output = subprocess.getoutput(cmd) + '\n'
+                    output = subprocess.check_output(
+                        cmdlist, stderr=subprocess.STDOUT, timeout=30)
+                    output = output.decode()
+                else:
+                    output = ''
+            except Exception as e:  # CalledProcessError, TimeoutExpired
+                info("Client %s:%s: %s"
+                     % (*ws.remote_address, e))
+                output = '%s' % e
+            await ws.send(output + '\n' + PS1)
+        except (websockets.exceptions.ConnectionClosedError,
+                websockets.exceptions.ConnectionClosedOK) as e:
             info("Client %s:%s closed!" % ws.remote_address)
             return
 

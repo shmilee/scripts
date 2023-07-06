@@ -51,6 +51,8 @@ welcome_msg = """Welcome to %s (%s %s)
 %s
  * Only support non-interactive commands!
  * Complicated shell commands should be: bash -c 'XX | YY >a.out'
+ * Change the working directory by 'cd', like 'cd ~', 'cd', 'cd /xxx'
+ * Set timeout for next commands by 'wsshell-timeout Number'.
 
 """ % (HOST, OSNAME, KERNEL, DATE, UPTIME, DESCRIPTION)
 
@@ -87,10 +89,54 @@ class BasicAuthServerProtocol(websockets.WebSocketServerProtocol):
              % (u, *self.remote_address))
 
 
+def _cmd_timeout(cmdlist, oldt=30):
+    '''
+    Check and change the timeout for subprocess.check_output.
+    Return 'timeout' value and output str.
+    '''
+    if len(cmdlist) > 1:
+        if cmdlist[-1].isdigit():
+            t = int(cmdlist[-1])
+            if t > 0:
+                return t, 'New timeout=%d.' % t
+        return oldt, 'Invalid timeout: %s' % cmdlist[-1]
+    return oldt, 'The timeout=%d.' % oldt
+
+
+def _cmd_cd(cmdlist, oldCWD=None):
+    '''
+    Check and change the working directory for next commands
+    by passing 'cwd' to subprocesscheck_output.
+    Return 'cwd' value and output str.
+    '''
+    # os.chdir(cmdlist[-1])  # will affects all connections!
+    if len(cmdlist) > 1:
+        p = os.path.expanduser(cmdlist[-1])
+        if os.path.isdir(p):
+            return p, p
+        else:
+            return oldCWD, 'No such directory: %s' % cmdlist[-1]
+    return None, os.getcwd()
+
+
+def _cmd_default(cmdlist, timeout=None, cwd=None):
+    '''
+    Call subprocess.check_output to run cmdlist.
+    Return output str.
+    '''
+    # output = subprocess.getoutput(cmd) + '\n'
+    output = subprocess.check_output(
+        cmdlist, stderr=subprocess.STDOUT,
+        timeout=timeout, cwd=cwd)
+    return output.decode()
+
+
 async def ws_shell(ws, path):
     info("Client connection from %s:%s" % ws.remote_address)
     await ws.send(welcome_msg)
     await ws.send(PS1)
+    TIMEOUT = 30  # default 30s
+    CWD = None
     while True:
         try:
             cmd = await ws.recv()
@@ -101,16 +147,25 @@ async def ws_shell(ws, path):
                 if cmdlist:
                     info("Client %s:%s run cmd: %s"
                          % (*ws.remote_address, cmd))
-                    # output = subprocess.getoutput(cmd) + '\n'
-                    output = subprocess.check_output(
-                        cmdlist, stderr=subprocess.STDOUT, timeout=30)
-                    output = output.decode()
+                    if cmdlist[0] == 'wsshell-timeout':
+                        TIMEOUT, output = _cmd_timeout(cmdlist, oldt=TIMEOUT)
+                    elif cmdlist[0] == 'cd':
+                        CWD, output = _cmd_cd(cmdlist, oldCWD=CWD)
+                    else:
+                        output = _cmd_default(
+                            cmdlist,
+                            timeout=TIMEOUT,
+                            cwd=CWD)
                 else:
                     output = ''
-            except Exception as e:  # CalledProcessError, TimeoutExpired
+            except Exception as e:
                 info("Client %s:%s: %s"
                      % (*ws.remote_address, e))
                 output = '%s' % e
+                # more output for CalledProcessError, TimeoutExpired
+                if isinstance(e, (subprocess.CalledProcessError,
+                                  subprocess.TimeoutExpired)):
+                    output += '\n\n' + e.output.decode()
             await ws.send(output + '\n' + PS1)
         except (websockets.exceptions.ConnectionClosedError,
                 websockets.exceptions.ConnectionClosedOK) as e:
@@ -131,7 +186,7 @@ def main():
                         help='Server port (default: %(default)d)')
     parser.add_argument('--auth', metavar='<path>',
                         default='./simple-wsshell-auth.txt',
-                        help='Authorization info path. '
+                        help='Authorization file path. '
                              '(default: %(default)s)')
     parser.add_argument('--pfile', metavar='<path>',
                         default='./simple-wsshell-run.pid',

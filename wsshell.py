@@ -137,7 +137,7 @@ async def _cmd_default(cmd, timeout=None, cwd=None):
         output.append(timerr)
     if proc.returncode:
         stderr = await proc.stderr.read()
-        errput = ('[ErrCode %d] ' % proc.returncode) + stderr.decode()
+        errput = ('[ErrCode %d]\n' % proc.returncode) + stderr.decode()
         output.append(errput.strip())
     stdout = await proc.stdout.read()
     if stdout:
@@ -157,8 +157,10 @@ async def ws_shell(ws, path):
             try:
                 cmd = cmd.decode().strip()
                 cmdlist = shlex.split(cmd)
-                cmd = shlex.join(cmdlist)
                 if cmdlist:
+                    if cmdlist[0] == 'ls' and '--color' not in cmdlist:
+                        cmdlist.append('--color')
+                    cmd = shlex.join(cmdlist)
                     info("Client %s:%s run cmd: %s"
                          % (*ws.remote_address, cmd))
                     if cmdlist[0] == 'wsshell-timeout':

@@ -8,6 +8,8 @@ See also:
 * https://github.com/shelld3v/wsshell/blob/main/wsshell.py
 * https://gist.github.com/nvgoldin/30cea3c04ee0796ebd0489aa62bcf00a
 * https://stackoverflow.com/questions/48562893/
+* https://github.com/MagicStack/uvloop/blob/v0.17.0/tests/test_process.py
+* https://docs.python.org/3.9/library/asyncio-task.html#asyncio.wait_for
 '''
 
 import os
@@ -91,7 +93,7 @@ class BasicAuthServerProtocol(websockets.WebSocketServerProtocol):
 
 def _cmd_timeout(cmdlist, oldt=30):
     '''
-    Check and change the timeout for subprocess.check_output.
+    Check and change the timeout for asyncio.wait_for.
     Return 'timeout' value and output str.
     '''
     if len(cmdlist) > 1:
@@ -106,7 +108,7 @@ def _cmd_timeout(cmdlist, oldt=30):
 def _cmd_cd(cmdlist, oldCWD=None):
     '''
     Check and change the working directory for next commands
-    by passing 'cwd' to subprocesscheck_output.
+    by passing 'cwd' to asyncio.create_subprocess_shell.
     Return 'cwd' value and output str.
     '''
     # os.chdir(cmdlist[-1])  # will affects all connections!
@@ -119,23 +121,35 @@ def _cmd_cd(cmdlist, oldCWD=None):
     return None, os.getcwd()
 
 
-def _cmd_default(cmdlist, timeout=None, cwd=None):
+async def _cmd_default(cmd, timeout=None, cwd=None):
     '''
-    Call subprocess.check_output to run cmdlist.
+    Call asyncio.create_subprocess_shell to run cmd.
     Return output str.
     '''
-    # output = subprocess.getoutput(cmd) + '\n'
-    output = subprocess.check_output(
-        cmdlist, stderr=subprocess.STDOUT,
-        timeout=timeout, cwd=cwd)
-    return output.decode()
+    proc = await asyncio.create_subprocess_shell(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    output = []
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=timeout)
+    except asyncio.TimeoutError as e:
+        proc.kill()
+        timerr = "Cmd '%s' timed out after %d seconds." % (cmd, timeout)
+        output.append(timerr)
+    if proc.returncode:
+        stderr = await proc.stderr.read()
+        errput = ('[ErrCode %d] ' % proc.returncode) + stderr.decode()
+        output.append(errput.strip())
+    stdout = await proc.stdout.read()
+    if stdout:
+        output.append(stdout.decode().strip())
+    return '\n\n'.join(output) + '\n'
 
 
 async def ws_shell(ws, path):
     info("Client connection from %s:%s" % ws.remote_address)
     await ws.send(welcome_msg)
     await ws.send(PS1)
-    TIMEOUT = 30  # default 30s
+    TIMEOUT = 15  # default 15s
     CWD = None
     while True:
         try:
@@ -148,24 +162,23 @@ async def ws_shell(ws, path):
                     info("Client %s:%s run cmd: %s"
                          % (*ws.remote_address, cmd))
                     if cmdlist[0] == 'wsshell-timeout':
-                        TIMEOUT, output = _cmd_timeout(cmdlist, oldt=TIMEOUT)
-                    elif cmdlist[0] == 'cd':
-                        CWD, output = _cmd_cd(cmdlist, oldCWD=CWD)
-                    else:
-                        output = _cmd_default(
+                        TIMEOUT, output = _cmd_timeout(
                             cmdlist,
+                            oldt=TIMEOUT)
+                    elif cmdlist[0] == 'cd':
+                        CWD, output = _cmd_cd(
+                            cmdlist,
+                            oldCWD=CWD)
+                    else:
+                        output = await _cmd_default(
+                            cmd,
                             timeout=TIMEOUT,
                             cwd=CWD)
                 else:
                     output = ''
             except Exception as e:
-                info("Client %s:%s: %s"
-                     % (*ws.remote_address, e))
+                info("Client %s:%s: %s" % (*ws.remote_address, e))
                 output = '%s' % e
-                # more output for CalledProcessError, TimeoutExpired
-                if isinstance(e, (subprocess.CalledProcessError,
-                                  subprocess.TimeoutExpired)):
-                    output += '\n\n' + e.output.decode()
             await ws.send(output + '\n' + PS1)
         except (websockets.exceptions.ConnectionClosedError,
                 websockets.exceptions.ConnectionClosedOK) as e:

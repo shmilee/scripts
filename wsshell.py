@@ -25,6 +25,7 @@ import shlex
 import subprocess
 import websockets
 import http
+import urllib.parse as urlparse
 from websockets.headers import (
     build_authorization_basic, parse_authorization_basic)
 # print(websockets)
@@ -43,25 +44,36 @@ CHARS = "abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789"
 
 OSNAME = subprocess.getoutput('uname -o')
 KERNEL = subprocess.getoutput('uname -r')
-DATE = subprocess.getoutput('date')
-UPTIME = subprocess.getoutput('uptime')
 welcome_msg = """Welcome to %s (%s %s)
 
- * Date: %s
- * Uptime: %s
+ * Date: %%s
+ * Uptime: %%s
 
 %s
  * Only support non-interactive commands!
  * Complicated shell commands should be: bash -c 'XX | YY >a.out'
  * Change the working directory by 'cd', like 'cd ~', 'cd', 'cd /xxx'
  * Set timeout for next commands by 'wsshell-timeout Number'.
+ * Transfer file URL: ws://user:passwd@IP:Port/PATH
+    - client command: 'websocat -n -U --binary URL >local/save/path
+    - relative PATH: /download/path/to/file?chunk_size=5242880
+    - absolute PATH: /download//path/to/file
+    - userhome PATH: /download/~/path/to/file
 
-""" % (HOST, OSNAME, KERNEL, DATE, UPTIME, DESCRIPTION)
+""" % (HOST, OSNAME, KERNEL, DESCRIPTION)
+LOGFILE = './simple-wsshell-%d.log' % os.getpid()
 
 
 def info(msg):
     s = time.strftime('%F %H:%M:%S')
-    print('[%s] - %s' % (s, msg))
+    msg = '[%s] - %s' % (s, msg)
+    print(msg)
+    try:
+        with open(LOGFILE, 'a+') as l:
+            l.write(msg)
+            l.write('\n')
+    except Exception:
+        pass
 
 
 def random_str(length):
@@ -77,6 +89,7 @@ class BasicAuthServerProtocol(websockets.WebSocketServerProtocol):
         # print(dir(self), self.remote_address)
         info("Client authorization for %s:%s" % self.remote_address)
         try:
+            # print('\nRequest headers:', request_headers, sep='\n')
             authorization = request_headers['Authorization']
         except KeyError:
             info("Miss authorization for %s:%s" % self.remote_address)
@@ -142,12 +155,64 @@ async def _cmd_default(cmd, timeout=None, cwd=None):
     stdout = await proc.stdout.read()
     if stdout:
         output.append(stdout.decode().strip())
-    return '\n\n'.join(output) + '\n'
+    return '\n\n'.join(output)
 
 
 async def ws_shell(ws, path):
     info("Client connection from %s:%s" % ws.remote_address)
-    await ws.send(welcome_msg)
+    # 1. transfer file:
+    #    - relative: /download/path/to/file?chunk_size=5242880
+    #    - absolute: /download//path/to/file
+    #    - homepath: /download/~/path/to/file or /download/~user/path/to/file
+    # print("ws get path: %s" % path)
+    if path and path.startswith('/download/'):
+        querypath = urlparse.urlparse(path)
+        filepath = urlparse.unquote(querypath.path[10:])  # utf8 decode
+        query = urlparse.parse_qs(querypath.query)
+        if filepath.startswith('~'):  # homepath
+            filepath = os.path.expanduser(filepath)
+        try:
+            size = max(int(query.get('chunk_size')[0]), 1024)  # min 1k
+        except Exception:
+            size = 1024*1024*5  # default 5M
+        try:
+            if os.path.isfile(filepath):
+                with open(filepath, 'rb') as data:
+                    info("Sending file '%s' to client %s:%s ..."
+                         % (filepath, *ws.remote_address))
+                    total = data.seek(0, os.SEEK_END)
+                    start = data.seek(0, os.SEEK_SET)
+                    chunk = data.read(size)
+                    while chunk:
+                        await ws.send(chunk)
+                        offset = data.seek(0, os.SEEK_CUR)
+                        info("Sending file '%s' to client %s:%s ... %.0f%%"
+                             % (filepath, *ws.remote_address,
+                                offset/total*100))
+                        if offset > total:
+                            info("'%s' still changing for client %s:%s. Break!"
+                                 % (filepath, *ws.remote_address))
+                            break
+                        chunk = data.read(size)
+                    info("Send file '%s' to client %s:%s. Done."
+                         % (filepath, *ws.remote_address))
+            else:
+                info("Client %s:%s, file '%s' not found!"
+                     % (*ws.remote_address, filepath))
+                await ws.send("'%s' not found!" % filepath)
+        # -ws.close()
+        except (websockets.exceptions.ConnectionClosedError,
+                websockets.exceptions.ConnectionClosedOK) as e:
+            info("Client %s:%s closed!" % ws.remote_address)
+        else:
+            info("Close client connection from %s:%s!" % ws.remote_address)
+        return
+    # 2. fake shell
+    # DATE = subprocess.getoutput('date')
+    # UPTIME = subprocess.getoutput('uptime')
+    DATE = await _cmd_default('date')
+    UPTIME = await _cmd_default('uptime')
+    await ws.send(welcome_msg % (DATE, UPTIME))
     await ws.send(PS1)
     TIMEOUT = 15  # default 15s
     CWD = None
@@ -156,7 +221,7 @@ async def ws_shell(ws, path):
             cmd = await ws.recv()
             try:
                 cmd = cmd.decode().strip()
-                cmdlist = shlex.split(cmd)
+                cmdlist = list(map(os.path.expanduser, shlex.split(cmd)))
                 if cmdlist:
                     if cmdlist[0] == 'ls' and '--color' not in cmdlist:
                         cmdlist.append('--color')
@@ -181,7 +246,7 @@ async def ws_shell(ws, path):
             except Exception as e:
                 info("Client %s:%s: %s" % (*ws.remote_address, e))
                 output = '%s' % e
-            await ws.send(output + '\n' + PS1)
+            await ws.send(output + '\n\n' + PS1)
         except (websockets.exceptions.ConnectionClosedError,
                 websockets.exceptions.ConnectionClosedOK) as e:
             info("Client %s:%s closed!" % ws.remote_address)
@@ -201,11 +266,14 @@ def main():
                         help='Server port (default: %(default)d)')
     parser.add_argument('--auth', metavar='<path>',
                         default='./simple-wsshell-auth.txt',
-                        help='Authorization file path. '
-                             '(default: %(default)s)')
-    parser.add_argument('--pfile', metavar='<path>',
+                        help='Authorization file path.\n'
+                             '  default: %(default)s')
+    parser.add_argument('--pid', metavar='<path>',
                         default='./simple-wsshell-run.pid',
-                        help='PID file path (default: %(default)s)')
+                        help='PID file path\n  default: %(default)s')
+    parser.add_argument('--log', metavar='<path>',
+                        default='./simple-wsshell-<pid>.log',
+                        help='Log file path\n  default: %(default)s')
     parser.add_argument('-h', '--help', action='store_true',
                         help='Show this help message and exit')
     args = parser.parse_args()
@@ -213,9 +281,11 @@ def main():
     if args.help:
         parser.print_help()
         sys.exit()
-    info("USER=%s, PID=%d in '%s', auth info in '%s'"
-         % (USER, os.getpid(), args.pfile, args.auth))
-    with open(args.pfile, 'w', encoding='utf8') as p:
+    global LOGFILE
+    LOGFILE = args.log.replace('<pid>', str(os.getpid()))
+    info("USER=%s, PID=%d in '%s', auth info in '%s', log in '%s'"
+         % (USER, os.getpid(), args.pid, args.auth, LOGFILE))
+    with open(args.pid, 'w', encoding='utf8') as p:
         p.write(str(os.getpid()))
     # authorization: ws-XXXXXX
     user_pass = []
@@ -224,7 +294,7 @@ def main():
     with open(args.auth, 'w', encoding='utf8') as a:
         for u, p in user_pass:
             AUTHORIZATION.append(build_authorization_basic(u, p))
-            a.write('%s:%s\n' % (u, p))
+            a.write('%s:%s\n\t%s\n' % (u, p, AUTHORIZATION[-1]))
     info(f"Serving wsshell on {args.bind} port {args.port} "
          f"(ws://{args.bind}:{args.port}) ...")
     shell = websockets.serve(ws_shell, args.bind, args.port,
@@ -238,7 +308,7 @@ def main():
         else:
             print("\n%s signal received, exiting." % sig.name)
         os.remove(args.auth)
-        os.remove(args.pfile)
+        os.remove(args.pid)
         loop.stop()
 
     for s in [signal.SIGINT, signal.SIGTERM]:

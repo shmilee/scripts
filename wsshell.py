@@ -51,9 +51,11 @@ welcome_msg = """Welcome to %s (%s %s)
 
 %s
  * Only support non-interactive commands!
- * Complicated shell commands should be: bash -c 'XX | YY >a.out'
- * Change the working directory by 'cd', like 'cd ~', 'cd', 'cd /xxx'
+ * Complicated shell commands should be: bash -c 'CMD1 | CMD2  >a.out'
  * Set timeout for next commands by 'wsshell-timeout Number'.
+ * Change the working directory by 'cd', like 'cd ~', 'cd', 'cd /xxx'
+ * Set bash mode for running next commands by 'wsshell-bash on/off'.
+   Then 'bash -c' can be omitted for CMD1, CMD2.
  * Transfer file URL: ws://user:passwd@IP:Port/PATH
     - client command: 'websocat -n -U --binary URL >local/save/path
     - relative PATH: /download/path/to/file?chunk_size=5242880
@@ -97,14 +99,14 @@ class BasicAuthServerProtocol(websockets.WebSocketServerProtocol):
         # info("get authorization: %s" % authorization)
         u = parse_authorization_basic(authorization)[0]
         if authorization not in AUTHORIZATION:
-            info("Incorrect authorization for %s from %s:%s"
+            info("Incorrect authorization of %s from %s:%s"
                  % (u, *self.remote_address))
             return http.HTTPStatus.FORBIDDEN, [], b'Incorrect credentials\n'
-        info("Get correct authorization for %s from %s:%s"
+        info("Get correct authorization of %s from %s:%s"
              % (u, *self.remote_address))
 
 
-def _cmd_timeout(cmdlist, oldt=30):
+def _cmd_timeout(cmdlist, oldt=15):
     '''
     Check and change the timeout for asyncio.wait_for.
     Return 'timeout' value and output str.
@@ -113,9 +115,9 @@ def _cmd_timeout(cmdlist, oldt=30):
         if cmdlist[-1].isdigit():
             t = int(cmdlist[-1])
             if t > 0:
-                return t, 'New timeout=%d.' % t
-        return oldt, 'Invalid timeout: %s' % cmdlist[-1]
-    return oldt, 'The timeout=%d.' % oldt
+                return t, 'New TIMEOUT=%d.' % t
+        return oldt, 'Invalid TIMEOUT: %s' % cmdlist[-1]
+    return oldt, 'The TIMEOUT=%d.' % oldt
 
 
 def _cmd_cd(cmdlist, oldCWD=None):
@@ -132,6 +134,17 @@ def _cmd_cd(cmdlist, oldCWD=None):
         else:
             return oldCWD, 'No such directory: %s' % cmdlist[-1]
     return None, os.getcwd()
+
+
+def _cmd_bash_toggle(cmdlist, oldBASH='off'):
+    ''' Toggle BASH = on/off. '''
+    if len(cmdlist) > 1:
+        onoff = cmdlist[-1].lower()
+        if onoff in ('on', 'off'):
+            return onoff, 'New BASH-mode=%s.' % onoff
+        else:
+            return oldBASH, 'Invalid BASH-mode: %s. (on/off)' % cmdlist[-1]
+    return oldBASH, 'The BASH-mode=%s.' % oldBASH
 
 
 async def _cmd_default(cmd, timeout=None, cwd=None):
@@ -158,56 +171,54 @@ async def _cmd_default(cmd, timeout=None, cwd=None):
     return '\n\n'.join(output)
 
 
-async def ws_shell(ws, path):
-    info("Client connection from %s:%s" % ws.remote_address)
-    # 1. transfer file:
+async def ws_download(ws, path):
+    # transfer file:
     #    - relative: /download/path/to/file?chunk_size=5242880
     #    - absolute: /download//path/to/file
     #    - homepath: /download/~/path/to/file or /download/~user/path/to/file
-    # print("ws get path: %s" % path)
-    if path and path.startswith('/download/'):
-        querypath = urlparse.urlparse(path)
-        filepath = urlparse.unquote(querypath.path[10:])  # utf8 decode
-        query = urlparse.parse_qs(querypath.query)
-        if filepath.startswith('~'):  # homepath
-            filepath = os.path.expanduser(filepath)
-        try:
-            size = max(int(query.get('chunk_size')[0]), 1024)  # min 1k
-        except Exception:
-            size = 1024*1024*5  # default 5M
-        try:
-            if os.path.isfile(filepath):
-                with open(filepath, 'rb') as data:
-                    info("Sending file '%s' to client %s:%s ..."
-                         % (filepath, *ws.remote_address))
-                    total = data.seek(0, os.SEEK_END)
-                    start = data.seek(0, os.SEEK_SET)
+    querypath = urlparse.urlparse(path)
+    filepath = urlparse.unquote(querypath.path[10:])  # utf8 decode
+    query = urlparse.parse_qs(querypath.query)
+    if filepath.startswith('~'):  # homepath
+        filepath = os.path.expanduser(filepath)
+    try:
+        size = max(int(query.get('chunk_size')[0]), 1024)  # min 1k
+    except Exception:
+        size = 1024*1024*5  # default 5M
+    try:
+        if os.path.isfile(filepath):
+            with open(filepath, 'rb') as data:
+                info("Sending file '%s' to client %s:%s ..."
+                     % (filepath, *ws.remote_address))
+                total = data.seek(0, os.SEEK_END)
+                start = data.seek(0, os.SEEK_SET)
+                chunk = data.read(size)
+                while chunk:
+                    await ws.send(chunk)
+                    offset = data.seek(0, os.SEEK_CUR)
+                    info("Sending file '%s' to client %s:%s ... %.0f%%"
+                         % (filepath, *ws.remote_address, offset/total*100))
+                    if offset > total:
+                        info("'%s' still changing for client %s:%s. Break!"
+                             % (filepath, *ws.remote_address))
+                        break
                     chunk = data.read(size)
-                    while chunk:
-                        await ws.send(chunk)
-                        offset = data.seek(0, os.SEEK_CUR)
-                        info("Sending file '%s' to client %s:%s ... %.0f%%"
-                             % (filepath, *ws.remote_address,
-                                offset/total*100))
-                        if offset > total:
-                            info("'%s' still changing for client %s:%s. Break!"
-                                 % (filepath, *ws.remote_address))
-                            break
-                        chunk = data.read(size)
-                    info("Send file '%s' to client %s:%s. Done."
-                         % (filepath, *ws.remote_address))
-            else:
-                info("Client %s:%s, file '%s' not found!"
-                     % (*ws.remote_address, filepath))
-                await ws.send("'%s' not found!" % filepath)
-        # -ws.close()
-        except (websockets.exceptions.ConnectionClosedError,
-                websockets.exceptions.ConnectionClosedOK) as e:
-            info("Client %s:%s closed!" % ws.remote_address)
+                info("Send file '%s' to client %s:%s. Done."
+                     % (filepath, *ws.remote_address))
         else:
-            info("Close client connection from %s:%s!" % ws.remote_address)
-        return
-    # 2. fake shell
+            info("Client %s:%s, file '%s' not found!"
+                 % (*ws.remote_address, filepath))
+            await ws.send("'%s' not found!" % filepath)
+    # -ws.close()
+    except (websockets.exceptions.ConnectionClosedError,
+            websockets.exceptions.ConnectionClosedOK) as e:
+        info("Client %s:%s closed!" % ws.remote_address)
+    else:
+        info("Close client connection from %s:%s!" % ws.remote_address)
+
+
+async def ws_shell(ws, path):
+    # fake shell
     # DATE = subprocess.getoutput('date')
     # UPTIME = subprocess.getoutput('uptime')
     DATE = await _cmd_default('date')
@@ -216,31 +227,52 @@ async def ws_shell(ws, path):
     await ws.send(PS1)
     TIMEOUT = 15  # default 15s
     CWD = None
+    BASH = 'off'
+    info("Client %s:%s default TIMEOUT=%d, CWD=%s, BASH mode=%s"
+         % (*ws.remote_address, TIMEOUT, CWD or os.getcwd(), BASH))
     while True:
         try:
-            cmd = await ws.recv()
+            bytecmd = await ws.recv()
             try:
-                cmd = cmd.decode().strip()
-                cmdlist = list(map(os.path.expanduser, shlex.split(cmd)))
+                rawcmd = bytecmd.decode().strip()
+                cmdlist = list(map(os.path.expanduser, shlex.split(rawcmd)))
                 if cmdlist:
-                    if cmdlist[0] == 'ls' and '--color' not in cmdlist:
-                        cmdlist.append('--color')
-                    cmd = shlex.join(cmdlist)
-                    info("Client %s:%s run cmd: %s"
-                         % (*ws.remote_address, cmd))
+                    info("Client %s:%s get rawcmd: %s"
+                         % (*ws.remote_address, rawcmd))
                     if cmdlist[0] == 'wsshell-timeout':
                         TIMEOUT, output = _cmd_timeout(
                             cmdlist,
                             oldt=TIMEOUT)
+                        info("Client %s:%s TIMEOUT is: %d"
+                             % (*ws.remote_address, TIMEOUT))
                     elif cmdlist[0] == 'cd':
                         CWD, output = _cmd_cd(
                             cmdlist,
                             oldCWD=CWD)
+                        info("Client %s:%s CWD is: %s"
+                             % (*ws.remote_address, CWD))
+                    elif cmdlist[0] == 'wsshell-bash':
+                        BASH, output = _cmd_bash_toggle(
+                            cmdlist,
+                            oldBASH=BASH)
+                        info("Client %s:%s BASH mode is: %s"
+                             % (*ws.remote_address, BASH))
                     else:
+                        if cmdlist[0] == 'ls' and '--color' not in cmdlist:
+                            cmdlist.insert(1, '--color')
+                        if BASH == 'on':  # update cmdlist
+                            if cmdlist[0] != 'bash':
+                                # print('%r' % cmdlist)
+                                cmdlist = ['bash', '-c', ' '.join(cmdlist)]
+                        cmd = shlex.join(cmdlist)
+                        info("Client %s:%s run cmd: %s"
+                             % (*ws.remote_address, cmd))
                         output = await _cmd_default(
                             cmd,
                             timeout=TIMEOUT,
                             cwd=CWD)
+                        if BASH == 'on':
+                            output = ('RUN CMD: %s \n\n' % cmd) + output
                 else:
                     output = ''
             except Exception as e:
@@ -251,6 +283,17 @@ async def ws_shell(ws, path):
                 websockets.exceptions.ConnectionClosedOK) as e:
             info("Client %s:%s closed!" % ws.remote_address)
             return
+
+
+async def ws_serve(ws, path):
+    info("Client connection from %s:%s" % ws.remote_address)
+    # print("ws get path: %s" % path)
+    if path and path.startswith('/download/'):  # transfer file
+        await ws_download(ws, path)
+        return
+    else:  # fake shell
+        await ws_shell(ws, path)
+        return
 
 
 def main():
@@ -297,7 +340,7 @@ def main():
             a.write('%s:%s\n\t%s\n' % (u, p, AUTHORIZATION[-1]))
     info(f"Serving wsshell on {args.bind} port {args.port} "
          f"(ws://{args.bind}:{args.port}) ...")
-    shell = websockets.serve(ws_shell, args.bind, args.port,
+    shell = websockets.serve(ws_serve, args.bind, args.port,
                              create_protocol=BasicAuthServerProtocol)
     loop = asyncio.get_event_loop()
     loop.run_until_complete(shell)

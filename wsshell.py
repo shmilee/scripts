@@ -41,6 +41,7 @@ else:
     PS1 = '[%s@%s]$ ' % (USER, HOST)
 AUTHORIZATION = []
 CHARS = "abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789"
+COMMAND_HISTORY = {}  # remote_address -> u; u -> commands info list
 
 OSNAME = subprocess.getoutput('uname -o')
 KERNEL = subprocess.getoutput('uname -r')
@@ -56,6 +57,8 @@ welcome_msg = """Welcome to %s (%s %s)
  * Change the working directory by 'cd', like 'cd ~', 'cd', 'cd /xxx'
  * Set bash mode for running next commands by 'wsshell-bash on/off'.
    Then 'bash -c' can be omitted for CMD1, CMD2.
+ * Show history commands by 'history [N]',
+   and 'history-running' shows commands which are still running.
  * Transfer file URL: ws://user:passwd@IP:Port/PATH
     - client command: 'websocat -n -U --binary URL >local/save/path
     - relative PATH: /download/path/to/file?chunk_size=5242880
@@ -104,6 +107,7 @@ class BasicAuthServerProtocol(websockets.WebSocketServerProtocol):
             return http.HTTPStatus.FORBIDDEN, [], b'Incorrect credentials\n'
         info("Get correct authorization of %s from %s:%s"
              % (u, *self.remote_address))
+        COMMAND_HISTORY[self.remote_address] = u
 
 
 def _cmd_timeout(cmdlist, oldt=15):
@@ -129,6 +133,9 @@ def _cmd_cd(cmdlist, oldCWD=None):
     # os.chdir(cmdlist[-1])  # will affects all connections!
     if len(cmdlist) > 1:
         p = os.path.expanduser(cmdlist[-1])
+        if not p.startswith('/'):
+            p = os.path.join(oldCWD or os.getcwd(), p)
+            p = os.path.abspath(p)
         if os.path.isdir(p):
             return p, p
         else:
@@ -145,6 +152,38 @@ def _cmd_bash_toggle(cmdlist, oldBASH='off'):
         else:
             return oldBASH, 'Invalid BASH-mode: %s. (on/off)' % cmdlist[-1]
     return oldBASH, 'The BASH-mode=%s.' % oldBASH
+
+
+def _cmd_history(cmdlist, historylist):
+    ''' Return history '''
+    N = 100
+    if len(cmdlist) > 1:
+        if cmdlist[-1].isdigit():
+            N = int(cmdlist[-1])
+            if N <= 0:
+                N = 100
+    out = []
+    for i, ci in enumerate(historylist[-N:], len(historylist[:-N])+1):
+        out.append('% 4d   %s' % (i, ci['cmd']))
+    return '\n'.join(out)
+
+
+def _cmd_history_running(cmdlist, historylist):
+    ''' Return info of running commands '''
+    out = []
+    for i, ci in enumerate(historylist, 1):
+        if ci['running']:
+            start = time.asctime(time.localtime(ci['start']))
+            timeleft = int(ci['start'] + ci['timeout'] - time.time())
+            out.append("Index: %d, cmd: %s\n"
+                       "  -> start: %s\n"
+                       "  -> timeout:  %ds\n"
+                       "  -> timeleft: %ds\n"
+                       "  -> CWD: %s"
+                       % (i, ci['cmd'],
+                          start, ci['timeout'], timeleft, ci['cwd'])
+                       )
+    return '\n\n'.join(out)
 
 
 async def _cmd_default(cmd, timeout=None, cwd=None):
@@ -230,6 +269,8 @@ async def ws_shell(ws, path):
     BASH = 'off'
     info("Client %s:%s default TIMEOUT=%d, CWD=%s, BASH mode=%s"
          % (*ws.remote_address, TIMEOUT, CWD or os.getcwd(), BASH))
+    u = COMMAND_HISTORY[ws.remote_address]
+    historylist = COMMAND_HISTORY[u]
     while True:
         try:
             bytecmd = await ws.recv()
@@ -257,6 +298,10 @@ async def ws_shell(ws, path):
                             oldBASH=BASH)
                         info("Client %s:%s BASH mode is: %s"
                              % (*ws.remote_address, BASH))
+                    elif cmdlist[0] == 'history':
+                        output = _cmd_history(cmdlist, historylist)
+                    elif cmdlist[0] == 'history-running':
+                        output = _cmd_history_running(cmdlist, historylist)
                     else:
                         if cmdlist[0] == 'ls' and '--color' not in cmdlist:
                             cmdlist.insert(1, '--color')
@@ -267,10 +312,21 @@ async def ws_shell(ws, path):
                         cmd = shlex.join(cmdlist)
                         info("Client %s:%s run cmd: %s"
                              % (*ws.remote_address, cmd))
+                        # save cmd info to COMMAND_HISTORY
+                        ci = dict(
+                            start=time.time(),
+                            running=True,
+                            cmd=cmd,
+                            timeout=TIMEOUT,
+                            cwd=CWD or os.getcwd(),
+                        )
+                        historylist.append(ci)
+                        # run cmd
                         output = await _cmd_default(
                             cmd,
                             timeout=TIMEOUT,
                             cwd=CWD)
+                        ci['running'] = False
                         if BASH == 'on':
                             output = ('RUN CMD: %s \n\n' % cmd) + output
                 else:
@@ -338,6 +394,7 @@ def main():
         for u, p in user_pass:
             AUTHORIZATION.append(build_authorization_basic(u, p))
             a.write('%s:%s\n\t%s\n' % (u, p, AUTHORIZATION[-1]))
+            COMMAND_HISTORY[u] = []
     info(f"Serving wsshell on {args.bind} port {args.port} "
          f"(ws://{args.bind}:{args.port}) ...")
     shell = websockets.serve(ws_serve, args.bind, args.port,

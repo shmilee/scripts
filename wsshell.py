@@ -163,8 +163,13 @@ def _cmd_history(cmdlist, historylist):
             if N <= 0:
                 N = 100
     out = []
+    hint = '% 4s  % 6s  %s' % ('idx', 'status', 'cmd')
+    out.append(hint)
+    out.append('-'*26)
     for i, ci in enumerate(historylist[-N:], len(historylist[:-N])+1):
-        out.append('% 4d   %s' % (i, ci['cmd']))
+        out.append('% 4d  % 5s   %s' % (i, ci['status'], ci['cmd']))
+    out.append('-'*26)
+    out.append(hint)
     return '\n'.join(out)
 
 
@@ -172,35 +177,45 @@ def _cmd_history_running(cmdlist, historylist):
     ''' Return info of running commands '''
     out = []
     for i, ci in enumerate(historylist, 1):
-        if ci['running']:
+        if ci['status'] == 'R':  # Running
             start = time.asctime(time.localtime(ci['start']))
             timeleft = int(ci['start'] + ci['timeout'] - time.time())
+            if timeleft < 0:
+                continue
             out.append("Index: %d, cmd: %s\n"
                        "  -> start: %s\n"
                        "  -> timeout:  %ds\n"
                        "  -> timeleft: %ds\n"
+                       "  -> PID: %d\n"
                        "  -> CWD: %s"
                        % (i, ci['cmd'],
-                          start, ci['timeout'], timeleft, ci['cwd'])
+                          start, ci['timeout'], timeleft,
+                          ci['pid'], ci['cwd'])
                        )
     return '\n\n'.join(out)
 
 
-async def _cmd_default(cmd, timeout=None, cwd=None):
+async def _cmd_default(cmd, cmdinfo={}, timeout=None, cwd=None):
     '''
     Call asyncio.create_subprocess_shell to run cmd.
     Return output str.
     '''
+    # status: (R)unning, (S)ucceeded, (F)ailed, (K)illed
+    cmdinfo['status'] = 'R'
     proc = await asyncio.create_subprocess_shell(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    cmdinfo['pid'] = proc.pid
     output = []
     try:
         await asyncio.wait_for(proc.wait(), timeout=timeout)
+        cmdinfo['status'] = 'S'
     except asyncio.TimeoutError as e:
         proc.kill()
+        cmdinfo['status'] = 'K'
         timerr = "Cmd '%s' timed out after %d seconds." % (cmd, timeout)
         output.append(timerr)
     if proc.returncode:
+        cmdinfo['status'] = 'F%d' % proc.returncode
         stderr = await proc.stderr.read()
         errput = ('[ErrCode %d]\n' % proc.returncode) + stderr.decode()
         output.append(errput.strip())
@@ -315,18 +330,18 @@ async def ws_shell(ws, path):
                         # save cmd info to COMMAND_HISTORY
                         ci = dict(
                             start=time.time(),
-                            running=True,
+                            status=None,
                             cmd=cmd,
                             timeout=TIMEOUT,
+                            pid=-1,
                             cwd=CWD or os.getcwd(),
                         )
                         historylist.append(ci)
                         # run cmd
                         output = await _cmd_default(
-                            cmd,
+                            cmd, ci,
                             timeout=TIMEOUT,
                             cwd=CWD)
-                        ci['running'] = False
                         if BASH == 'on':
                             output = ('RUN CMD: %s \n\n' % cmd) + output
                 else:

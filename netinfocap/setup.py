@@ -31,9 +31,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Topic :: Internet',
@@ -46,7 +43,11 @@ setup(
     ] + [
         # video-thumbnails,
         # for sub package vcsi from 'https://github.com/amietn/vcsi'
-        'numpy', 'pillow', 'jinja2', 'texttable', 'parsedatetime',
+        'numpy>=1.24.3',
+        'pillow>=10.0.0',
+        'jinja2>=3.1.2',
+        'texttable>=1.6.7',
+        'parsedatetime>=2.6',
     ],
     extras_require={},
     package_data={},

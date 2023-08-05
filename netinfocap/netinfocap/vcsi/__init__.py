@@ -1,3 +1,5 @@
-def main():
-    from . import vcsi
-    vcsi.main()
+from . import vcsi
+
+
+def main(argv=None):
+    vcsi.main(argv=None)

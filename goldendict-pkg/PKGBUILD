@@ -2,38 +2,35 @@
 # Contributor: Jaroslav Lichtblau <svetlemodry@archlinux.org>
 # Contributor: m0rph <m0rph.mailbox@gmail.com>
 
-_pkgname=goldendict
-pkgname="${_pkgname}"
-_commit=8834e4a2924d143751870f4b943c3ce608b10a7d
-_commit_ver="r$((2633-2016)).g${_commit:0:8}"
-pkgver="1.5.0rc2.${_commit_ver}"
-pkgrel=1
+pkgname=goldendict
+pkgver="1.5.0"
+pkgrel=3
 pkgdesc='A feature-rich dictionary lookup program, supporting multiple dictionary formats and online dictionaries'
 arch=('x86_64')
-url="http://goldendict.org"
+url="https://github.com/goldendict/goldendict"
 license=('GPL3')
-depends=('libvorbis' 'zlib' 'hunspell' 'libxtst' 'lzo' 'bzip2'
-    'libao' 'libtiff'
-    #'libeb'
+depends=(
+    'libvorbis' 'libxtst' 'libao' 'libtiff'
+    #'libeb'  # for epwing etc.
     'qt5-webkit' 'qt5-svg' 'qt5-x11extras' 'qt5-tools' 'qt5-multimedia'
-    'ffmpeg'
-    'opencc'
-    'xz' 'zstd'
+    'hunspell' 'ffmpeg' 'opencc'
+    'bzip2' 'lzo' 'xz' 'zlib' 'zstd'
 )
-provides=("stardict" "${_pkgname}")
-conflicts=("${_pkgname}")
-source=("${_pkgname}-${pkgver}.tar.gz::https://github.com/${_pkgname}/${_pkgname}/archive/${_commit}.tar.gz" hidpi-icon.patch)
-sha256sums=('4662b9e41d13439313efac2997b8323a30206e96e66c1958335707763b6eb4c3'
+source=(
+    "${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/${pkgver}.tar.gz"
+    hidpi-icon.patch
+)
+sha256sums=('f9f8e068ece74cc026fdc5f56615246228b4e70c97c7197ccd4c14ceae412c7c'
             '635759e4e4e3049bd5cb2f8b72878826266a62446cf85737f490789b808c9b5d')
 
 prepare() {
-    cd "${_pkgname}-${_commit}"
+    cd "${pkgname}-${pkgver}"
     patch -Np1 -i "$srcdir"/hidpi-icon.patch
     msg "Fixing QMake in goldendict.pro file..."
     echo "QMAKE_CXXFLAGS_RELEASE = ${CFLAGS}" >> goldendict.pro
     echo "QMAKE_CFLAGS_RELEASE = ${CXXFLAGS}" >> goldendict.pro
     msg "Setting default version string..."
-    sed -i "s/^\(VERSION = .*-RC2\).*/\1-${_commit_ver}/" goldendict.pro
+    sed -i "s/^\(VERSION = .*\)+git/\1/" goldendict.pro
     qmake-qt5 PREFIX='/usr' \
         'CONFIG+=no_epwing_support' \
         'CONFIG+=chinese_conversion_support' \
@@ -42,11 +39,11 @@ prepare() {
 }
 
 build(){
-    cd "${_pkgname}-${_commit}"
+    cd "${pkgname}-${pkgver}"
     make ${MAKEFLAGS} -j4
 }
 
 package() {
-    cd "${_pkgname}-${_commit}"
+    cd "${pkgname}-${pkgver}"
     make INSTALL_ROOT="${pkgdir}" install
 }

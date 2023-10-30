@@ -8,3 +8,4 @@ __pycache__/
 *.pkg.tar.xz
 *.pkg.tar.zst
 create-ap/transocks
+ffmpeg-flv-hevc-support/1*-*.patch

@@ -1,32 +1,27 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.11691'
-_srcurl='https://wps-linux-personal.wpscdn.cn/wps/download/ep/Linux2019/11691'
-_common_dirs=(
-    ./etc
-    ./usr
-    ./opt/kingsoft/wps-office/desktops
-    ./opt/kingsoft/wps-office/office6/addons/officespace/mui
-    ./opt/kingsoft/wps-office/office6/{cfgs,data,dicts,mui,res,skins,wpsart}
-    ./opt/kingsoft/wps-office/templates
-)
+_pkgver='11.1.0.11711'
+_srcurl='https://wps-linux-personal.wpscdn.cn/wps/download/ep/Linux2019/11711'
 
 pkgbase=wpsforlinux
-pkgname=('wpsoffice-common'
-         'wpsoffice')
+pkgname=('wpsoffice')
 pkgver=${_pkgver/\~/_}
-pkgrel=2
+pkgrel=1
 arch=('x86_64')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
 url='http://wps-community.org/'
-conflicts=('wps-office' 'kingsoft-office')
+conflicts=('wps-office' 'kingsoft-office' 'wps-office-cn')
 options=(!emptydirs !strip)
-source=('wps-office.xml' 'check_data.sh' "${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb")
-sha1sums=('0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
-          '1819bae14fa888f92c29c9fd01b59246f53e6937'
-          '94dc54f2853877e5bf61980021bf6524a30f1b91')
+source=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb"
+        "https://archive.org/download/archlinux_pkg_freetype2/freetype2-2.13.0-1-x86_64.pkg.tar.zst"
+        'wps-office.xml'
+        'check_data.sh')
+sha1sums=('61e0ca79b7ef506fd7470fad1d9b63f325bb5c57'
+          '5eee4a7fa1711ac221a459378d06f15a04e8d9d0'
+          '0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
+          '1819bae14fa888f92c29c9fd01b59246f53e6937')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -43,14 +38,25 @@ application\/msword;application\/msword-template;application\/rtf;\
 application\/vnd.openxmlformats-officedocument.wordprocessingml.template;\
 application\/vnd.openxmlformats-officedocument.wordprocessingml.document;"
 
-package_wpsoffice-common() {
-    arch=('any')
-    pkgdesc="Common files and license for WPS office."
+package_wpsoffice() {
+    arch=('x86_64')
+    pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
+    depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
+             'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
+             'glu' 'openssl-1.1' 'sdl2' 'libpulse' 'hicolor-icon-theme'
+             'libxss' 'sqlite' 'libtool' 'libxslt' 'qt5-base')
+    optdepends=('libtiff5: Provide libtiff.so.5 for wpspdf working'
+                'cups: for printing support'
+                'libjpeg-turbo: JPEG image codec support'
+                'pango: for complex (right-to-left) text support'
+                'curl: An URL retrieval utility and library'
+                'ttf-wps-fonts: Symbol fonts required by wps-office'
+                'ttf-ms-fonts: Microsft Fonts recommended for wps-office'
+                'wps-office-fonts: FZ TTF fonts provided by wps community')
+    install=wpsoffice.install
 
-    cd "$srcdir"
-    # _common_dirs
-    tar xv -C "${pkgdir}" -f data.tar.xz ${_common_dirs[@]}
-    tar xv -C "${pkgdir}" -f data.tar.xz './opt/kingsoft/wps-office/office6/document theme'
+    cd "${srcdir}"
+    tar xv -C "${pkgdir}" -f data.tar.xz
 
     msg2 "editing mime files: wps-office-{et,wpp,wps,pdf}.xml ..."
     rm -f "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et,pdf}.xml
@@ -95,29 +101,14 @@ package_wpsoffice-common() {
         fi
     done
 
-    clean_startpage_qing "${pkgdir}/opt/kingsoft/wps-office/office6/"
-}
-
-package_wpsoffice() {
-    arch=('x86_64')
-    pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
-    depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
-             'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
-             'glu' 'openssl-1.1' 'sdl2' 'libpulse' 'hicolor-icon-theme'
-             'libxss' 'sqlite' 'libtool' 'libxslt' 'qt5-base'
-             "wpsoffice-common=${pkgver}")
-    optdepends=('cups: for printing support'
-                'libjpeg-turbo: JPEG image codec support'
-                'pango: for complex (right-to-left) text support'
-                'curl: An URL retrieval utility and library')
-    install=wpsoffice.install
-
-    cd "${srcdir}"
-    tar xv -C "${pkgdir}" -f data.tar.xz ${_common_dirs[@]/\.\//--exclude=\.\/} \
-        --exclude='./opt/kingsoft/wps-office/office6/document theme'
-
     # fix libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /usr/lib/libicuuc.so.72)
-    rm "${pkgdir}"/opt/kingsoft/wps-office/office6/libstdc++.so*
+    rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libstdc++.so*
+    # Use system libjpeg
+    rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libjpeg.so*
+    # fix bold fonts, black cloud error, freetype2 so.6.19.0
+    install -Dm755 "${srcdir}"/usr/lib/libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6.19.0
+    ln -s libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6
+    ln -s libfreetype.so.6 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so
 
     clean_startpage_qing "${pkgdir}/opt/kingsoft/wps-office/office6/"
 }

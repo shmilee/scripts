@@ -5,10 +5,10 @@
 # Contributor: Tom Newsom <Jeepster@gmx.co.uk>
 # Contributor: Paul Mattal <paul@archlinux.org>
 
-pkgname=ffmpeg
-pkgver=6.0
-pkgrel=13
-epoch=2
+pkgname=ffmpeg5.1
+pkgver=5.1.4
+pkgrel=1
+#epoch=0
 pkgdesc='Complete solution to record, convert and stream audio and video, add hevc/vp8/vp9/opus support'
 arch=(x86_64)
 url=https://ffmpeg.org/
@@ -33,9 +33,8 @@ depends=(
   libfreetype.so
   libgl
   libiec61883
-  libjxl.so
+  libmfx
   libmodplug
-  libopenmpt.so
   libpulse
   librav1e.so
   libraw1394
@@ -51,6 +50,7 @@ depends=(
   libvorbisenc.so
   libvorbis.so
   libvpx.so
+  libvulkan.so
   libwebp
   libx11
   libx264.so
@@ -62,7 +62,6 @@ depends=(
   libxvidcore.so
   libzimg.so
   ocl-icd
-  onevpl
   opencore-amr
   openjpeg2
   opus
@@ -72,7 +71,6 @@ depends=(
   svt-av1
   v4l-utils
   vmaf
-  vulkan-icd-loader
   xz
   zlib
 )
@@ -81,7 +79,7 @@ makedepends=(
   avisynthplus
   clang
   ffnvcodec-headers
-  #git
+#  git
   ladspa
   mesa
   nasm
@@ -90,20 +88,20 @@ makedepends=(
 )
 optdepends=(
   'avisynthplus: AviSynthPlus support'
-  'intel-media-sdk: Intel QuickSync support (legacy)'
-  'onevpl-intel-gpu: Intel QuickSync support'
+  'intel-media-sdk: Intel QuickSync support'
   'ladspa: LADSPA filters'
   'nvidia-utils: Nvidia NVDEC/NVENC support'
 )
+# see https://www.ffmpeg.org/download.html
 provides=(
-  libavcodec.so
-  libavdevice.so
-  libavfilter.so
-  libavformat.so
-  libavutil.so
-  libpostproc.so
-  libswresample.so
-  libswscale.so
+  libavcodec.so=59
+  libavdevice.so=59
+  libavfilter.so=8
+  libavformat.so=59
+  libavutil.so=57
+  libpostproc.so=56
+#  libswresample.so=4  # conflict with 6.x
+  libswscale.so=6
 )
 options=(
   #debug
@@ -111,28 +109,20 @@ options=(
 #_tag=3949db4d261748a9f34358a388ee255ad1a7f0c0
 source=(
   #git+https://git.ffmpeg.org/ffmpeg.git?signed#tag=${_tag}
-  http://ffmpeg.org/releases/ffmpeg-${pkgver}.tar.gz
-  add-av_stream_get_first_dts-for-chromium.patch
-  090-add-flv_hevc-support.patch
-  101-fix-assembling-with-binutil2.41.patch::https://git.ffmpeg.org/gitweb/ffmpeg.git/patch/effadce6c756247ea8bae32dc13bb3e6f464f0eb
-  102-fix-playing-ogg-with-mplayer.patch::https://git.ffmpeg.org/gitweb/ffmpeg.git/patch/cbcc817353a019da4332ad43deb7bbc4e695d02a
-  103-non-deprecated-nvenc-GUID-for-conftest.patch::https://git.ffmpeg.org/gitweb/ffmpeg.git/patch/03823ac0c6a38bd6ba972539e3203a592579792f
-  104-non-deprecated-nvenc-GUID-for-conftest.patch::https://git.ffmpeg.org/gitweb/ffmpeg.git/patch/d2b46c1ef768bc31ba9180f6d469d5b8be677500
+  https://www.ffmpeg.org/releases/ffmpeg-${pkgver}.tar.gz
+  010-add-av_stream_get_first_dts-for-chromium.patch
+  050-add-flv_hevc-support.patch
 )
-b2sums=('6f5d3279fc09ac8624b9353337515858fd588660e9d6d17ef70c95c241cb69ef2b320a6e4aad20fcdd9d99d13647e1a75f1ebb51b16a25368a9e57585a6bed24'
+b2sums=('eb7e7389e9ad2d9bdcaa7ab3aef1f3db2c1a4a59c84f8c85080b04a72a5404c12500a01f04d9a1d815e1921586c527ac0689d2d5fd91afb189a47b16b68deb91'
         '555274228e09a233d92beb365d413ff5c718a782008075552cafb2130a3783cf976b51dfe4513c15777fb6e8397a34122d475080f2c4483e8feea5c0d878e6de'
-        'ca90dc517797d86a208f523a3d79a49615255b9b3c18c3793a962c5ff5d9405836328fd8a461f24fe2123c3402db59cd41cb7d34a1925cc47bbc82a22ad53b4e'
-        '89b689a3e9a0aa84776f107803e0773f6266c5fc9d43fd9851b77b8a6493117c13baa4a82d0da544f08b5b58c5688dd71dd4f0e5e56e396bee56ffa8edfd7b79'
-        '2330d7b72bcdda4cb093c814729dbd9ccb8e07550f53abef7bcc8be72d9be21c7f2a20fac9deda37ca5e531b531e8d5e42c6a448c86d6a7f06534e2aa0ac5db1'
-        '99110abca3ae6d35a87fb2bf6365396227bc434add831ef2ed18571737c5c1571316f8714a157b152d91a9642d9a29846a24532333fefad89a6e7cbd336bdb88'
-        '1a48e46524b603b1f281cd53b004a0752bf0af738664a498662725bb19968bb3551b0805fd13194e36f5d5f6f7077884436d1412f26edf6318bd9d0dae53a161')
+        '2006884610226b8239b7cb837df9c46aa61bf2400f54ac5caae4b11665b663dce78defbc5f24f3c3074c857c327f991fc250d01fc91f049f64914d847b36c744')
 #validpgpkeys=(DD1EC9E8DE085C629B3E1846B18E8928B3948D64) # Michael Niedermayer <michael@niedermayer.cc>
 
 prepare() {
   cd ffmpeg-${pkgver}
-  patch -Np1 -i ../add-av_stream_get_first_dts-for-chromium.patch # https://crbug.com/1251779
-  patch -Np1 -i ../090-add-flv_hevc-support.patch
-  for p in ../10*-*.patch; do
+  # 010-add-av_stream_get_first_dts-for-chromium.patch # https://crbug.com/1251779
+  for p in ../0*-*.patch; do
+   msg2 "patch: $p"
     patch -Np1 -i "$p"
   done
 }
@@ -147,7 +137,10 @@ build() {
 
   ./configure \
     --prefix=/usr \
+    --incdir=/usr/include/ffmpeg5.1 \
+    --libdir=/usr/lib/ffmpeg5.1 \
     --disable-debug \
+    --disable-doc \
     --disable-static \
     --disable-stripping \
     --enable-amf \
@@ -170,13 +163,12 @@ build() {
     --enable-libgsm \
     --enable-libiec61883 \
     --enable-libjack \
-    --enable-libjxl \
+    --enable-libmfx \
     --enable-libmodplug \
     --enable-libmp3lame \
     --enable-libopencore_amrnb \
     --enable-libopencore_amrwb \
     --enable-libopenjpeg \
-    --enable-libopenmpt \
     --enable-libopus \
     --enable-libpulse \
     --enable-librav1e \
@@ -191,7 +183,6 @@ build() {
     --enable-libvidstab \
     --enable-libvmaf \
     --enable-libvorbis \
-    --enable-libvpl \
     --enable-libvpx \
     --enable-libwebp \
     --enable-libx264 \
@@ -201,20 +192,49 @@ build() {
     --enable-libxvid \
     --enable-libzimg \
     --enable-nvdec \
-    --enable-nvenc \
     --enable-opencl \
     --enable-opengl \
     --enable-shared \
     --enable-version3 \
     --enable-vulkan
+#  --enable-nvenc \  # need nvidia-sdk; ERROR: nvenc requested but not found
+
   make
-  make tools/qt-faststart
-  make doc/ff{mpeg,play}.1
+  #make tools/qt-faststart
+  #make doc/ff{mpeg,play}.1
 }
 
 package() {
-  make DESTDIR="${pkgdir}" -C ffmpeg-${pkgver} install install-man
-  install -Dm 755 ffmpeg-${pkgver}/tools/qt-faststart "${pkgdir}"/usr/bin/
+  make DESTDIR="${pkgdir}" -C ffmpeg-${pkgver} install #install-man
+  #install -Dm 755 ffmpeg-${pkgver}/tools/qt-faststart "${pkgdir}"/usr/bin/
+
+  cd "${pkgdir}"
+  local f
+  # rename bin xx5.1
+  for f in ffmpeg ffplay ffprobe; do
+    mv -v usr/bin/"$f" usr/bin/"$f"5.1
+  done
+  # move libs to /usr/lib, create links except libswresample.so.4
+  for f in usr/lib/ffmpeg5.1/*; do
+    if [[ -L $f ]]; then
+      # update target
+      ln -svrf -- usr/lib/"$(readlink "$f")" "$f"
+      if [[ $f != *.so ]]; then
+        # create new links
+        ln -svf -- "$(basename "$(readlink "$f")")" usr/lib/"$(basename "$f")"
+      fi
+    else
+      # move libs
+      mv -v "$f" usr/lib
+    fi
+  done
+  rm -vf "usr/lib/libswresample.so.4" # rm conflict .so
+  # pkgconfig conflict
+  for f in usr/lib/pkgconfig/*.pc; do
+    mv -v "$f" "${f%.pc}"-5.1.pc
+  done
+  # remove others
+  rm -r usr/share
 }
 
 # vim: ts=2 sw=2 et:

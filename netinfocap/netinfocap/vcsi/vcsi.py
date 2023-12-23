@@ -209,7 +209,8 @@ class MediaInfo(object):
     """Collect information about a video file
     """
 
-    def __init__(self, path, verbose=False):
+    def __init__(self, path, ffprobe_bin="ffprobe", verbose=False):
+        self.ffprobe_bin = ffprobe_bin
         self.probe_media(path)
         self.find_video_stream()
         self.find_audio_stream()
@@ -228,7 +229,7 @@ class MediaInfo(object):
         """Probe video file using ffprobe
         """
         ffprobe_command = [
-            "ffprobe", *_if_localm3u8_opt(path),
+            self.ffprobe_bin, *_if_localm3u8_opt(path),
             "-v", "quiet",
             "-print_format", "json",
             "-show_format",
@@ -528,7 +529,8 @@ class MediaCapture(object):
     """
 
     def __init__(self, path, accurate=False, skip_delay_seconds=Config.accurate_delay_seconds,
-                 frame_type=Config.frame_type):
+                 frame_type=Config.frame_type, ffmpeg_bin="ffmpeg"):
+        self.ffmpeg_bin = ffmpeg_bin
         self.path = path
         self.accurate = accurate
         self.skip_delay_seconds = skip_delay_seconds
@@ -540,7 +542,7 @@ class MediaCapture(object):
         skip_delay = MediaInfo.pretty_duration(self.skip_delay_seconds, show_millis=True)
 
         ffmpeg_command = [
-            "ffmpeg", *_if_localm3u8_opt(self.path),
+            self.ffmpeg_bin, *_if_localm3u8_opt(self.path),
             "-ss", time,
             "-i", self.path,
             "-vframes", "1",
@@ -571,7 +573,7 @@ class MediaCapture(object):
 
             if skip_time_seconds < 0:
                 ffmpeg_command = [
-                    "ffmpeg", *_if_localm3u8_opt(self.path),
+                    self.ffmpeg_bin, *_if_localm3u8_opt(self.path),
                     "-i", self.path,
                     "-ss", time,
                     "-vframes", "1",
@@ -588,7 +590,7 @@ class MediaCapture(object):
             else:
                 skip_time = MediaInfo.pretty_duration(skip_time_seconds, show_millis=True)
                 ffmpeg_command = [
-                    "ffmpeg", *_if_localm3u8_opt(self.path),
+                    self.ffmpeg_bin, *_if_localm3u8_opt(self.path),
                     "-ss", skip_time,
                     "-i", self.path,
                     "-ss", skip_delay,
@@ -1644,6 +1646,15 @@ def main(argv=None):
         dest="timestamp_format"
     )
 
+    parser.add_argument(
+        "--ffmpeg",
+        help="Use specified ffmpeg command",
+        dest="ffmpeg_bin", default="ffmpeg")
+    parser.add_argument(
+        "--ffprobe",
+        help="Use specified ffprobe command",
+        dest="ffprobe_bin", default="ffprobe")
+
     args = parser.parse_args(args=argv)
 
     if args.list_template_attributes:
@@ -1728,10 +1739,10 @@ def process_file(path, args):
     args.num_groups = 5
 
     media_info = MediaInfo(
-        path,
+        path, ffprobe_bin=args.ffprobe_bin,
         verbose=args.is_verbose)
     media_capture = MediaCapture(
-        path,
+        path, ffmpeg_bin=args.ffmpeg_bin,
         accurate=args.is_accurate,
         skip_delay_seconds=args.accurate_delay_seconds,
         frame_type=args.frame_type

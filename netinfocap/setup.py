@@ -11,7 +11,7 @@ with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='netinfocap',
-    version='0.9.5',
+    version='0.9.6',
     description='Netinfo Capture',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -31,8 +31,9 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Internet',
         'Topic :: Multimedia :: Video'
     ],

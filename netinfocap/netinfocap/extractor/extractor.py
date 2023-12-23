@@ -117,7 +117,7 @@ class Streaming_Extractor(Extractor):
         self.ffmpeg, self.ffprobe = None, None
         if type(ffmpeg) is str and shutil.which(shlex.split(ffmpeg)[0]):
             self.ffmpeg = ffmpeg
-            ffprobe = shlex.split(ffmpeg)[0][:-4] + 'probe'
+            ffprobe = shlex.split(ffmpeg)[0].replace('ffmpeg', 'ffprobe')
             if shutil.which(ffprobe):
                 ffprobe += ' -v quiet -print_format json -show_streams'
                 self.ffprobe = ffprobe
@@ -166,16 +166,23 @@ class Streaming_Extractor(Extractor):
         '''set output file in convcmd and return'''
         output, ext = os.path.splitext(input('[ASK] Set output file: '))
         output = output or 'stream-output-%d' % self.result['UniqID']
-        if not ext and self.ffprobe:
+        if ext in ('', '.mp4') and self.ffprobe:
             cmd = shlex.split(self.ffprobe) + [URL]
             try:
                 info = json.loads(self.check_cmd_output(cmd))
                 for s in info['streams']:
-                    if s['codec_type'] == 'video' and s['codec_name'] in (
-                            # 'hevc',
-                            'h264',):
-                        ext = '.mp4'
-                        break
+                    if s['codec_type'] == 'video':
+                        if s['codec_name'] == 'h264':
+                            ext = '.mp4'
+                            break
+                        elif s['codec_name'] == 'hevc':
+                            ext = '.mp4'
+                            if s['codec_tag_string'] in (
+                                    "hev1",  # tag "0x31766568"
+                                    "[0][0][0][0]"  # tag "0x0000"
+                            ):
+                                if '-vcodec' not in convcmd:
+                                    convcmd.extend(['-vcodec', 'libx264'])
             except Exception:
                 pass
         ext = ext or '.flv'
@@ -262,6 +269,8 @@ class Streaming_Extractor(Extractor):
                 '--metadata-font', kwargs.get(
                     'metadata_font',
                     '/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc'),
+                '--ffmpeg', shlex.split(self.ffmpeg)[0],
+                '--ffprobe', shlex.split(self.ffprobe)[0],
             ])
         except Exception as e:
             pass

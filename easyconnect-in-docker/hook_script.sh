@@ -157,12 +157,26 @@ start_easyconn() {
     [ -n "$ECUSER" ] && params+=" -u $ECUSER"
     [ -n "$ECPASSWD" ] && params+=" -p $ECPASSWD"
 
-    start_EC resources/bin/easyconn login $params
-    keep='K'
-    while [ x"$keep" != x'XXX' ]; do
-        read -p " -> Enter 'XXX' to exit:" keep
+    local CMD=${ResourcesDir}/bin/easyconn
+    local cmd='login'
+    while true; do
+        if [ "$cmd" == 'login' ]; then
+            echo "Run CMD: $CMD login $params"
+            $CMD login $params
+        elif [ "$cmd" == 'logout' ]; then
+            echo "Run CMD: $CMD logout"
+            $CMD logout
+        elif [ "$cmd" == 'mylogin' ]; then
+            read -p " -> Enter new params: " params
+            echo "Run CMD: $CMD login $params"
+            $CMD login $params
+        elif [ "$cmd" == 'exit' ]; then
+            echo "Run CMD: $CMD logout"
+            $CMD logout
+            break
+        fi
+        read -p " -> Enter 'login/logout/mylogin/exit': " cmd
     done
-    start_EC resources/bin/easyconn logout
 }
 
 ## reload main

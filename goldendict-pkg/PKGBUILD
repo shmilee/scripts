@@ -1,49 +1,63 @@
-# Maintainer: shmilee
-# Contributor: Jaroslav Lichtblau <svetlemodry@archlinux.org>
-# Contributor: m0rph <m0rph.mailbox@gmail.com>
+# Maintainer: slbtty <shenlebantongying@gmail.com>
 
-pkgname=goldendict
-pkgver="1.5.0"
-pkgrel=3
-pkgdesc='A feature-rich dictionary lookup program, supporting multiple dictionary formats and online dictionaries'
-arch=('x86_64')
-url="https://github.com/goldendict/goldendict"
+pkgname=goldendict-ng
+pkgver=24.01.22
+true_ver=24.01.22-LoongYear.3dddb3be
+pkgrel=1
+pkgdesc="The next generation GoldenDict (Supports Qt WebEngine & Qt6)."
+arch=('i686' 'x86_64' 'aarch64')
+url="https://github.com/xiaoyifang/goldendict-ng"
 license=('GPL3')
 depends=(
-    'libvorbis' 'libxtst' 'libao' 'libtiff'
-    #'libeb'  # for epwing etc.
-    'qt5-webkit' 'qt5-svg' 'qt5-x11extras' 'qt5-tools' 'qt5-multimedia'
-    'hunspell' 'ffmpeg' 'opencc'
-    'bzip2' 'lzo' 'xz' 'zlib' 'zstd'
+	ffmpeg
+	hunspell
+	libvorbis
+	libxtst
+	lzo
+	zlib
+	xz
+#	libeb
+	tomlplusplus
+	fmt
+	opencc
+	xapian-core
+	libzim
+	qt6-base
+	qt6-svg
+	qt6-multimedia
+	qt6-webengine
+	qt6-speech
+	qt6-5compat
+	)
+makedepends=(
+	git
+	cmake
+	ninja
+	qt6-tools
 )
-source=(
-    "${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/${pkgver}.tar.gz"
-    hidpi-icon.patch
-)
-sha256sums=('f9f8e068ece74cc026fdc5f56615246228b4e70c97c7197ccd4c14ceae412c7c'
-            '635759e4e4e3049bd5cb2f8b72878826266a62446cf85737f490789b808c9b5d')
+conflicts=('goldendict' 'goldendict-git' 'goldendict-ng-git' 'goldendict-svn' 'goldendict-git-opt')
+provides=('goldendict')
+replaces=('goldendict-svn' 'goldendict-git-opt' 'goldendict-webengine-git')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/xiaoyifang/goldendict-ng/archive/refs/tags/v${true_ver}.tar.gz")
+sha256sums=('d09fba435dd64aba594fbe2fae39811c08a09128c819c05bfcb31159620d78be')
 
 prepare() {
-    cd "${pkgname}-${pkgver}"
-    patch -Np1 -i "$srcdir"/hidpi-icon.patch
-    msg "Fixing QMake in goldendict.pro file..."
-    echo "QMAKE_CXXFLAGS_RELEASE = ${CFLAGS}" >> goldendict.pro
-    echo "QMAKE_CFLAGS_RELEASE = ${CXXFLAGS}" >> goldendict.pro
-    msg "Setting default version string..."
-    sed -i "s/^\(VERSION = .*\)+git/\1/" goldendict.pro
-    qmake-qt5 PREFIX='/usr' \
-        'CONFIG+=no_epwing_support' \
-        'CONFIG+=chinese_conversion_support' \
-        'CONFIG+=zim_support' \
-        goldendict.pro
+	# This flag leads to crashs around Oct 2022, remove this in future.
+	export CXXFLAGS+=" -Wp,-U_GLIBCXX_ASSERTIONS"
 }
 
 build(){
-    cd "${pkgname}-${pkgver}"
-    make ${MAKEFLAGS} -j4
+	cd "$srcdir/$pkgname-${true_ver}"
+	cmake -B build_dir -S . -G Ninja \
+		-DCMAKE_INSTALL_PREFIX='/usr' \
+		-DUSE_SYSTEM_FMT=ON \
+		-DUSE_SYSTEM_TOML=ON \
+        -DWITH_EPWING_SUPPORT=OFF \
+		-Wno-dev
+	cmake --build build_dir
 }
 
 package() {
-    cd "${pkgname}-${pkgver}"
-    make INSTALL_ROOT="${pkgdir}" install
+	cd "$srcdir/$pkgname-${true_ver}"
+	DESTDIR="$pkgdir" cmake --install ./build_dir/
 }

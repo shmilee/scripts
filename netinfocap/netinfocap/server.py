@@ -127,7 +127,7 @@ def _result2div(res, count, control_keys=Extractor.control_keys,
                 print("[Info] Creating thumbnail '%s' ..." % tpath)
                 vcsi.main(argv=args+[res['fullurl'], '-o', tpath])
             except Exception:
-                if 'localm3u8' in res:
+                if 'localm3u8' in res and os.path.isfile(res['localm3u8']):
                     vcsi.main(argv=args+[res['localm3u8'], '-o', tpath])
             if os.path.isfile(tpath):
                 li += '\n<li>%s<img src="%s" width="400" alt="%s"></li>' % (

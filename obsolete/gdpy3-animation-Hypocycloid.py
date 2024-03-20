@@ -2,121 +2,299 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 shmilee
-
-# ref: https://en.wikipedia.org/wiki/Hypocycloid
-#      https://en.wikipedia.org/wiki/Hypotrochoid
-#      https://en.wikipedia.org/wiki/Epicycloid
 # TOCHECK https://en.wikipedia.org/wiki/Rosetta_orbit
-# TODO 3: large, small, tiny
+# TODO 3 circles: large, small, tiny
 
 import numpy as np
 from gdpy3 import get_visplter
 import matplotlib.animation as animation
-
 pi, sin, cos = np.pi, np.sin, np.cos
-plotter = get_visplter("mpl::Hypocycloid")
-#plotter.style = ['gdpy3-paper-aip']
-plotter.style = ['gdpy3-notebook']
-lws = 1.0  # line width scale
 
-p, q = 5, 3  # TODO parameter
-#p, q = 19, 17
-#p, q = 34, 11
-#p, q = 94, 31
-sigma = 1  # TODO parameter, 1: inside; -1: outside
-k = sigma*p/q  # abs()>=1.0
 
-R = 1.0
-r = R/k  # small circle
-#d = r   # TODO parameter: distance of fixed point from the circle center
-d = 1.1*r
+class Hypocycloid(object):
+    '''
+    The curve of Hypocycloid, Hypotrochoid, Epitrochoid and more.
+    Trace a point attached to a rolling circle that rolls around a fixed circle.
 
-# trace
-N = q + 1
-pi2 = np.linspace(0, 2*pi, 360)
-t0 = -pi/2  # TODO parameter: initial theta0
-theta = np.linspace(t0, t0+N*2*pi, int(180*N))
-tx = r*(k-1.0)*cos(theta) + d*cos((k-1.0)*theta + k*t0)
-ty = r*(k-1.0)*sin(theta) - d*sin((k-1.0)*theta + k*t0)
+    Ref
+    ----
+    1. https://en.wikipedia.org/wiki/Hypocycloid
+    2. https://en.wikipedia.org/wiki/Hypotrochoid
+    3. https://en.wikipedia.org/wiki/Epicycloid
+    4. https://en.wikipedia.org/wiki/Epitrochoid
 
-print(' R = %.2f\n r = %s%d/%dR = %.4f\n d = %.4fr = %.4f'
-      % (R, '-' if sigma == -1 else '', q, p, r, d/r, d))
-print(' N = theta/2pi = %d\n theta_0 = %.4fpi\n' % (N, t0/pi))
+    Parameter
+    ---------
+    p, q: int, >0
+        k=p/q, the ratio of fixed circle radius(R) to rolling circle radius(r)
+        k>1, fixed circle larger than rolling circle.
+    sigma: 1 or -1, default 1
+        rolling around the inside(1) or outside(-1) of the fixed circle
+    dr: float, >0, default 1.0
+        the ratio of *d* to *r*, where
+        d is the distance of fixed point from the rolling circle center
+    n: int, >=LCM(p,q)/p, default LCM(p,q)/p+1
+        How many 2pi-angle(theta) of the center of the rolling circle rolls?
+        at least LCM(p,q)/p
+    nexample: int, >=180, default 180
+        number of theta examples of one 2pi
+    theta0: float
+        initial angle of the center of the rolling circle
+    alpha0: float
+        initial angle of the fixed point radius line
+        0, the point is on the attached side
+    color_r: str, color of the rolling circle
+    color_p: str, color of the fixed point radius line
+    color_t: str, color of the trace
+    '''
+    plotter = get_visplter("mpl::Hypotrochoid")
+    plotter.style = ['gdpy3-notebook', {'axes.grid': False}]
+    plt_lws = 1.0  # line width scale
+    arr_2pi = np.linspace(0, 2*pi, 360)
+    Ux_circle, Uy_circle = cos(arr_2pi), sin(arr_2pi)  # of Unit circle
+    R, color_R = 1.0, 'k'  # of the fixed circle
+    R_circle = (R*Ux_circle, R*Uy_circle)
+    color_a = 'b'  # of auxiliary lines
 
-# small circle
-def get_circle(dtheta):
-    cx = (R-r)*cos(dtheta) + r*cos(pi2)
-    cy = (R-r)*sin(dtheta) + r*sin(pi2)
-    return cx, cy
+    def __init__(self, p=2, q=1, sigma=1, dr=1, n=0, nexample=180,
+                 theta0=0, alpha0=0, color_r='k', color_p='r', color_t='r'):
+        p, q = int(abs(p)), int(abs(q))
+        sigma = -1 if sigma == -1 else 1
+        k = sigma*p/q
+        r = self.R/k
+        d = float(abs(dr))*r
+        lstn = np.lcm(p, q)//p
+        n = int(n) if int(n) >= lstn else (lstn+1)
+        theta0 = float(theta0)
+        default_nexample = 180*(p//q//5) if (lstn == 1 and p/q >= 10) else 180
+        if default_nexample > nexample:  # more nexample
+            nexample = default_nexample
+            print('Warnning: more examples %d for 2pi theta.' % nexample)
+        theta = np.linspace(theta0, theta0+n*2*pi, n*nexample)
+        alpha0 = float(alpha0)
+        # start point, k*theta0 -> back to attached side, then alpha0
+        tracex = r*(k-1.0)*cos(theta) + d*cos((k-1.0)*theta - k*theta0-alpha0)
+        tracey = r*(k-1.0)*sin(theta) - d*sin((k-1.0)*theta - k*theta0-alpha0)
+        self.p, self.q, self.sigma, self.k = p, q, sigma, k
+        self.r, self.d, self.n = r, d, n
+        self.theta0, self.alpha0 = theta0, alpha0
+        self.theta, self.tracex, self.tracey = theta, tracex, tracey
+        # cache info, array
+        if sigma == 1:
+            self.curve = 'Hypocycloid' if d == r else 'Hypotrochoid'
+        elif sigma == -1:
+            self.curve = 'Epicycloid' if d == r else 'Epitrochoid'
+        info = 'R={0:.1f}, p={1}, q={2}, r={3:.3f}, d={4:.3f}r'.format(
+            self.R, p, q, r, d/r)
+        self.info = '{0}, n={1}, t0={2:.2f}pi, a0={3:.2f}pi'.format(
+            info, n, theta0/pi, alpha0/pi)
+        self._rx_circle = self.r*self.Ux_circle
+        self._ry_circle = self.r*self.Uy_circle
+        # for animation
+        if sigma == 1:  # R>0, r>0, d>0
+            self.Rlim = 1.1*max(self.R-r+d, self.R, r-self.R+d)
+        elif sigma == -1:  # R>0, r<0, d<0
+            self.Rlim = 1.1*max(self.R-r-d, self.R-2*r)
+        self.color_r = color_r
+        self.color_p = color_p
+        self.color_t = color_t
+        print('Curve:', self)
 
-# fixed point line
-def get_pline(dtheta):
-    dalpha = - (k-1.0)*dtheta - k*t0  # R*dtheta = r*(-dalpha + dtheta)
-    cox = (R-r)*cos(dtheta)
-    coy = (R-r)*sin(dtheta)
-    px = cox + d*cos(dalpha)
-    py = coy + d*sin(dalpha)
-    return [cox, px], [coy, py]
+    def __repr__(self):
+        return '<{0} object for {1}.>'.format(self.curve, self.info)
 
-def add_ani(fig, axesdict, artistdict, **fkwargs):
+    def r_circle(self, dtheta):
+        '''
+        Get x, y array of the rolling circle.
+        *dtheta* is the angle of the center of the rolling circle.
+        '''
+        cox = (self.R-self.r)*cos(dtheta)
+        coy = (self.R-self.r)*sin(dtheta)
+        return cox + self._rx_circle, coy + self._ry_circle
 
-    def update_lines(num):
-        # num: 0 -> theta.size-1; frame-number
-        line = artistdict[10][0]  # update trace
-        line.set_data(tx[:num+1], ty[:num+1])
+    def rp_line(self, dtheta):
+        '''
+        Get the line of the rolling circle center to the fixed point.
+        *dtheta* is the angle of the center of the rolling circle.
+        '''
+        cox = (self.R-self.r)*cos(dtheta)
+        coy = (self.R-self.r)*sin(dtheta)
+        # fixed point R*dtheta = r*(-dalpha + dtheta), and k*theta0
+        dalpha = - (self.k-1.0)*dtheta + self.k*self.theta0 + self.alpha0
+        pox = (self.R-self.r)*cos(dtheta) + self.d*cos(dalpha)
+        poy = (self.R-self.r)*sin(dtheta) + self.d*sin(dalpha)
+        return (cox, pox), (coy, poy)
 
-        dtheta = theta[num]
-        circle = artistdict[20][0]  # update circle
-        cx, cy = get_circle(dtheta)
-        circle.set_data(cx, cy)
+    def animation(self, *othercurves, speedup=1, **kwargs):
+        '''Plot this curve and other curves'''
+        # othercurves = [c for c in othercurves if isinstance(c, Hypocycloid)]
+        curves = [self]
+        for c in othercurves:
+            if isinstance(c, Hypocycloid) and c not in curves:
+                curves.append(c)
+        _kwargs = dict(interval=10, repeat_delay=1000)  # default 10ms, 1s
+        _kwargs.update(kwargs)
+        _kwargs['blit'] = True
+        Rlim = max(c.Rlim for c in curves)
+        uniqR_r = set(abs(self.R-c.r) for c in curves)  # for R-r, R-2r circles
+        uniqR_r.update(abs(self.R-2*c.r) for c in curves)
+        lws = self.plt_lws
+        axes = {
+            'layout': [111, dict(
+                xlim=[-Rlim, Rlim],
+                ylim=[-Rlim, Rlim],
+                aspect='equal',
+            )],
+            'data': [
+                [1, 'revise', 'arrow_spines', dict(arrow_size=10*lws)],
+                [3, 'plot', self.R_circle, dict(color=self.color_R, lw=2*lws)],
+                *[[4+i, 'plot', (ur*self.Ux_circle, ur*self.Uy_circle, '--'),
+                   dict(color=self.color_a, lw=0.8)]
+                  for i, ur in enumerate(uniqR_r)],
+                *[[100+10*i+1, 'plot', c.r_circle(c.theta0),
+                   dict(label='circle', color=c.color_r, lw=1.5*lws)]
+                  for i, c in enumerate(curves)],
+                *[[100+10*i+2, 'plot', c.rp_line(c.theta0),
+                   dict(label='line', color=c.color_p, lw=1.5*lws,
+                        marker='o', ms=4*lws)]
+                  for i, c in enumerate(curves)],
+                *[[100+10*i+3, 'plot', (c.tracex[:1], c.tracey[:1]),
+                   dict(label='trace', color=c.color_t, lw=2*lws)]
+                  for i, c in enumerate(curves)],
+                [2, 'revise', self.animation_revise,
+                 dict(curves=curves, speedup=int(speedup), **_kwargs)],
+            ]
+        }
+        figlabel = ['%s-%s-%s' % (c.curve, hex(id(c)), c.info.replace(' ', ''))
+                    for c in curves]
+        fig = self.plotter.create_figure(';'.join(figlabel), axes)
+        fig.show()
+        input('[I] Enter to continue: ')
+        # fig.animation.save('a.mp4')  # time=n*nexample/speedup/fps s
+        return fig
 
-        pline = artistdict[30][0]  # update fixed point
-        lx, ly = get_pline(dtheta)
-        pline.set_data(lx, ly)
-        return line, circle, pline  #  returns a list of artists to be updated
+    def animation_revise(self, fig, axesdict, artistdict, **kwargs):
+        '''Animation function for matplotlib'''
+        curves = kwargs.pop('curves')
+        speedup = kwargs.pop('speedup')
+        L = max(c.theta.size for c in curves)
+        frames = list(range(0, L-1, speedup)) + [L-1]
 
-    L = tx.size
-    fig.gdpy3_animation = animation.FuncAnimation(
-        fig, update_lines, np.arange(0, L), interval=10, blit=True)
-    fig.gdpy3_animation_paused = False
+        def update(num):
+            # num: 0 -> L-1; frame-number
+            arts = []
+            for i, curv in enumerate(curves):
+                if num >= curv.theta.size:
+                    # print('!!!', num, curv.theta.size)
+                    tmpnum = curv.theta.size-1
+                    # continue  # still update arts as blit=True
+                else:
+                    tmpnum = num
+                idx = 100+10*i
+                dtheta = curv.theta[tmpnum]
+                circle = artistdict[idx+1][0]  # update circle
+                cx, cy = curv.r_circle(dtheta)
+                circle.set_data(cx, cy)
+                pline = artistdict[idx+2][0]  # update fixed point
+                lx, ly = curv.rp_line(dtheta)
+                pline.set_data(lx, ly)
+                trace = artistdict[idx+3][0]  # update trace
+                trace.set_data(curv.tracex[:tmpnum+1], curv.tracey[:tmpnum+1])
+                arts.extend([circle, pline, trace])
+            return arts  # return a list of updated artists, as blit=True
 
-    def toggle_pause(event):
-        if fig.gdpy3_animation_paused:
-            fig.gdpy3_animation.resume()
-        else:
-            fig.gdpy3_animation.pause()
-        fig.gdpy3_animation_paused = not fig.gdpy3_animation_paused
-    fig.canvas.mpl_connect('button_press_event', toggle_pause)
+        fig.animation = animation.FuncAnimation(fig, update, frames, **kwargs)
+        fig.animation_paused = False
 
-if sigma == 1:
-    Rlim = 1.1*max(R-r+d, R)
-elif sigma == -1:  # R>0, r<0, d<0
-    Rlim = 1.1*max(R-r-d, R-2*r)
-fig = plotter.create_figure(
-    'Hypocycloid',
-    {
-        'layout': [111, dict(
-            xlim=[-Rlim, Rlim],
-            ylim=[-Rlim, Rlim],
-            aspect='equal',
-        )],
-        'data': [
-            [1, 'plot', (R*cos(pi2), R*sin(pi2), 'k'), dict(lw=2*lws)],
-            [2, 'plot', ((R-r)*cos(pi2), (R-r)*sin(pi2), '--b'), dict(lw=0.8)],
-            [3, 'plot', ((R-2*r)*cos(pi2), (R-2*r)*sin(pi2), '--b'), dict(lw=0.8)],
-            [10, 'plot', (tx[0], ty[0], 'k'), dict(label='trace', lw=2*lws)],
-            [20, 'plot', (*get_circle(0), 'k'), dict(label='circle', lw=1.5*lws)],
-            [30, 'plot', (*get_pline(0), 'ro-'), dict(ms=4*lws, lw=1.5*lws)],
-            [100, 'revise', 'arrow_spines', dict(arrow_size=10*lws)],
-            [101, 'grid', (False,), {}],
-            [110, 'revise', add_ani, {}],
-        ]
-    })
+        fig.animation.pause()
 
-# long time mins?
-#fig.gdpy3_animation.save('a.mp4')
+        def toggle_pause(event):
+            if fig.animation_paused:
+                fig.animation.resume()
+            else:
+                fig.animation.pause()
+            fig.animation_paused = not fig.animation_paused
+        fig.canvas.mpl_connect('button_press_event', toggle_pause)
 
-fig.show()
-input('Enter')
 
-# next projection='polar'
+if __name__ == '__main__':
+    test = 11  # 1, 11, 2, 21, 22, 3, 5, 51, 'T'
+    if test == 1:  # multi
+        h11 = Hypocycloid()
+        h11.animation(speedup=3)
+        h12 = Hypocycloid(p=34, q=11)
+        h12.animation(speedup=2)
+        h13 = Hypocycloid(p=94, q=31, color_t='g', color_p='g')
+        h13.animation(h12, speedup=5)
+    elif test == 11:  # dr
+        h104 = Hypocycloid(p=119, q=17, dr=0.4, color_t='r', nexample=160)
+        h106 = Hypocycloid(p=119, q=17, dr=0.6, color_t='orange', nexample=220)
+        h108 = Hypocycloid(p=119, q=17, dr=0.8, color_t='y', nexample=260)
+        h11 = Hypocycloid(p=119, q=17, dr=1.0, color_t='g', nexample=300)
+        h12 = Hypocycloid(p=119, q=17, dr=1.2, color_t='b', nexample=340)
+        h13 = Hypocycloid(p=119, q=17, dr=1.4, color_t='c', nexample=380)
+        h14 = Hypocycloid(p=119, q=17, dr=1.6, color_t='m', nexample=420)
+        fig = h104.animation(h106, h108, h11, h12, h13, h14, speedup=2)
+        fig.animation.save('h11-fps14.mp4', fps=14)  # n*420/speedup/14=30s
+    elif test == 2:  # ellipse
+        h210 = Hypocycloid(p=2, q=1, dr=0.2/1, color_t='k', color_p='k')
+        h211 = Hypocycloid(p=2, q=1, dr=1/1, color_t='b', color_p='b')
+        h212 = Hypocycloid(p=2, q=1, dr=2/1, color_t='r', color_p='r')
+        h215 = Hypocycloid(p=2, q=1, dr=5/1, color_t='g', color_p='g')
+        h210.animation(h211, h212, h215)
+    elif test == 21:  # ellipse
+        h2101 = Hypocycloid(p=2, q=1, dr=0.5, theta0=pi/4,
+                            alpha0=0, color_t='k', color_p='k')
+        h2131 = Hypocycloid(p=2, q=1, dr=3/1, theta0=pi/4,
+                            alpha0=pi/2, color_t='b', color_p='b')
+        h2141 = Hypocycloid(p=2, q=1, dr=4/1, theta0=pi/4,
+                            alpha0=-pi/2, color_t='r', color_p='r')
+        h2151 = Hypocycloid(p=2, q=1, dr=5/1, theta0=pi/4,
+                            alpha0=pi, color_t='g', color_p='g')
+        h2101.animation(h2131, h2141, h2151, h2101, h2151, repeat_delay=10000)
+    elif test == 22:  # non ellipse
+        h21a = Hypocycloid(p=2, q=1, dr=1/1, sigma=-1,
+                           color_t='k', color_p='k')
+        h21b = Hypocycloid(p=2, q=1, dr=1/2, sigma=-1,
+                           alpha0=pi, color_t='b', color_p='b')
+        h21c = Hypocycloid(p=2, q=1, dr=1/4, sigma=-1,
+                           color_t='g', color_p='g')
+        h21a.animation(h21b, h21c)
+    elif test == 3:  # p<q, so r>R
+        h341 = Hypocycloid(p=3, q=4)
+        h342 = Hypocycloid(p=3, q=4, sigma=-1, color_t='#008800')
+        h341.animation(h342, speedup=2)
+    elif test == 5:  # stars
+        h51 = Hypocycloid(p=5, q=1, theta0=pi/2, color_t='y')
+        h52 = Hypocycloid(p=5, q=2, theta0=pi/2, color_t='orange')
+        h53 = Hypocycloid(p=5, q=3, theta0=pi/2, color_t='orange')
+        h54 = Hypocycloid(p=5, q=4, theta0=pi/2, color_t='y')
+        h51.animation(h52, speedup=5)
+        h53.animation(h54, speedup=5)
+        print('==> 5/1 vs 5/4')
+        h51.animation(h54, speedup=2)
+    elif test == 51:  # star, dr
+        h530 = Hypocycloid(p=5, q=3, dr=0.3/3, theta0=pi/2, color_t='k')
+        h531 = Hypocycloid(p=5, q=3, dr=1/3, theta0=pi/2, color_t='k')
+        h532 = Hypocycloid(p=5, q=3, dr=2/3, theta0=pi/2, color_t='r')
+        h53L = Hypocycloid(p=5, q=3, dr=2.5/3, theta0=pi/2, color_t='b')
+        h533 = Hypocycloid(p=5, q=3, dr=3/3, theta0=pi/2, color_t='g')
+        h534 = Hypocycloid(p=5, q=3, dr=4/3, theta0=pi/2, color_t='y')
+        h535 = Hypocycloid(p=5, q=3, dr=5/3, theta0=pi/2, color_t='orange')
+        h536 = Hypocycloid(p=5, q=3, dr=6/3, theta0=pi/2, color_t='gold')
+        h536.animation(
+            # h535,
+            h534,
+            h533,
+            # h53L,
+            h532,
+            h531,  # h530,
+            speedup=3)
+    elif test == 'T':  # trace only
+        Hypocycloid.color_R = 'w'
+        Hypocycloid.color_a = 'w'
+        color_kws = dict(color_r='w', color_p='w', color_t='gold')
+        h511 = Hypocycloid(p=5, q=1, theta0=pi/2, **color_kws)
+        h521 = Hypocycloid(p=5, q=2, theta0=pi/2, **color_kws)
+        h531 = Hypocycloid(p=5, q=3, dr=4/3, theta0=pi/2, **color_kws)
+        h511.animation(h521, h531, speedup=10, repeat_delay=10*1000)

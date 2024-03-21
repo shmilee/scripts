@@ -5,6 +5,7 @@
 # TOCHECK https://en.wikipedia.org/wiki/Rosetta_orbit
 # TODO 3 circles: large, small, tiny
 
+import sys
 import numpy as np
 from gdpy3 import get_visplter
 import matplotlib.animation as animation
@@ -121,8 +122,8 @@ class Hypocycloid(object):
         coy = (self.R-self.r)*sin(dtheta)
         # fixed point R*dtheta = r*(-dalpha + dtheta), and k*theta0
         dalpha = - (self.k-1.0)*dtheta + self.k*self.theta0 + self.alpha0
-        pox = (self.R-self.r)*cos(dtheta) + self.d*cos(dalpha)
-        poy = (self.R-self.r)*sin(dtheta) + self.d*sin(dalpha)
+        pox = cox + self.d*cos(dalpha)
+        poy = coy + self.d*sin(dalpha)
         return (cox, pox), (coy, poy)
 
     def animation(self, *othercurves, speedup=1, **kwargs):
@@ -185,7 +186,6 @@ class Hypocycloid(object):
             arts = []
             for i, curv in enumerate(curves):
                 if num >= curv.theta.size:
-                    # print('!!!', num, curv.theta.size)
                     tmpnum = curv.theta.size-1
                     # continue  # still update arts as blit=True
                 else:
@@ -206,8 +206,6 @@ class Hypocycloid(object):
         fig.animation = animation.FuncAnimation(fig, update, frames, **kwargs)
         fig.animation_paused = False
 
-        fig.animation.pause()
-
         def toggle_pause(event):
             if fig.animation_paused:
                 fig.animation.resume()
@@ -218,7 +216,15 @@ class Hypocycloid(object):
 
 
 if __name__ == '__main__':
-    test = 11  # 1, 11, 2, 21, 22, 3, 5, 51, 'T'
+    test_keys = [1, 11, 2, 21, 22, 3, 5, 51, 'T']
+    test = 21
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
+        test = int(arg) if arg.isdigit() else arg
+        if test not in test_keys:
+            print('[Err] Test %s out of valid tests: %s' % (test, test_keys))
+            sys.exit()
+    print("Test: %s\n" % test)
     if test == 1:  # multi
         h11 = Hypocycloid()
         h11.animation(speedup=3)
@@ -253,17 +259,23 @@ if __name__ == '__main__':
                             alpha0=pi, color_t='g', color_p='g')
         h2101.animation(h2131, h2141, h2151, h2101, h2151, repeat_delay=10000)
     elif test == 22:  # non ellipse
-        h21a = Hypocycloid(p=2, q=1, dr=1/1, sigma=-1,
-                           color_t='k', color_p='k')
-        h21b = Hypocycloid(p=2, q=1, dr=1/2, sigma=-1,
-                           alpha0=pi, color_t='b', color_p='b')
-        h21c = Hypocycloid(p=2, q=1, dr=1/4, sigma=-1,
+        h21a = Hypocycloid(p=2, q=1, dr=1/1, sigma=-1, alpha0=0,
+                           color_t='r', color_p='r')
+        h21b = Hypocycloid(p=2, q=1, dr=1/2, sigma=-1, alpha0=pi/2,
+                           color_t='b', color_p='b')
+        h21c = Hypocycloid(p=2, q=1, dr=1/4, sigma=-1, alpha0=pi,
                            color_t='g', color_p='g')
         h21a.animation(h21b, h21c)
     elif test == 3:  # p<q, so r>R
-        h341 = Hypocycloid(p=3, q=4)
-        h342 = Hypocycloid(p=3, q=4, sigma=-1, color_t='#008800')
+        h341 = Hypocycloid(p=3, q=4, n=4, nexample=180)
+        h342 = Hypocycloid(p=3, q=5, sigma=-1, color_t='#008800')
         h341.animation(h342, speedup=2)
+        print('==> 3/4 vs 3/1, -3/1')
+        h3410 = Hypocycloid(p=3, q=1, sigma=+1, color_t='g', color_p='g',
+                            n=1, nexample=180*4)  # slow down
+        h3411 = Hypocycloid(p=3, q=1, sigma=-1, color_t='b', color_p='b',
+                            n=1, nexample=180*4)
+        h3411.animation(h3410, h341, speedup=2, repeat_delay=5*1000)
     elif test == 5:  # stars
         h51 = Hypocycloid(p=5, q=1, theta0=pi/2, color_t='y')
         h52 = Hypocycloid(p=5, q=2, theta0=pi/2, color_t='orange')

@@ -6,6 +6,7 @@
 # TODO 3 circles: large, small, tiny
 
 import sys
+import random
 import numpy as np
 from gdpy3 import get_visplter
 import matplotlib.animation as animation
@@ -91,6 +92,7 @@ class Hypocycloid(object):
             info, n, theta0/pi, alpha0/pi)
         self._rx_circle = self.r*self.Ux_circle
         self._ry_circle = self.r*self.Uy_circle
+        self._tracex, self._tracey = 1.0*tracex, 1.0*tracey
         # for animation
         if sigma == 1:  # R>0, r>0, d>0
             self.Rlim = 1.1*max(self.R-r+d, self.R, r-self.R+d)
@@ -113,10 +115,12 @@ class Hypocycloid(object):
         coy = (self.R-self.r)*sin(dtheta)
         return cox + self._rx_circle, coy + self._ry_circle
 
-    def rp_line(self, dtheta):
+    def rp_line(self, dtheta, deltad):
         '''
         Get the line of the rolling circle center to the fixed point.
         *dtheta* is the angle of the center of the rolling circle.
+        *deltad* is a perturbation on :attr:`d` of the fixed point.
+        Return line-x, line-y, dx, dy
         '''
         cox = (self.R-self.r)*cos(dtheta)
         coy = (self.R-self.r)*sin(dtheta)
@@ -124,10 +128,23 @@ class Hypocycloid(object):
         dalpha = - (self.k-1.0)*dtheta + self.k*self.theta0 + self.alpha0
         pox = cox + self.d*cos(dalpha)
         poy = coy + self.d*sin(dalpha)
-        return (cox, pox), (coy, poy)
+        dx = deltad*cos(dalpha)
+        dy = deltad*sin(dalpha)
+        return (cox, pox+dx), (coy, poy+dy), dx, dy
 
-    def animation(self, *othercurves, speedup=1, **kwargs):
-        '''Plot this curve and other curves'''
+    def animation(self, *othercurves, speedup=1, perturbation=0, **kwargs):
+        '''
+        Plot this curve and other curves.
+
+        Parameter
+        ---------
+        othercurves: list of other Hypocycloid instance to plot together
+        speedup: int
+            how many trace points updated in one frame
+        perturbation: float, 0-1
+            perturbation on fixed point radius :attr:`d`
+        kwargs: dict, passed to `animation.FuncAnimation`
+        '''
         # othercurves = [c for c in othercurves if isinstance(c, Hypocycloid)]
         curves = [self]
         for c in othercurves:
@@ -155,7 +172,7 @@ class Hypocycloid(object):
                 *[[100+10*i+1, 'plot', c.r_circle(c.theta0),
                    dict(label='circle', color=c.color_r, lw=1.5*lws)]
                   for i, c in enumerate(curves)],
-                *[[100+10*i+2, 'plot', c.rp_line(c.theta0),
+                *[[100+10*i+2, 'plot', c.rp_line(c.theta0, 0)[:2],
                    dict(label='line', color=c.color_p, lw=1.5*lws,
                         marker='o', ms=4*lws)]
                   for i, c in enumerate(curves)],
@@ -163,7 +180,8 @@ class Hypocycloid(object):
                    dict(label='trace', color=c.color_t, lw=2*lws)]
                   for i, c in enumerate(curves)],
                 [2, 'revise', self.animation_revise,
-                 dict(curves=curves, speedup=int(speedup), **_kwargs)],
+                 dict(curves=curves, speedup=int(speedup),
+                      perturbation=perturbation, **_kwargs)],
             ]
         }
         figlabel = ['%s-%s-%s' % (c.curve, hex(id(c)), c.info.replace(' ', ''))
@@ -178,6 +196,7 @@ class Hypocycloid(object):
         '''Animation function for matplotlib'''
         curves = kwargs.pop('curves')
         speedup = kwargs.pop('speedup')
+        perturbation = min(0.99, abs(kwargs.pop('perturbation')))
         L = max(c.theta.size for c in curves)
         frames = list(range(0, L-1, speedup)) + [L-1]
 
@@ -186,20 +205,31 @@ class Hypocycloid(object):
             arts = []
             for i, curv in enumerate(curves):
                 if num >= curv.theta.size:
-                    tmpnum = curv.theta.size-1
+                    tnum = curv.theta.size-1
+                    perturb = 0  # stop perturbation of this curve
                     # continue  # still update arts as blit=True
                 else:
-                    tmpnum = num
+                    tnum = num
+                    perturb = 1 if perturbation > 0 else 0
                 idx = 100+10*i
-                dtheta = curv.theta[tmpnum]
+                dtheta = curv.theta[tnum]
                 circle = artistdict[idx+1][0]  # update circle
                 cx, cy = curv.r_circle(dtheta)
                 circle.set_data(cx, cy)
                 pline = artistdict[idx+2][0]  # update fixed point
-                lx, ly = curv.rp_line(dtheta)
-                pline.set_data(lx, ly)
                 trace = artistdict[idx+3][0]  # update trace
-                trace.set_data(curv.tracex[:tmpnum+1], curv.tracey[:tmpnum+1])
+                if perturb == 1:
+                    deltad = perturb*perturbation*curv.d*random.random()
+                    lx, ly, dx, dy = curv.rp_line(dtheta, deltad)
+                    pline.set_data(lx, ly)
+                    curv._tracex[tnum] = curv.tracex[tnum] + dx
+                    curv._tracey[tnum] = curv.tracey[tnum] + dy
+                    trace.set_data(
+                        curv._tracex[:tnum+1], curv._tracey[:tnum+1])
+                else:
+                    lx, ly, dx, dy = curv.rp_line(dtheta, 0)
+                    pline.set_data(lx, ly)
+                    trace.set_data(curv.tracex[:tnum+1], curv.tracey[:tnum+1])
                 arts.extend([circle, pline, trace])
             return arts  # return a list of updated artists, as blit=True
 
@@ -229,7 +259,7 @@ if __name__ == '__main__':
         h11 = Hypocycloid()
         h11.animation(speedup=3)
         h12 = Hypocycloid(p=34, q=11)
-        h12.animation(speedup=2)
+        h12.animation(speedup=2, perturbation=0.05)
         h13 = Hypocycloid(p=94, q=31, color_t='g', color_p='g')
         h13.animation(h12, speedup=5)
     elif test == 11:  # dr
@@ -257,7 +287,8 @@ if __name__ == '__main__':
                             alpha0=-pi/2, color_t='r', color_p='r')
         h2151 = Hypocycloid(p=2, q=1, dr=5/1, theta0=pi/4,
                             alpha0=pi, color_t='g', color_p='g')
-        h2101.animation(h2131, h2141, h2151, h2101, h2151, repeat_delay=10000)
+        h2101.animation(h2131, h2141, h2151, h2101, h2151,
+                        perturbation=0.01, repeat_delay=10000)
     elif test == 22:  # non ellipse
         h21a = Hypocycloid(p=2, q=1, dr=1/1, sigma=-1, alpha0=0,
                            color_t='r', color_p='r')

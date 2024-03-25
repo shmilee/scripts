@@ -44,22 +44,25 @@ start_easyconn() {
     local CMD=${ResourcesDir}/bin/easyconn
     local cmd='login'
     while true; do
-        if [ "$cmd" == 'login' ]; then
+        if [ "$cmd" = 'login' ]; then
             echo "Run CMD: $CMD login $params"
             $CMD login $params
-        elif [ "$cmd" == 'logout' ]; then
+        elif [ "$cmd" = 'logout' ]; then
             echo "Run CMD: $CMD logout"
             $CMD logout
-        elif [ "$cmd" == 'mylogin' ]; then
+        elif [ "$cmd" = 'mylogin' ]; then
             read -p " -> Enter new params: " params
             echo "Run CMD: $CMD login $params"
             $CMD login $params
-        elif [ "$cmd" == 'exit' ]; then
+        elif [ "$cmd" = 'exit' ]; then
             echo "Run CMD: $CMD logout"
             $CMD logout
             break
+        elif [ "$cmd" != '' ]; then
+            echo " => Run: $cmd"
+            $cmd
         fi
-        read -p " -> Enter 'login/logout/mylogin/exit': " cmd
+        read -p " -> Enter 'login/logout/mylogin/??/exit': " cmd
     done
 }
 

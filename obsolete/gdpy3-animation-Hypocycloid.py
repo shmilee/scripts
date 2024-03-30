@@ -6,7 +6,6 @@
 # TODO 3 circles: large, small, tiny
 
 import sys
-import random
 import numpy as np
 from gdpy3 import get_visplter
 import matplotlib.animation as animation
@@ -130,9 +129,19 @@ class Hypocycloid(object):
         poy = coy + self.d*sin(dalpha)
         dx = deltad*cos(dalpha)
         dy = deltad*sin(dalpha)
+        # dtx = -(self.k-1.0)*(self.r*sin(dtheta) + self.d*sin(
+        #    (self.k-1.0)*dtheta - self.k*self.theta0-self.alpha0))
+        # dty = (self.k-1.0)*(self.r*cos(dtheta) - self.d*cos(
+        #    (self.k-1.0)*dtheta - self.k*self.theta0-self.alpha0))
+        # if dtx*dty != 0:
+        #    K = -dtx/dty
+        #    dx = deltad/np.sqrt(1+K**2)
+        #    dy = deltad*K/np.sqrt(1+K**2)
+        #    print('K=',K,', dy=', dy)
         return (cox, pox+dx), (coy, poy+dy), dx, dy
 
-    def animation(self, *othercurves, speedup=1, perturbation=0, **kwargs):
+    def animation(self, *othercurves, speedup=1, perturbation=0, legend=True,
+                  **kwargs):
         '''
         Plot this curve and other curves.
 
@@ -143,6 +152,8 @@ class Hypocycloid(object):
             how many trace points updated in one frame
         perturbation: float, 0-1
             perturbation on fixed point radius :attr:`d`
+        legend: bool
+            show perturbation and trace point rho
         kwargs: dict, passed to `animation.FuncAnimation`
         '''
         # othercurves = [c for c in othercurves if isinstance(c, Hypocycloid)]
@@ -165,8 +176,8 @@ class Hypocycloid(object):
             )],
             'data': [
                 [1, 'revise', 'arrow_spines', dict(arrow_size=10*lws)],
-                [3, 'plot', self.R_circle, dict(color=self.color_R, lw=2*lws)],
-                *[[4+i, 'plot', (ur*self.Ux_circle, ur*self.Uy_circle, '--'),
+                [4, 'plot', self.R_circle, dict(color=self.color_R, lw=2*lws)],
+                *[[5+i, 'plot', (ur*self.Ux_circle, ur*self.Uy_circle, '--'),
                    dict(color=self.color_a, lw=0.8)]
                   for i, ur in enumerate(uniqR_r)],
                 *[[100+10*i+1, 'plot', c.r_circle(c.theta0),
@@ -179,9 +190,18 @@ class Hypocycloid(object):
                 *[[100+10*i+3, 'plot', (c.tracex[:1], c.tracey[:1]),
                    dict(label='trace', color=c.color_t, lw=2*lws)]
                   for i, c in enumerate(curves)],
-                [2, 'revise', self.animation_revise,
+                [2 if legend else -2, 'revise', 'multi_merge_legend', dict(
+                    groups=[
+                        dict(index=[
+                            j
+                            for i in range(len(curves))
+                            for j in ([100+10*i+2, 100+10*i+3]
+                                      if perturbation > 0 else [100+10*i+3])
+                        ])
+                    ])],
+                [3, 'revise', self.animation_revise,
                  dict(curves=curves, speedup=int(speedup),
-                      perturbation=perturbation, **_kwargs)],
+                      perturbation=perturbation, legend=legend, **_kwargs)],
             ]
         }
         figlabel = ['%s-%s-%s' % (c.curve, hex(id(c)), c.info.replace(' ', ''))
@@ -197,6 +217,12 @@ class Hypocycloid(object):
         curves = kwargs.pop('curves')
         speedup = kwargs.pop('speedup')
         perturbation = min(0.99, abs(kwargs.pop('perturbation')))
+        legend = kwargs.pop('legend')
+        if legend:
+            lg = artistdict[2][0]  # only one
+            texts = lg.get_texts()
+            # for j, t in enumerate(texts):
+            #    print(j, t)
         L = max(c.theta.size for c in curves)
         frames = list(range(0, L-1, speedup)) + [L-1]
 
@@ -218,19 +244,49 @@ class Hypocycloid(object):
                 circle.set_data(cx, cy)
                 pline = artistdict[idx+2][0]  # update fixed point
                 trace = artistdict[idx+3][0]  # update trace
-                if perturb == 1:
-                    deltad = perturb*perturbation*curv.d*random.random()
-                    lx, ly, dx, dy = curv.rp_line(dtheta, deltad)
-                    pline.set_data(lx, ly)
-                    curv._tracex[tnum] = curv.tracex[tnum] + dx
-                    curv._tracey[tnum] = curv.tracey[tnum] + dy
+                if perturbation > 0:
+                    if perturb == 1:  # cal perturbation
+                        if tnum > 0:
+                            t0, t1 = tnum+1-speedup, tnum+1
+                        else:
+                            t0, t1 = 0, 1
+                        dtheta = curv.theta[t0:t1]
+                        random = 2.0*(np.random.rand(dtheta.size) - 0.5)
+                        deltad = perturb*perturbation*curv.d*random
+                        dx, dy = [], []
+                        for dt, dd in zip(dtheta, deltad):
+                            lx, ly, _dx, _dy = curv.rp_line(dt, dd)
+                            dx.append(_dx)
+                            dy.append(_dy)
+                        pline.set_data(lx, ly)  # last lx,ly
+                        curv._tracex[t0:t1] = curv.tracex[t0:t1] + np.array(dx)
+                        curv._tracey[t0:t1] = curv.tracey[t0:t1] + np.array(dy)
+                        deltad = deltad[-1]
+                    else:  # stoped
+                        dx = curv._tracex[tnum] - curv.tracex[tnum]
+                        dy = curv._tracey[tnum] - curv.tracey[tnum]
+                        deltad = np.sqrt(dx**2+dy**2)
+                        lx, ly, dx, dy = curv.rp_line(dtheta, 0)
+                        pline.set_data(lx, ly)
                     trace.set_data(
                         curv._tracex[:tnum+1], curv._tracey[:tnum+1])
+                    rho = np.sqrt(curv._tracex[tnum]**2+curv._tracey[tnum]**2)
                 else:
                     lx, ly, dx, dy = curv.rp_line(dtheta, 0)
                     pline.set_data(lx, ly)
                     trace.set_data(curv.tracex[:tnum+1], curv.tracey[:tnum+1])
+                    deltad = 0
+                    rho = np.sqrt(curv.tracex[tnum]**2+curv.tracey[tnum]**2)
+                if legend:
+                    if perturbation > 0:
+                        idx = i*2 + 0  # line
+                        texts[idx].set_text('line, $\Delta d=%.3fr$'
+                                            % abs(deltad/curv.r))
+                    idx = (2*i + 1) if perturbation > 0 else i  # trace
+                    texts[idx].set_text(r'trace, $\rho=%.3f$' % rho)
                 arts.extend([circle, pline, trace])
+            if legend:
+                arts.append(lg)
             return arts  # return a list of updated artists, as blit=True
 
         fig.animation = animation.FuncAnimation(fig, update, frames, **kwargs)
@@ -285,7 +341,7 @@ if __name__ == '__main__':
                             alpha0=pi/2, color_t='b', color_p='b')
         h2141 = Hypocycloid(p=2, q=1, dr=4/1, theta0=pi/4,
                             alpha0=-pi/2, color_t='r', color_p='r')
-        h2151 = Hypocycloid(p=2, q=1, dr=5/1, theta0=pi/4,
+        h2151 = Hypocycloid(p=2, q=1, dr=5/1, theta0=pi/4, nexample=181,
                             alpha0=pi, color_t='g', color_p='g')
         h2101.animation(h2131, h2141, h2151, h2101, h2151,
                         perturbation=0.01, repeat_delay=10000)

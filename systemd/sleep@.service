@@ -1,0 +1,13 @@
+# path: /etc/systemd/system/sleep@.service
+
+[Unit]
+Description=Call user's sleep service before system suspend/sleep target
+Before=sleep.target
+
+[Service]
+# oneshot,forking: user unit up, breaks sleep; simple,exec: ok
+Type=simple
+ExecStart=/usr/bin/systemctl --user --machine=%i@ start --wait xsecurelock.service
+
+[Install]
+WantedBy=sleep.target

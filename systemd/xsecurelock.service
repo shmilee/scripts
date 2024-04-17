@@ -1,0 +1,15 @@
+# path: ~/.config/systemd/user/xsecurelock.service
+
+[Unit]
+Description=Lock screen before suspend/sleep
+Before=sleep.target
+
+[Service]
+Type=simple
+Environment=XSECURELOCK_FONT="LXGW Neo XiHei Screen"
+Environment=XSECURELOCK_SHOW_DATETIME=1
+Environment=XSECURELOCK_DATETIME_FORMAT="%%c"
+Environment=XSECURELOCK_PASSWORD_PROMPT=time_hex
+Environment=XSECURELOCK_NO_COMPOSITE=1
+Environment=LC_ALL=zh_CN.UTF-8
+ExecStart=/usr/bin/xsecurelock

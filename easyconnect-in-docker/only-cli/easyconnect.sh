@@ -35,6 +35,25 @@ run_cmd() {
 }
 
 ## run CLI EC cmd easyconn
+ALL_OFF="\e[1;0m"
+BOLD="\e[1;1m"
+GREEN="${BOLD}\e[1;32m"
+BLUE="${BOLD}\e[1;34m"
+YELLOW="${BOLD}\e[1;33m"
+RED="${BOLD}\e[1;31m"
+readonly ALL_OFF BOLD GREEN BLUE YELLOW RED
+msg() {
+    local mesg=$1; shift
+    printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+}
+warning() {
+    local mesg=$1; shift
+    printf "${YELLOW}==> WARNING:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+}
+prompt() {
+    local mesg=$1; shift
+    printf "${GREEN} ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}" "$@" >&1
+}
 start_easyconn() {
     local params="-v"
     [ -n "$ECADDRESS" ] && params+=" -d $ECADDRESS"
@@ -45,25 +64,25 @@ start_easyconn() {
     local cmd='login'
     while true; do
         if [ "$cmd" = 'login' ]; then
-            echo "==> Run CMD: $CMD login $params"
+            msg "Run CMD: $CMD login $params"
             $CMD login $params
-            echo " -> Please run 'clear' to hide you password!!!"
+            warning "Please run 'clear' to hide you password!!!"
         elif [ "$cmd" = 'logout' ]; then
-            echo "==> Run CMD: $CMD logout"
+            msg "Run CMD: $CMD logout"
             $CMD logout
         elif [ "$cmd" = 'mylogin' ]; then
-            read -p " -> Enter new params: " params
-            echo "==> Run CMD: $CMD login $params"
+            read -p "$(prompt "Enter new params: ")" params
+            msg "Run CMD: $CMD login $params"
             $CMD login $params
         elif [ "$cmd" = 'exit' ]; then
-            echo "==> Run CMD: $CMD logout"
+            msg "Run CMD: $CMD logout"
             $CMD logout
             break
         elif [ "$cmd" != '' ]; then
-            echo "==> Run: $cmd"
+            msg "Run: $cmd"
             $cmd
         fi
-        read -p " -> Enter 'login/logout/mylogin/??/exit': " cmd
+        read -p "$(prompt "Enter 'login/logout/mylogin/??/exit': ")" cmd
     done
 }
 

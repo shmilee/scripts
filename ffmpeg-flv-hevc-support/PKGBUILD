@@ -7,8 +7,7 @@
 
 pkgname=ffmpeg5.1
 pkgver=5.1.4
-pkgrel=1
-#epoch=0
+pkgrel=3
 pkgdesc='Complete solution to record, convert and stream audio and video, add hevc/vp8/vp9/opus support'
 arch=(x86_64)
 url=https://ffmpeg.org/
@@ -92,20 +91,19 @@ optdepends=(
   'ladspa: LADSPA filters'
   'nvidia-utils: Nvidia NVDEC/NVENC support'
 )
-# see https://www.ffmpeg.org/download.html
+# rm cmd find-libprovides pkg.tar.xz
 provides=(
-  libavcodec.so=59
-  libavdevice.so=59
-  libavfilter.so=8
-  libavformat.so=59
-  libavutil.so=57
-  libpostproc.so=56
-#  libswresample.so=4  # conflict with 6.x
-  libswscale.so=6
+  libavcodec.so=59-64
+  libavdevice.so=59-64
+  libavfilter.so=8-64
+  libavformat.so=59-64
+  libavutil.so=57-64
+  libpostproc.so=56-64
+# conflict with 6.x, see https://www.ffmpeg.org/download.html
+#  libswresample.so=4-64
+  libswscale.so=6-64
 )
-options=(
-  #debug
-)
+options=()
 #_tag=3949db4d261748a9f34358a388ee255ad1a7f0c0
 source=(
   #git+https://git.ffmpeg.org/ffmpeg.git?signed#tag=${_tag}
@@ -135,13 +133,22 @@ prepare() {
 build() {
   cd ffmpeg-${pkgver}
 
+  # 1. static failed: miss other static .a
+  #  --disable-shared --enable-static \
+  #  --extra-libs=-static --extra-cflags=--static \
+  # 2. share: ldexeflags for link exe; ldsoflags for link so
+  #  --disable-static --enable-shared \
+  #  --extra-ldexeflags=-Wl,-rpath,/usr/lib/ffmpeg5.1 \
+  #  --extra-ldsoflags=-Wl,-rpath,/usr/lib/ffmpeg5.1 \
   ./configure \
     --prefix=/usr \
     --incdir=/usr/include/ffmpeg5.1 \
     --libdir=/usr/lib/ffmpeg5.1 \
+    --disable-static --enable-shared \
+    --extra-ldexeflags=-Wl,-rpath,/usr/lib/ffmpeg5.1 \
+    --extra-ldsoflags=-Wl,-rpath,/usr/lib/ffmpeg5.1 \
     --disable-debug \
     --disable-doc \
-    --disable-static \
     --disable-stripping \
     --enable-amf \
     --enable-avisynth \
@@ -194,7 +201,6 @@ build() {
     --enable-nvdec \
     --enable-opencl \
     --enable-opengl \
-    --enable-shared \
     --enable-version3 \
     --enable-vulkan
 #  --enable-nvenc \  # need nvidia-sdk; ERROR: nvenc requested but not found
@@ -210,29 +216,33 @@ package() {
 
   cd "${pkgdir}"
   local f
+
   # rename bin xx5.1
   for f in ffmpeg ffplay ffprobe; do
     mv -v usr/bin/"$f" usr/bin/"$f"5.1
   done
-  # move libs to /usr/lib, create links except libswresample.so.4
-  for f in usr/lib/ffmpeg5.1/*; do
-    if [[ -L $f ]]; then
-      # update target
-      ln -svrf -- usr/lib/"$(readlink "$f")" "$f"
-      if [[ $f != *.so ]]; then
-        # create new links
-        ln -svf -- "$(basename "$(readlink "$f")")" usr/lib/"$(basename "$f")"
-      fi
-    else
-      # move libs
-      mv -v "$f" usr/lib
-    fi
-  done
-  rm -vf "usr/lib/libswresample.so.4" # rm conflict .so
-  # pkgconfig conflict
-  for f in usr/lib/pkgconfig/*.pc; do
-    mv -v "$f" "${f%.pc}"-5.1.pc
-  done
+
+  ## after -rpath, this part not needed
+  ## move libs to /usr/lib, create links except libswresample.so.4
+  #for f in usr/lib/ffmpeg5.1/*; do
+  #  if [[ -L $f ]]; then
+  #    # update target
+  #    ln -svrf -- usr/lib/"$(readlink "$f")" "$f"
+  #    if [[ $f != *.so ]]; then
+  #      # create new links
+  #      ln -svf -- "$(basename "$(readlink "$f")")" usr/lib/"$(basename "$f")"
+  #    fi
+  #  else
+  #    # move so files and dir pkgconfig/ to libs
+  #    mv -v "$f" usr/lib
+  #  fi
+  #done
+  #rm -vf "usr/lib/libswresample.so.4" # rm conflict .so
+  ## pkgconfig conflict; note: lib/ffmpeg5.1/pkgconfig -> lib/pkgconfig
+  #for f in usr/lib/pkgconfig/*.pc; do
+  #  mv -v "$f" "${f%.pc}"-5.1.pc
+  #done
+
   # remove others
   rm -r usr/share
 }

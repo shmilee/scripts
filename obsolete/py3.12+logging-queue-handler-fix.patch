@@ -1,0 +1,23 @@
+--- config.py	2024-05-31 10:16:24.905893630 +0800
++++ config.py-fix3.12	2024-05-31 13:18:07.223555882 +0800
+@@ -786,8 +786,11 @@
+                     # raise ValueError('No handlers specified for a QueueHandler')
+                 if 'queue' in config:
+                     from multiprocessing.queues import Queue as MPQueue
++                    from multiprocessing.managers import BaseProxy as MPBaseProxy                    
+                     qspec = config['queue']
+-                    if not isinstance(qspec, (queue.Queue, MPQueue)):
++                    print('============', isinstance(qspec, MPBaseProxy))
++                    print(qspec, type(qspec))
++                    if not isinstance(qspec, (queue.Queue, MPQueue, MPBaseProxy)):
+                         if isinstance(qspec, str):
+                             q = self.resolve(qspec)
+                             if not callable(q):
+@@ -800,6 +803,7 @@
+                         else:
+                             raise TypeError('Invalid queue specifier %r' % qspec)
+                         config['queue'] = q
++                    print('===============')
+                 if 'listener' in config:
+                     lspec = config['listener']
+                     if isinstance(lspec, type):

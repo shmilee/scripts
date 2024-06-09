@@ -42,6 +42,7 @@ BLUE="${BOLD}\e[1;34m"
 YELLOW="${BOLD}\e[1;33m"
 RED="${BOLD}\e[1;31m"
 readonly ALL_OFF BOLD GREEN BLUE YELLOW RED
+export TZ=Asia/Shanghai
 msg() {
     local mesg=$1; shift
     printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
@@ -50,9 +51,21 @@ warning() {
     local mesg=$1; shift
     printf "${YELLOW}==> WARNING:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
-prompt() {
+prompt1() {
+    local tuninfo interface
+    for interface in $(ifconfig -a | sed 's/[ \t].*//;/^\(lo\|\)$/d'); do
+        local ip=$(ifconfig $interface | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}')
+        if [ -z "$tuninfo" ]; then
+            tuninfo="${ALL_OFF}${BOLD}${interface}:${GREEN}${ip}${ALL_OFF}"
+        else
+            tuninfo="${tuninfo} ${BOLD}${interface}:${GREEN}${ip}${ALL_OFF}"
+        fi
+    done
+    printf "${BLUE}╭─[${GREEN}$(whoami)${BLUE}@${YELLOW}${HOSTNAME}${BLUE}]${ALL_OFF}-${BLUE}[${tuninfo[@]}${BLUE}]${ALL_OFF}-${BLUE}(${ALL_OFF}${BOLD}$(date '+%T')${ALL_OFF}${BLUE})${ALL_OFF}\n"
+}
+prompt2() {
     local mesg=$1; shift
-    printf "${GREEN} ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}" "$@" >&1
+    printf "${BLUE}╰─[${ALL_OFF}${BOLD}${mesg}${ALL_OFF}${BLUE}]${ALL_OFF} " "$@" >&1
 }
 start_easyconn() {
     local params="-v"
@@ -71,7 +84,12 @@ start_easyconn() {
             msg "Run CMD: $CMD logout"
             $CMD logout
         elif [ "$cmd" = 'mylogin' ]; then
-            read -p "$(prompt "Enter new params: ")" params
+            local old_params="$params"
+            prompt1
+            read -e -p "$(prompt2 "Enter new params")" params
+            if [ -z "$params" ]; then
+                params="$old_params"
+            fi
             msg "Run CMD: $CMD login $params"
             $CMD login $params
         elif [ "$cmd" = 'exit' ]; then
@@ -82,7 +100,9 @@ start_easyconn() {
             msg "Run: $cmd"
             $cmd
         fi
-        read -p "$(prompt "Enter 'login/logout/mylogin/??/exit': ")" cmd
+        prompt1
+        read -e -p "$(prompt2 "Enter login/logout/mylogin/bash/exit/??")" cmd
+        history -s $cmd
     done
 }
 

@@ -150,6 +150,10 @@ user "xxxx" login successfully!
 ==> WARNING: Please run 'clear' to hide you password!!!
 ╭─[root@8ec67df00663]-[eth0:172.17.0.2]-(22:51:45)
 ╰─[Enter login/logout/mylogin/bash/exit/??]
+╭─[root@8ec67df00663]-[eth0:172.17.0.2 tun0:10.xxx.1.xxx]-(22:51:48)
+╰─[Enter login/logout/mylogin/bash/exit/??] history
+==> Run: history
+    1  history
 ╭─[root@8ec67df00663]-[eth0:172.17.0.2 tun0:10.xxx.1.xxx]-(22:51:51)
 ╰─[Enter login/logout/mylogin/bash/exit/??] exit
 Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/easyconn logout

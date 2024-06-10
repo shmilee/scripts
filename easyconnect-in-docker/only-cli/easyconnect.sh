@@ -43,6 +43,10 @@ YELLOW="${BOLD}\e[1;33m"
 RED="${BOLD}\e[1;31m"
 readonly ALL_OFF BOLD GREEN BLUE YELLOW RED
 export TZ=Asia/Shanghai
+export HISTCONTROL=ignoredups:erasedups
+export HISTIGNORE="ls:history"
+export HISTSIZE=300
+export HISTTIMEFORMAT="%F %T "
 msg() {
     local mesg=$1; shift
     printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
@@ -100,9 +104,9 @@ start_easyconn() {
             msg "Run: $cmd"
             $cmd
         fi
+        history -s $cmd
         prompt1
         read -e -p "$(prompt2 "Enter login/logout/mylogin/bash/exit/??")" cmd
-        history -s $cmd
     done
 }
 

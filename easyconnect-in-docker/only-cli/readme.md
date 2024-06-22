@@ -57,9 +57,9 @@ Get https://127.0.0.1:54530/ECAgent ...
 Get https://127.0.0.1:54530/ECAgent Done, code=200
 user "xxx" login successfully!
 ==> WARNING: Please run 'clear' to hide you password!!!
-╭─[root@8ec67df00663]-[eth0:172.17.0.2]-(22:51:45)
+╭─[root@8ec67df00663]-(22:51:45)
 ╰─[Enter login/logout/mylogin/bash/exit/??]
-╭─[root@8ec67df00663]-[eth0:172.17.0.2 tun0:10.xxx.1.xxx]-(22:51:51)
+╭─[root@8ec67df00663]-[tun0:10.xxx.1.xxx]-(22:51:51)
 ╰─[Enter login/logout/mylogin/bash/exit/??] exit
 Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/easyconn logout
 user "xxx" is already logged out!

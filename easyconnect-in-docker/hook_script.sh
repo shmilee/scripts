@@ -178,7 +178,7 @@ prompt1() {
     #local interfaces=$(ifconfig -a | sed -n 's/[ \t].*//;/^\(tun[0-9]*\)$/p')
     #local interface=${1:-tun0}
     local tuninfo interface
-    for interface in $(ifconfig -a | sed 's/[ \t].*//;/^\(lo\|\)$/d'); do
+    for interface in $(ifconfig -a | sed 's/[ \t].*//;/^\(lo\|eth0\|\)$/d'); do
         local ip=$(ifconfig $interface | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}')
         if [ -z "$tuninfo" ]; then
             tuninfo="${ALL_OFF}${BOLD}${interface}:${GREEN}${ip}${ALL_OFF}"
@@ -186,8 +186,11 @@ prompt1() {
             tuninfo="${tuninfo} ${BOLD}${interface}:${GREEN}${ip}${ALL_OFF}"
         fi
     done
+    if [ -n "$tuninfo" ]; then
+        tuninfo="${BLUE}[${tuninfo}${BLUE}]${ALL_OFF}-"
+    fi
     #$(date '+%T %:::z')
-    printf "${BLUE}╭─[${GREEN}$(whoami)${BLUE}@${YELLOW}${HOSTNAME}${BLUE}]${ALL_OFF}-${BLUE}[${tuninfo[@]}${BLUE}]${ALL_OFF}-${BLUE}(${ALL_OFF}${BOLD}$(date '+%T')${ALL_OFF}${BLUE})${ALL_OFF}\n"
+    printf "${BLUE}╭─[${GREEN}$(whoami)${BLUE}@${YELLOW}${HOSTNAME}${BLUE}]${ALL_OFF}-${tuninfo}${BLUE}(${ALL_OFF}${BOLD}$(date '+%T')${ALL_OFF}${BLUE})${ALL_OFF}\n"
 }
 prompt2() {
     local mesg=$1; shift

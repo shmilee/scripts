@@ -20,7 +20,7 @@ package.path = package.path .. string.format(';%s/.config/mpv/scripts/?.lua', ho
 local inspectloaded, inspect = pcall(require, 'inspect')
 if not inspectloaded then
     msg.warn('inspect not found!')
-    inspect = tostring
+    inspect = utils.to_string
 end
 msg.warn('package.path: ' .. package.path)
 

@@ -280,7 +280,7 @@ class Hypocycloid(object):
                 if legend:
                     if perturbation > 0:
                         idx = i*2 + 0  # line
-                        texts[idx].set_text('line, $\Delta d=%.3fr$'
+                        texts[idx].set_text(r'line, $\Delta d=%.3fr$'
                                             % abs(deltad/curv.r))
                     idx = (2*i + 1) if perturbation > 0 else i  # trace
                     texts[idx].set_text(r'trace, $\rho=%.3f$' % rho)

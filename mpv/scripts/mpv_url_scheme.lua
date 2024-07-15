@@ -188,6 +188,21 @@ local myutils = {
     end,
 }
 
+-- searching filename in directories `dpaths`
+-- The dpaths can be splited by ';', for example o.cookies_path.
+function myutils.search_file(dpaths, filename)
+    for d in string.gmatch(dpaths, "([^;]+)") do
+        if d:match('^~/') then
+            d = string.gsub(d, '^~', os.getenv('HOME'))
+        end
+        local file = utils.join_path(d, filename)
+        msg.verbose('searching file: '.. file)
+        if myutils.file_readable(file) then
+            return file
+        end
+    end
+end
+
 function myutils.setting_properties(properties, t)
     for _, prop in pairs(properties) do
         if t[prop] then
@@ -216,7 +231,7 @@ local Protocol_1 = {  -- {{{
 }
 
 function Protocol_1.match(s)
-    s = string.gsub(s,'^mpv%-debug://','mpv://')
+    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     if s:match(Protocol_1.pattern_url) then
         return true
     else
@@ -234,20 +249,14 @@ Protocol_1.param_handlers = {
             t['ytdl-raw-options'][k] = v
             return
         end
-        local d, f = utils.split_path(v)
+        local d, filename = utils.split_path(v)
         --split the o.cookies_path, searching cookies file
-        for cpath in string.gmatch(o.cookies_path, "([^;]+)") do
-            local file = utils.join_path(cpath, f)
-            if file:match('^~/') then
-                file = string.gsub(file,'^~', os.getenv('HOME'))
-            end
-            msg.verbose('searching cookies: '.. file)
-            if myutils.file_readable(file) then
-                t['ytdl-raw-options'][k] = file
-                return
-            end
+        local file = myutils.search_file(o.cookies_path, filename)
+        if file then
+            t['ytdl-raw-options'][k] = file
+        else
+            msg.warn(string.format('cookies file %s not found/readable!', v))
         end
-        msg.warn(string.format('cookies file %s not found/readable!', v))
     end,
     ['profile'] = function(k, v, t)
         local profiles = myutils.get_profile_names()
@@ -281,7 +290,7 @@ Protocol_1.param_handlers = {
 }
 
 function Protocol_1.parse(s)
-    s = string.gsub(s,'^mpv%-debug://','mpv://')
+    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     local t = {}
     local b64url = string.match(s, Protocol_1.pattern_url)
     t['stream-open-filename'] = base64.safe_decode(b64url)
@@ -327,26 +336,172 @@ function Protocol_1.setting(t)
 end
 -- Protocol_1  -- }}}
 
--- Protocol 2: TODO
--- 5. https://github.com/LuckyPuppy514/Play-With-MPV/issues/124
--- 2. mpv://"${videoUrl}" --other-mpv-parameters-options --may-URL-encoded
---    mpv-url://"${videoUrl}" --other-mpv-parameters-options
+-- Protocol 2:
+--    mpv://<URL-encoded-string-of-mpv-options-below>
+--    mpv://"${videoUrl}" --audio-file="${audioUrl}" --sub-file="${subtitleUrl}" \
+--      --force-media-title="${title}" --start=${startTime} \
+--      --http-header-fields="referer: ${referer}" \
+--      --http-header-fields="origin: ${origin}" \
+--      --http-proxy=${proxy} --ytdl-raw-options=proxy=[${proxy}] ${other}
+--    mpv-url://"${videoUrl}" --other-above-options-...
 local Protocol_2 = {  -- {{{
     ref = {'https://github.com/LuckyPuppy514/Play-With-MPV',
-           'https://github.com/LuckyPuppy514/Play-With-MPV/issues/124'},
-    pattern_url = '^mpv://play/([%w-_]+)[/]?[%?]?',
-    pattern_param = '^mpv-url://play/[%w-_]+/%?(.*)',
+           'https://github.com/LuckyPuppy514/Play-With-MPV/issues/124',
+           'https://github.com/LuckyPuppy514/Play-With-MPV/blob/04a6387b0a0875c36249d5f336a0f4db3a09cf8f/play-with-mpv.user.js#L220-L233'},
+    pattern_url = '^mpv://%%22(http[s]?.-)%%22%%20[%-]*',
+    pattern_options = '^mpv://%%22http[s]?.-%%22%%20%-%-(%a+.*)',
 }
+
+function Protocol_2.match(s)
+    s = string.gsub(s, '^mpv%-url://', 'mpv://')
+    if s:match(Protocol_2.pattern_url) then
+        return true
+    else
+        return false
+    end
+end
+
+function Protocol_2.array_opt_handler(k, v, t, add_ks)
+    if add_ks then
+        k = k .. 's'
+    end
+    t[k] = t[k] or mp.get_property_native(k, {})
+    if not myutils.table_hasval(t[k], v) then
+        table.insert(t[k], v)
+    end
+end
+
+function Protocol_2.parse(s)
+    s = string.gsub(s, '^mpv%-url://', 'mpv://')
+    local t = {}
+    local videourl = string.match(s, Protocol_2.pattern_url)
+    t['stream-open-filename'] = myutils.unescape_url(videourl)
+    local opts = string.match(s, Protocol_2.pattern_options)
+    if opts then
+        opts = string.gsub(opts, '%%20%-%-', '@')  -- separator ' --' -> '@'
+        for kv in string.gmatch(opts, "([^@]+)") do
+            local k, v = string.match(kv, "([%a%-]-)=(.*)")
+            v = myutils.unescape_url(v)
+            -- delete ^$ space and "
+            v = string.gsub(string.gsub(v, '^%s+', ''), '%s+$', '')
+            v = string.gsub(string.gsub(v, '^"', ''), '"$', '')
+            if k == 'audio-file' or k == 'sub-file' then
+                Protocol_2.array_opt_handler(k, v, t, true)
+            elseif k == 'http-header-fields' then
+                for vv in string.gmatch(v, "([^,]+)") do  -- separated by ','
+                    Protocol_2.array_opt_handler(k, vv, t, false)
+                end
+            elseif k == 'ytdl-raw-options' then
+                t[k] = t[k] or mp.get_property_native(k, {})
+                local vk, vv = string.match(v, "([%a%-]-)=(.*)")
+                t[k][vk] = vv
+            else  -- 'force-media-title', 'start', 'http-proxy', other-options
+                t[k] = v
+            end
+        end
+        -- check referer
+        local referer
+        if t['http-header-fields'] then
+            for _, field in pairs(t['http-header-fields']) do
+                local k, v = string.match(field, "([%a%-]-):(.*)")
+                if k == 'referer' then
+                    referer = string.gsub(v, '^%s+', '')
+                    break
+                end
+            end
+        else
+            t['http-header-fields'] = {}
+        end
+        if referer == nil then
+            if string.find(videourl, '%.bilivideo%.c[nom]+') then
+                referer = "https://www.bilibili.com"
+            else
+                referer = string.match(videourl, '(http[s]?://[%w%-%._]-)/')
+            end
+            if referer then
+                table.insert(t['http-header-fields'], 'referer:' .. referer)
+            end
+        end
+        --t['referrer'] = t['referrer'] or referer
+        -- try to add cookies by referer domain name
+        if referer then
+            local domain = string.match(referer, 'http[s]?://([%w%-%._]+)')
+            if domain and domain:len() >= 3 then
+                local cookie = myutils.search_file(o.cookies_path, domain)
+                if not cookie then
+                    cookie = myutils.search_file(o.cookies_path, domain..'.txt')
+                end
+                --msg.info(string.format('COOKIE: %s, %s', domain, cookie))
+                if cookie then
+                    if t['ytdl-raw-options'] and myutils.ytdl_enabled() then
+                        t['ytdl-raw-options']['cookies'] = cookie
+                    end
+                    t['cookies'] = 'yes'
+                    t['cookies-file'] = cookie
+                end
+            end
+        end
+    end
+    return t
+end
+
+function Protocol_2.setting(t)
+    myutils.setting_properties({
+        'stream-open-filename', 'audio-files', 'sub-files',
+        'force-media-title', 'start', 'http-header-fields', 'http-proxy',
+        'ytdl-raw-options', 'referrer', 'cookies', 'cookies-file',
+    }, t)
+end
 -- Protocol_2  -- }}}
 
--- Protocol 3: TODO
--- 3. mpv://play?file=https%3A%2F%2Fyoutu.be%2FXCs7FacjHQY&file=<next-url>
---
--- 6. https://github.com/SilverEzhik/mpv-msix
+-- Protocol 3:
+--    mpv://play?file=https%3A%2F%2Fyoutu.be%2FXCs7FacjHQY&file=<next-url>
+local Protocol_3 = {  -- {{{
+    ref = 'https://github.com/SilverEzhik/mpv-msix',
+    pattern_url = '^mpv://play%?(file=[.*]-[&]?.*)',
+}
+
+function Protocol_3.match(s)
+    return s:match(Protocol_3.pattern_url)
+end
+
+function Protocol_3.parse(s)
+    local t = {}
+    local query = string.match(s, Protocol_3.pattern_url)
+    if query then
+        -- read-only https://mpv.io/manual/master/#command-interface-playlist
+        t['playlist'] = {}
+        for kv in string.gmatch(query, "([^&]+)") do
+            local k, v = string.match(kv, "([%w_]+)=(.*)")
+            if k == 'file' then
+                v = myutils.unescape_url(v)
+                table.insert(t['playlist'], v)
+            else
+                msg.warn('Ignore option of mpv-launcher: ' .. kv)
+            end
+        end
+        if #t['playlist'] > 0 then
+            t['stream-open-filename'] = t['playlist'][1]
+        end
+    end
+    return t
+end
+
+function Protocol_3.setting(t)
+    myutils.setting_properties({'stream-open-filename'}, t)
+    if #t['playlist'] > 0 then
+        -- list file data in memory
+        local list = "memory://" .. table.concat(t['playlist'], "\n")
+        mp.commandv('loadlist', list)  -- loadlist <url> [<flags> [<index>]]
+    end
+end
+-- Protocol_3  -- }}}
 
 local available_protocols = {
     -- ['label'] = { match=function, parse=function, setting=function }
     ['play-base64'] = Protocol_1,
+    ['url-opts'] = Protocol_2,
+    ['play-msix'] = Protocol_3,
 }
 
 -- start

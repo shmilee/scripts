@@ -343,7 +343,7 @@ end
 --      --http-header-fields="referer: ${referer}" \
 --      --http-header-fields="origin: ${origin}" \
 --      --http-proxy=${proxy} --ytdl-raw-options=proxy=[${proxy}] ${other}
---    mpv-url://"${videoUrl}" --other-above-options-...
+--    mpv-debug://"${videoUrl}" --other-above-options-...
 local Protocol_2 = {  -- {{{
     ref = {'https://github.com/LuckyPuppy514/Play-With-MPV',
            'https://github.com/LuckyPuppy514/Play-With-MPV/issues/124',
@@ -353,7 +353,7 @@ local Protocol_2 = {  -- {{{
 }
 
 function Protocol_2.match(s)
-    s = string.gsub(s, '^mpv%-url://', 'mpv://')
+    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     if s:match(Protocol_2.pattern_url) then
         return true
     else
@@ -372,7 +372,7 @@ function Protocol_2.array_opt_handler(k, v, t, add_ks)
 end
 
 function Protocol_2.parse(s)
-    s = string.gsub(s, '^mpv%-url://', 'mpv://')
+    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     local t = {}
     local videourl = string.match(s, Protocol_2.pattern_url)
     t['stream-open-filename'] = myutils.unescape_url(videourl)
@@ -456,16 +456,19 @@ end
 
 -- Protocol 3:
 --    mpv://play?file=https%3A%2F%2Fyoutu.be%2FXCs7FacjHQY&file=<next-url>
+--    mpv-debug://play?file=https%3A%2F%2Fyoutu.be%2FXCs7FacjHQY
 local Protocol_3 = {  -- {{{
     ref = 'https://github.com/SilverEzhik/mpv-msix',
     pattern_url = '^mpv://play%?(file=[.*]-[&]?.*)',
 }
 
 function Protocol_3.match(s)
+    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     return s:match(Protocol_3.pattern_url)
 end
 
 function Protocol_3.parse(s)
+    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     local t = {}
     local query = string.match(s, Protocol_3.pattern_url)
     if query then

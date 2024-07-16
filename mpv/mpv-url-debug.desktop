@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=mpv-url-handler-debug
+GenericName=Multimedia player
+Comment=Play URL Scheme mpv:// for website videos and songs with mpv & yt-dlp (Debug)
+Exec=mpv --log-file=/tmp/mpv-url.log -- %U
+Icon=mpv
+MimeType=x-scheme-handler/mpv-debug;
+# xdg-mime default mpv-url-debug.desktop x-scheme-handler/mpv-debug [multiple x-scheme-handler/mpv??]
+# remove from file ~/.config/mimeapps.list
+Categories=AudioVideo;Audio;Video;Player;TV;
+Terminal=true
+NoDisplay=true

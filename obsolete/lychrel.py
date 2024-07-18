@@ -7,7 +7,7 @@
 # ref https://www.geeksforgeeks.org/lychrel-number-implementation/
 
 # Max Iterations
-MAX_ITERATIONS = 200
+MAX_ITERATIONS = 1000
 
 # Function to check whether number is Lychrel Number
 def isLychrel(number):
@@ -16,7 +16,8 @@ def isLychrel(number):
     for i in range(1, MAX_ITERATIONS+1):
         rev = reverse(number)
         new = number + rev
-        print(f'{i}): {number} + {rev} = {new}')
+        print(f'i={i}): {number} + {rev} = {new}')
+        #print(f'i={i}')
         if (isPalindrome(new)):
             return "No"
         number = new
@@ -26,20 +27,25 @@ def isLychrel(number):
 def isPalindrome(number):
     return number == reverse(number)
 
+# %timeit !python ./lychrel.py 196677 # Iterations=10000
+# 43s vs 84s => 48.8%
+cache_on, reverse_cache = True, {}
+
 # Function to reverse the number
-reverse_cache = {}
 def reverse(number):
-    if number in reverse_cache:
-        #  print(f'using cache for {number}')
-        return reverse_cache[number]
+    if cache_on:
+        if number in reverse_cache:
+            #  print(f'using cache for {number}')
+            return reverse_cache[number]
     reverse = 0
     num = number
     while (num > 0):
         remainder = num % 10
         reverse = (reverse * 10) + remainder
-        num = int(num / 10)
-    reverse_cache[number] = reverse
-    reverse_cache[reverse] = number
+        num = num // 10  # int(num / 10)
+    if cache_on:
+        reverse_cache[number] = reverse
+        reverse_cache[reverse] = number
     return reverse
 
 if __name__ == '__main__':

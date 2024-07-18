@@ -23,7 +23,8 @@ local o = {
     enable = true,
     hook_type = 'on_load',  -- see mp.add_hook(type,priority,fn)
     hook_priority = 8,      -- before ytdl_hook/on_load, priority=10
-    protocols = 'play-base64|url-opts|play-msix',  -- labels of protocol
+    -- labels of protocols
+    protocols = 'play-base64|url-opts|play-msix|open-iina',
     cookies_path = '~/.config/mpv/cookies/;~/.config/mpv-handler/cookies/',
 }
 options.read_options(o)
@@ -211,11 +212,14 @@ function myutils.setting_properties(properties, t)
                 -- see manual #lua-scripting-mp-set-property-native
                 msg.info(string.format(
                     'setting table %s=%s', prop, utils.to_string(t[prop])))
-                mp.set_property_native(prop, t[prop])
+                ret, err = mp.set_property_native(prop, t[prop])
             else
                 msg.info(string.format(
                     'setting %s=%s', prop, utils.to_string(t[prop])))
-                mp.set_property(prop, t[prop])
+                ret, err = mp.set_property(prop, t[prop])
+            end
+            if not ret then
+                msg.warn(string.format('setting %s ERROR: %s', prop, err))
             end
         end
     end
@@ -500,11 +504,93 @@ function Protocol_3.setting(t)
 end
 -- Protocol_3  -- }}}
 
+-- Protocol 4:
+--    mpv:///open?url=https%3A%2F%2Fgithub.com%2F&pip=1&flags=--profile%3D??'
+local Protocol_4 = {  -- {{{
+    ref = 'https://github.com/Baldomo/open-in-mpv',
+    pattern_url = '^mpv:///open%?(url=[.*]-[&]?.*)',
+}
+
+function Protocol_4.match(s)
+    return s:match(Protocol_4.pattern_url)
+end
+
+function Protocol_4.parse(s)
+    local t = {}
+    local query = string.match(s, Protocol_4.pattern_url)
+    local propertylist = mp.get_property_native('property-list', {})
+    if query then
+        for kv in string.gmatch(query, "([^&]+)") do
+            local k, v = string.match(kv, "([%w_]+)=(.*)")
+            if k == 'url' then
+                v = myutils.unescape_url(v)
+                t['stream-open-filename'] = v
+            elseif k == 'full_screen' and v == '1' then
+                t['fullscreen'] = 'yes'
+            elseif k == 'pip' and v == '1' then
+                -- "--ontop --no-border --autofit=384x216 --geometry=98%:98%"
+                t['ontop'] = 'yes'
+                t['border'] = 'no'
+                t['autofit'] = '384x216'
+                t['geometry'] = '+98%+98%'
+            elseif k == 'flags' then
+                v = string.gsub(v, '%%20[%-]+', '@')  -- ' --' -> '@'
+                msg.verbose('flags@=[['.. v ..']]')
+                for fvv in string.gmatch(v, "([^@]+)") do
+                    fvv = myutils.unescape_url(fvv)
+                    local f, vv = string.match(fvv, "[%-]+([%a%-]-)=(.*)")
+                    msg.verbose(string.format('%s => %s=[[%s]]', fvv, f, vv))
+                    if myutils.table_hasval(propertylist, f) then
+                        local oldvv = mp.get_property_native(f, nil)
+                        if type(oldvv) == 'table' then
+                            table.insert(oldvv, vv)
+                            vv = oldvv
+                        end
+                        t[f] = vv
+                        msg.verbose(string.format('Get %s=[[%s]]', f, utils.to_string(vv)))
+                    else
+                        msg.warn(string.format('unknown option %s, ignore it!', f, vv))
+                    end
+                end
+            else
+                if k ~= 'player' then
+                    msg.warn('Ignore params: ' .. kv)
+                end
+            end
+        end
+    end
+    if t['stream-open-filename'] == nil then
+        msg.warn("No url get!")
+        return {}
+    end
+    return t
+end
+
+function Protocol_4.setting(t)
+    local properties = {}
+    for p, v in pairs(t) do
+        if p == 'profile' then
+            local profiles = myutils.get_profile_names()
+            if myutils.table_hasval(profiles, v) then
+                msg.info("Applying profile: " .. v)
+                mp.commandv("apply-profile", v)
+            else
+                msg.warn(string.format('unknown profile %s, ignore it!', v))
+            end
+        else
+            table.insert(properties, p)
+        end
+    end
+    myutils.setting_properties(properties, t)
+end
+-- Protocol_4  -- }}}
+
 local available_protocols = {
     -- ['label'] = { match=function, parse=function, setting=function }
     ['play-base64'] = Protocol_1,
     ['url-opts'] = Protocol_2,
     ['play-msix'] = Protocol_3,
+    ['open-iina'] = Protocol_4,
 }
 
 -- start

@@ -23,7 +23,7 @@ local o = {
 
     API_key = "wrong key",
     --add a blacklist for error messages to not print to the OSD
-    blacklist = "",
+    blacklist = "",  -- no table support
 
     --also show warning messages on the OSD
     warnings = false,

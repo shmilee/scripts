@@ -115,3 +115,55 @@ mp.add_hook("on_load", 99, function ()
         show_priority(99, i, pro)
     end
 end)
+
+local myutils = {}
+function myutils.todigits(n, base)
+    local r = {}
+    base = base or 2
+    while n > 0 do
+        table.insert(r, 1, n % base )
+        n = math.floor(n / base)
+    end
+    return table.concat(r)
+end
+function myutils.path_rwxable(path, rwx, dir)
+    local info, err = utils.file_info(path)
+    rwx = rwx or 'rx'
+    local exist
+    if dir then
+        exist = info and info.is_dir
+    else
+        exist = info and info.is_file
+    end
+    if exist then
+        local able, mode = true, myutils.todigits(info.mode, 2)
+        msg.warn(string.format('%s mode: %s', path, mode))
+        for i = 1,#rwx do
+            local m = rwx:sub(i, i)
+            if m == 'r' and mode:sub(-9, -9) == '0' then
+                able = false
+            elseif m == 'w' and mode:sub(-8, -8) == '0' then
+                able = false
+            elseif m == 'x' and mode:sub(-7, -7) == '0' then
+                able = false
+            end
+        end
+        return able
+    end
+    return false
+end
+mp.add_hook("on_load", 111, function ()
+    msg.warn('=> priority=111! show file mode!')
+    local path = {
+        ['/usr/bin/ls'] = {'f', 'rx'},
+        ['/usr/bin/'] = {'d', 'rwx'},
+        ['/tmp/mpv-url.log'] = {'f', 'rw'},
+        ['/tmp/lost'] = {'f', 'rw'},
+        ['/tmp'] = {'d', 'wx'},
+    }
+    for p, i in pairs(path) do
+        local t, rwx = i[1], i[2]
+        msg.warn(string.format('%s %s %s: %s', t, p, rwx,
+                                myutils.path_rwxable(p, rwx, t == 'd')))
+    end
+end)

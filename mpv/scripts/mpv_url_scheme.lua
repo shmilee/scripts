@@ -24,10 +24,17 @@ local o = {
     hook_type = 'on_load',  -- see mp.add_hook(type,priority,fn)
     hook_priority = 8,      -- before ytdl_hook/on_load, priority=10
     -- labels of protocols
-    protocols = 'play-base64|url-opts|play-msix|open-iina',
+    protocols = 'play-base64|url-opts|play-msix|open-iina|open-m3u8',
     cookies_path = '~/.config/mpv/cookies/;~/.config/mpv-handler/cookies/',
+    ytdl_prefix = true,  -- prefixing http(s) URLs with 'ytdl://' or not
 }
 options.read_options(o)
+-- ytdl_prefix, boolean to string
+if o.ytdl_prefix then
+    o.ytdl_prefix = 'ytdl://'
+else
+    o.ytdl_prefix = ''
+end
 
 -- decode safe-base64-encoded-URL
 local base64 = {  --{{{
@@ -232,16 +239,15 @@ local Protocol_1 = {  -- {{{
     ref = 'https://github.com/akiirui/mpv-handler',
     pattern_url = '^mpv://play/([%w-_]+)[/]?[%?]?',
     pattern_param = '^mpv://play/[%w-_]+/%?(.*)',
+    match = function(self, s)
+        s = string.gsub(s, '^mpv%-debug://', 'mpv://')
+        if s:match(self.pattern_url) then
+            return true
+        else
+            return false
+        end
+    end,
 }
-
-function Protocol_1.match(s)
-    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
-    if s:match(Protocol_1.pattern_url) then
-        return true
-    else
-        return false
-    end
-end
 
 Protocol_1.param_handlers = {
     ['cookies'] = function(k, v, t)
@@ -293,19 +299,19 @@ Protocol_1.param_handlers = {
     end,
 }
 
-function Protocol_1.parse(s)
+function Protocol_1.parse(self, s)
     s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     local t = {}
-    local b64url = string.match(s, Protocol_1.pattern_url)
-    t['stream-open-filename'] = base64.safe_decode(b64url)
-    local query = string.match(s, Protocol_1.pattern_param)
+    local b64url = string.match(s, self.pattern_url)
+    t['stream-open-filename'] = o.ytdl_prefix .. base64.safe_decode(b64url)
+    local query = string.match(s, self.pattern_param)
     if query then
         t['ytdl-raw-options'] = mp.get_property_native('ytdl-raw-options', {})
         t['_ytdl_format_sort'] = {}
         t['sub-files'] = mp.get_property_native('sub-files', {})
         for kv in string.gmatch(query, "([^&]+)") do
             local k, v = string.match(kv, "([%w_]+)=(.*)")
-            local h = Protocol_1.param_handlers[k]
+            local h = self.param_handlers[k]
             if type(h) == 'function' then
                 h(k, v, t)
             end
@@ -328,7 +334,7 @@ function Protocol_1.parse(s)
     return t
 end
 
-function Protocol_1.setting(t)
+function Protocol_1.setting(self, t)
     if t['profile'] then
         -- ref: https://github.com/mpv-player/mpv/blob/master/player/lua/auto_profiles.lua
         msg.info("Applying profile: " .. t['profile'])
@@ -354,33 +360,31 @@ local Protocol_2 = {  -- {{{
            'https://github.com/LuckyPuppy514/Play-With-MPV/blob/04a6387b0a0875c36249d5f336a0f4db3a09cf8f/play-with-mpv.user.js#L220-L233'},
     pattern_url = '^mpv://%%22(http[s]?.-)%%22%%20[%-]*',
     pattern_options = '^mpv://%%22http[s]?.-%%22%%20%-%-(%a+.*)',
+    match = function(self, s)
+        s = string.gsub(s, '^mpv%-debug://', 'mpv://')
+        if s:match(self.pattern_url) then
+            return true
+        else
+            return false
+        end
+    end,
+    array_opt_handler = function(k, v, t, add_ks)
+        if add_ks then
+            k = k .. 's'
+        end
+        t[k] = t[k] or mp.get_property_native(k, {})
+        if not myutils.table_hasval(t[k], v) then
+            table.insert(t[k], v)
+        end
+    end,
 }
 
-function Protocol_2.match(s)
-    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
-    if s:match(Protocol_2.pattern_url) then
-        return true
-    else
-        return false
-    end
-end
-
-function Protocol_2.array_opt_handler(k, v, t, add_ks)
-    if add_ks then
-        k = k .. 's'
-    end
-    t[k] = t[k] or mp.get_property_native(k, {})
-    if not myutils.table_hasval(t[k], v) then
-        table.insert(t[k], v)
-    end
-end
-
-function Protocol_2.parse(s)
+function Protocol_2.parse(self, s)
     s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     local t = {}
-    local videourl = string.match(s, Protocol_2.pattern_url)
+    local videourl = string.match(s, self.pattern_url)
     t['stream-open-filename'] = myutils.unescape_url(videourl)
-    local opts = string.match(s, Protocol_2.pattern_options)
+    local opts = string.match(s, self.pattern_options)
     if opts then
         opts = string.gsub(opts, '%%20%-%-', '@')  -- separator ' --' -> '@'
         for kv in string.gmatch(opts, "([^@]+)") do
@@ -390,10 +394,10 @@ function Protocol_2.parse(s)
             v = string.gsub(string.gsub(v, '^%s+', ''), '%s+$', '')
             v = string.gsub(string.gsub(v, '^"', ''), '"$', '')
             if k == 'audio-file' or k == 'sub-file' then
-                Protocol_2.array_opt_handler(k, v, t, true)
+                self.array_opt_handler(k, v, t, true)
             elseif k == 'http-header-fields' then
                 for vv in string.gmatch(v, "([^,]+)") do  -- separated by ','
-                    Protocol_2.array_opt_handler(k, vv, t, false)
+                    self.array_opt_handler(k, vv, t, false)
                 end
             elseif k == 'ytdl-raw-options' then
                 t[k] = t[k] or mp.get_property_native(k, {})
@@ -449,7 +453,7 @@ function Protocol_2.parse(s)
     return t
 end
 
-function Protocol_2.setting(t)
+function Protocol_2.setting(self, t)
     myutils.setting_properties({
         'stream-open-filename', 'audio-files', 'sub-files',
         'force-media-title', 'start', 'http-header-fields', 'http-proxy',
@@ -464,24 +468,23 @@ end
 local Protocol_3 = {  -- {{{
     ref = 'https://github.com/SilverEzhik/mpv-msix',
     pattern_url = '^mpv://play%?(file=[.*]-[&]?.*)',
+    match = function(self, s)
+        s = string.gsub(s, '^mpv%-debug://', 'mpv://')
+        return s:match(self.pattern_url)
+    end,
 }
 
-function Protocol_3.match(s)
-    s = string.gsub(s, '^mpv%-debug://', 'mpv://')
-    return s:match(Protocol_3.pattern_url)
-end
-
-function Protocol_3.parse(s)
+function Protocol_3.parse(self, s)
     s = string.gsub(s, '^mpv%-debug://', 'mpv://')
     local t = {}
-    local query = string.match(s, Protocol_3.pattern_url)
+    local query = string.match(s, self.pattern_url)
     if query then
         -- read-only https://mpv.io/manual/master/#command-interface-playlist
         t['playlist'] = {}
         for kv in string.gmatch(query, "([^&]+)") do
             local k, v = string.match(kv, "([%w_]+)=(.*)")
             if k == 'file' then
-                v = myutils.unescape_url(v)
+                v = o.ytdl_prefix .. myutils.unescape_url(v)
                 table.insert(t['playlist'], v)
             else
                 msg.warn('Ignore option of mpv-launcher: ' .. kv)
@@ -494,7 +497,7 @@ function Protocol_3.parse(s)
     return t
 end
 
-function Protocol_3.setting(t)
+function Protocol_3.setting(self, t)
     myutils.setting_properties({'stream-open-filename'}, t)
     if #t['playlist'] > 0 then
         -- list file data in memory
@@ -505,25 +508,24 @@ end
 -- Protocol_3  -- }}}
 
 -- Protocol 4:
---    mpv:///open?url=https%3A%2F%2Fgithub.com%2F&pip=1&flags=--profile%3D??'
+--    mpv:///open?url=https%3A%2F%2Fgithub.com%2F&pip=1&flags=--profile%3Dxxx'
 local Protocol_4 = {  -- {{{
     ref = 'https://github.com/Baldomo/open-in-mpv',
     pattern_url = '^mpv:///open%?(url=[.*]-[&]?.*)',
+    match = function(self, s)
+        return s:match(self.pattern_url)
+    end,
 }
 
-function Protocol_4.match(s)
-    return s:match(Protocol_4.pattern_url)
-end
-
-function Protocol_4.parse(s)
+function Protocol_4.parse(self, s)
     local t = {}
-    local query = string.match(s, Protocol_4.pattern_url)
+    local query = string.match(s, self.pattern_url)
     local propertylist = mp.get_property_native('property-list', {})
     if query then
         for kv in string.gmatch(query, "([^&]+)") do
             local k, v = string.match(kv, "([%w_]+)=(.*)")
             if k == 'url' then
-                v = myutils.unescape_url(v)
+                v = o.ytdl_prefix .. myutils.unescape_url(v)
                 t['stream-open-filename'] = v
             elseif k == 'full_screen' and v == '1' then
                 t['fullscreen'] = 'yes'
@@ -566,7 +568,7 @@ function Protocol_4.parse(s)
     return t
 end
 
-function Protocol_4.setting(t)
+function Protocol_4.setting(self, t)
     local properties = {}
     for p, v in pairs(t) do
         if p == 'profile' then
@@ -585,40 +587,63 @@ function Protocol_4.setting(t)
 end
 -- Protocol_4  -- }}}
 
+-- Protocol 5:
+--    mpv://https://url.com/path/to/video.m3u8
+local Protocol_5 = {  -- {{{
+    pattern_url = '^mpv://(http[s]?://.*%.m3u8)$',
+    match = function(self, s)
+        return s:match(self.pattern_url)
+    end,
+    parse = function(self, s)
+        local t = {}
+        local url = myutils.unescape_url(s:match(self.pattern_url))
+        t['stream-open-filename'] = url
+        local referer = string.match(url, '(http[s]?://[%w%-%._]-)/')
+        if referer then
+            local k = 'http-header-fields'
+            t[k] = mp.get_property_native(k, {})
+            table.insert(t[k], 'referer:' .. referer)
+        end
+        return t
+    end,
+    setting = function(self, t)
+        myutils.setting_properties({
+            'stream-open-filename', 'http-header-fields'
+        }, t)
+    end,
+}
+-- Protocol_5  -- }}}
+
 local available_protocols = {
-    -- ['label'] = { match=function, parse=function, setting=function }
+    -- ['label'] = { match=function, parse=function, setting=function, ... }
     ['play-base64'] = Protocol_1,
     ['url-opts'] = Protocol_2,
     ['play-msix'] = Protocol_3,
     ['open-iina'] = Protocol_4,
+    ['open-m3u8'] = Protocol_5,
 }
 
 -- start
 if o.enable then
-    local registered_protocols = {
-        -- { label=name, match=function, parse=function, setting=function }
-    }
+    local registered_protocols = {}  -- labels
     --split the o.protocols labels
     for label in string.gmatch(o.protocols, "([^|]+)") do
         local proto = available_protocols[label]
         if proto ~= nil then
             msg.verbose('-> adding mpv_url_scheme: [[' .. label .. ']] ...')
-            table.insert(registered_protocols, {
-                label=label, match=proto['match'],
-                parse=proto['parse'], setting=proto['setting'],
-            })
+            table.insert(registered_protocols, label)
         else
             msg.warn('Invalid mpv_url_scheme label: ' .. label)
         end
     end
     mp.add_hook(o.hook_type, o.hook_priority, function()
         local url = mp.get_property("stream-open-filename", nil) or mp.get_property("path", "")
-        local label, parse, setting
-        for i, p in pairs(registered_protocols) do
-            if type(p.match) == 'function' and p.match(url) then
-                msg.info(string.format('Using %s to handle %s', p.label, url))
-                local t = p.parse(url)
-                p.setting(t)
+        for _, label in pairs(registered_protocols) do
+            local proto = available_protocols[label]
+            if type(proto.match) == 'function' and proto:match(url) then
+                msg.info(string.format('Using %s to handle %s', label, url))
+                local t = proto:parse(url)
+                proto:setting(t)
                 break
             end
         end

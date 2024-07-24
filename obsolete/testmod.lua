@@ -1,6 +1,9 @@
-local mod = {}
-
-mod.a = 8
+local mod = {
+    a = 8,
+    show = function(self, i)
+        print('show: a=', self.a, 'and i=', i)
+    end,
+}
 
 function mod.fun1(i)
     print(tostring(mod), 'mod fun1: i=', i, 'a=', mod.a)
@@ -24,5 +27,7 @@ function mod.do_all(i)
     mod:fun3(i)
     mod:fun4(i)
 end
+
+mod:show(999)
 
 return mod

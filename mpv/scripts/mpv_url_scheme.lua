@@ -25,7 +25,7 @@ local o = {
     hook_priority = 8,      -- before ytdl_hook/on_load, priority=10
     -- labels of protocols
     protocols = 'play-base64|url-opts|play-msix|open-iina|open-m3u8',
-    cookies_path = '~/.config/mpv/cookies/;~/.config/mpv-handler/cookies/',
+    cookies_path = '~~home/cookies/;~/.config/mpv-handler/cookies/',
     ytdl_prefix = true,  -- prefixing http(s) URLs with 'ytdl://' or not
 }
 options.read_options(o)
@@ -200,8 +200,8 @@ local myutils = {
 -- The dpaths can be splited by ';', for example o.cookies_path.
 function myutils.search_file(dpaths, filename)
     for d in string.gmatch(dpaths, "([^;]+)") do
-        if d:match('^~/') then
-            d = string.gsub(d, '^~', os.getenv('HOME'))
+        if d:match('^~') then
+            d = mp.command_native({"expand-path", d})
         end
         local file = utils.join_path(d, filename)
         msg.verbose('searching file: '.. file)

@@ -6,8 +6,8 @@
 # Contributor: Paul Mattal <paul@archlinux.org>
 
 pkgname=ffmpeg5.1
-pkgver=5.1.4
-pkgrel=3
+pkgver=5.1.6
+pkgrel=1
 pkgdesc='Complete solution to record, convert and stream audio and video, add hevc/vp8/vp9/opus support'
 arch=(x86_64)
 url=https://ffmpeg.org/
@@ -111,7 +111,7 @@ source=(
   010-add-av_stream_get_first_dts-for-chromium.patch
   050-add-flv_hevc-support.patch
 )
-b2sums=('eb7e7389e9ad2d9bdcaa7ab3aef1f3db2c1a4a59c84f8c85080b04a72a5404c12500a01f04d9a1d815e1921586c527ac0689d2d5fd91afb189a47b16b68deb91'
+b2sums=('a0ef0af75179963574d074694662ec1efc4e13043da3d9a5f3ffbb6b4e0491e1cfc9ddebec8bbeda1c69420b514249485c1df4333f0d5dba35291fdf0e059829'
         '555274228e09a233d92beb365d413ff5c718a782008075552cafb2130a3783cf976b51dfe4513c15777fb6e8397a34122d475080f2c4483e8feea5c0d878e6de'
         '2006884610226b8239b7cb837df9c46aa61bf2400f54ac5caae4b11665b663dce78defbc5f24f3c3074c857c327f991fc250d01fc91f049f64914d847b36c744')
 #validpgpkeys=(DD1EC9E8DE085C629B3E1846B18E8928B3948D64) # Michael Niedermayer <michael@niedermayer.cc>

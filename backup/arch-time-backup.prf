@@ -1,0 +1,161 @@
+## Profile for arch-time-backup.sh
+## Set Options for https://github.com/laurent22/rsync-time-backup
+
+
+## Setting ssh port, private key for SOURCE or DESTINATION
+#SSH_PORT=22
+#SSH_KEY="${HOME}/.ssh/id_rsa"
+
+
+## Setting source, destination folder
+SOURCE="/"
+DESTINATION="/media/BackArch/atb-slim-backup"
+
+
+## Set rsync flags to be used for backup, for --rsync-set-flags
+## Use rsync_tmbackup.sh --rsync-get-flags to show the Default flags
+##   --one-file-system, avoid crossing filesystem boundaries,
+##                      prevent backing up any mount point in the hierarchy
+##   --compress, compress file data, when over SSH
+##   --info=help, show more FLAGS for --info=FLAGS
+RSYNC_FLAGS="-aAX --info=progress2 -D --numeric-ids --links --hard-links --itemize-changes --times --recursive --perms --owner --group --stats --human-readable"
+
+
+## Set the expiration strategy. Default: "1:1 30:7 365:30"
+#EXP_STATEGY="1:1 30:7 365:30"
+
+
+## Setting Exclude file by all content between THE_EXCLUDE_LIST_BEGIN
+## and THE_EXCLUDE_LIST_END, also including comments
+## THE_EXCLUDE_LIST can also be used with `rsync --filter`.
+## Be carefully with each pattern(rule) and their order, see more:
+##   1. https://github.com/laurent22/rsync-time-backup/issues/183
+##      https://github.com/laurent22/rsync-time-backup/issues/183#issuecomment-639091776
+##   2. https://stackoverflow.com/questions/35364075/using-rsync-filter-to-include-exclude-files
+##   3. https://wiki.archlinux.org/title/Rsync#Advanced_usage_of_filter_rules
+##   4. https://web.archive.org/web/20230126121643/https://sites.google.com/site/rsync2u/home/rsync-tutorial/the-exclude-from-option
+
+THE_EXCLUDE_LIST_BEGIN
+
+# ref: https://wiki.archlinux.org/title/Rsync#Full_system_backup
+- /dev/*
+- /proc/*
+- /sys/*
+- /tmp/*
+- /run/*
+- /mnt/*
+- /media/*
+- /lost+found/
+
+# under /boot
+- /boot/vmlinuz-*
+- /boot/initramfs-*.img
+- /boot/intel-ucode.img
+- /boot/EFI/APPLE/
+- /boot/archboot/*
+
+# under /etc
+- /etc/**.pacnew
++ /etc/
+
+# exclude opt, usr, (packages can be reinstalled)
+# only scripts in /usr/local/bin
+# be careful with `rsync --recursive`
+# ref: https://stackoverflow.com/questions/35364075/
+- /opt/*
++ /usr/
++ /usr/local/
++ /usr/local/bin/
+- /usr/local/*
++ /usr/bin/
+- /usr/bin/*
++ /usr/lib/
+- /usr/lib/*
+- /usr/*
+
+# under /root
+- /root/*
+
+# under /var, only pacman database
+# get installed packages list from backup data by
+#   pacman -Qqe -b DESTINATION/DATEXXX/var/lib/pacman/
++ /var/
++ /var/log/
++ /var/log/pacman.log
+- /var/log/*
++ /var/lib/
++ /var/lib/pacman/
++ /var/lib/pacman/local/
+- /var/lib/pacman/*
+- /var/lib/*
+- /var/*
+
+# under /home/USER, dotfiles
++ /home/
++ /home/shmilee/
+
++ /home/shmilee/.aria2/
++ /home/shmilee/.filezilla/
++ /home/shmilee/.Gdpy3/
++ /home/shmilee/.gnupg/
+- /home/shmilee/.goldendict/index/
++ /home/shmilee/.goldendict/
++ /home/shmilee/.icons/
++ /home/shmilee/.ipython/
+- /home/shmilee/.kodi/userdata/Thumbnails/*
++ /home/shmilee/.kodi/
++ /home/shmilee/.Mathematica/
++ /home/shmilee/.matlab/
++ /home/shmilee/.mlterm/
++ /home/shmilee/.mozilla/
++ /home/shmilee/.oh-my-zsh/
++ /home/shmilee/.Osmos/
++ /home/shmilee/.pip/
++ /home/shmilee/.sogouinput/
++ /home/shmilee/.ssh/
++ /home/shmilee/.terminfo/
+- /home/shmilee/.unison/*.log
++ /home/shmilee/.unison/
++ /home/shmilee/.vim/
+- /home/shmilee/.Zotero-data/*.bak
++ /home/shmilee/.zotero/
++ /home/shmilee/.Zotero-data/
+
++ /home/shmilee/.ECDATA/
++ /home/shmilee/.ECDATA/*.deb
+- /home/shmilee/.ECDATA/*
+
+# only keep wallpaper, exclude others in .cache/
++ /home/shmilee/.cache/
++ /home/shmilee/.cache/wallpaper-360chrome/
++ /home/shmilee/.cache/wallpaper-baidu/
++ /home/shmilee/.cache/wallpaper-bing/
++ /home/shmilee/.cache/wallpaper-lovebizhi/
++ /home/shmilee/.cache/wallpaper-nationalgeographic/
++ /home/shmilee/.cache/wallpaper-spotlight/
++ /home/shmilee/.cache/wallpaper-wallhaven/
+- /home/shmilee/.cache/*
+
+# exclude big size dirs, keep others in .config/
+- /home/shmilee/.config/dinglive/
+- /home/shmilee/.config/DingTalk/
+- /home/shmilee/.config/GIMP/
+- /home/shmilee/.config/google-chrome/
+- /home/shmilee/.config/LiteLoaderQQNT/
+- /home/shmilee/.config/LiteLoaderQQNT-NapCat/
+- /home/shmilee/.config/QQ/
+- /home/shmilee/.config/weixin/
++ /home/shmilee/.config/
+
+# exclude big size dirs, keep others in .local/
+- /home/shmilee/.local/share/wemeetapp/
+- /home/shmilee/.local/matlab2014b/
+- /home/shmilee/.local/share/zeitgeist/
+- /home/shmilee/.local/share/Kingsoft/office6/data/backup/
+- /home/shmilee/.local/share/QtProject/
++ /home/shmilee/.local/
+
+- /home/shmilee/*
+- /home/*
+
+THE_EXCLUDE_LIST_END

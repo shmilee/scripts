@@ -1,4 +1,4 @@
-## Profile for arch-time-backup.sh
+## Example Profile for arch-time-backup.sh
 ## Set Options for https://github.com/laurent22/rsync-time-backup
 
 
@@ -12,8 +12,10 @@ SOURCE="/"
 DESTINATION="/media/BackArch/atb-slim-backup"
 
 
-## Set rsync flags to be used for backup, for --rsync-set-flags
+## Set rsync flags to be used for backup,
+## Used by rsync_tmbackup.sh --rsync-set-flags
 ## Use rsync_tmbackup.sh --rsync-get-flags to show the Default flags
+## Some rsync flags:
 ##   --one-file-system, avoid crossing filesystem boundaries,
 ##                      prevent backing up any mount point in the hierarchy
 ##   --compress, compress file data, when over SSH

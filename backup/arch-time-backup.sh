@@ -20,7 +20,7 @@ else
 fi
 
 read_profile() {
-    local lineN0=$(awk '/THE_EXCLUDE_LIST_BEGIN/{print NR;exit}' "${PROFILE}")
+    local lineN0=$(awk '/^#.*THE_EXCLUDE_LIST_BEGIN/{print NR;exit}' "${PROFILE}")
     local lineN1=$(awk '/^[ ]*THE_EXCLUDE_LIST_BEGIN[ ]*$/{print NR;exit}' "${PROFILE}")
     local lineN2=$(awk '/^[ ]*THE_EXCLUDE_LIST_END[ ]*$/{print NR;exit}' "${PROFILE}")
     if [ -z "$lineN0" -o -z "$lineN1" -o -z "$lineN2" ]; then

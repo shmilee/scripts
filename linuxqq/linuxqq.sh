@@ -16,9 +16,5 @@ fi
 # set default LITELOADERQQNT_PROFILE for LiteLoaderQQNT data plugins
 LITELOADERQQNT_PROFILE=${LITELOADERQQNT_PROFILE:-~/.config/LiteLoaderQQNT}
 export LITELOADERQQNT_PROFILE
-if [ ! -d "${LITELOADERQQNT_PROFILE}/plugins" ]; then
-    # fix no such directory ... plugins
-    mkdir -pv "${LITELOADERQQNT_PROFILE}/plugins"
-fi
 
 exec /opt/QQ/qq ${QQ_USER_FLAGS[@]} "$@"

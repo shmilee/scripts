@@ -12,6 +12,11 @@ if (require("fs").existsSync(liteloader_dir)) {
         console.warn('!!!!! LITELOADERQQNT_PROFILE not set!');
     }
     require(liteloader_dir);
+} else {
+    // default QQ
+    require(require("path").join(process.resourcesPath, "app/app_launcher/index.js"));
+    setTimeout(() => {
+        // qqnt.buildVersion >= 28060
+        global.launcher.installPathPkgJson.main = "./application/app_launcher/index.js";
+    }, 0);
 }
-
-require('./launcher.node').load('external_index', module);

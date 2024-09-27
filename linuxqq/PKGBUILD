@@ -2,14 +2,14 @@
 # Maintainer: Purofle <purofle@gmail.com>
 # Contributor: Integral <integral@member.fsf.org>
 
-_LiteLoader_VER=1.2.1
+_LiteLoader_VER=1.2.2
 #PKGEXT='.pkg.tar'
 
 pkgbase=linuxqq
 pkgname=("$pkgbase" "$pkgbase-liteloader")
-pkgver=3.2.12_240819
+pkgver=3.2.12_28327
 pkgrel=1
-epoch=4
+epoch=5
 pkgdesc="New Linux QQ based on Electron"
 arch=('x86_64')  # 'aarch64' 'loong64')
 url="https://im.qq.com/linuxqq"
@@ -20,50 +20,51 @@ optdepends=(
     'libappindicator-gtk3: Allow QQ to extend a menu via Ayatana indicators in Unity, KDE or Systray (GTK+ 3 library).'
     'linuxqq-liteloader: LiteLoaderQQNT plugins support'
 )
-source_x86_64=("https://dldir1.qq.com/qqfile/qq/QQNT/Linux/QQ_${pkgver}_amd64_01.deb")
-#source_aarch64=("https://dldir1.qq.com/qqfile/qq/QQNT/Linux/QQ_${pkgver}_arm64_01.deb")
-#source_loong64=("https://dldir1.qq.com/qqfile/qq/QQNT/Linux/QQ_${pkgver}_loongarch64_01.deb")
+source_x86_64=("https://dldir1.qq.com/qqfile/qq/QQNT/f60e8252/linuxqq_${pkgver/_/-}_amd64.deb")
+#source_aarch64=("https://dldir1.qq.com/qqfile/qq/QQNT/f60e8252/linuxqq_${pkgver/_/-}_arm64.deb")
+#source_loong64=("https://dldir1.qq.com/qqfile/qq/QQNT/f60e8252/linuxqq_${pkgver/_/-}_loongarch64.deb")
 source=(
     "linuxqq.sh"
-    "app_launcher-index.js"
+    "app_launcher-index-lite.js"
     "LiteLoaderQQNT-${_LiteLoader_VER}.zip::https://github.com/LiteLoaderQQNT/LiteLoaderQQNT/releases/download/${_LiteLoader_VER}/LiteLoaderQQNT.zip"
-    "LiteLoaderQQNT-application-${_LiteLoader_VER}.tar.gz"
 )
 noextract=("LiteLoaderQQNT-${_LiteLoader_VER}.zip")
-sha512sums=('fae490093a36db6babdfcb05d91554158180a5b2781e28c4eb94c9d35b9613ae99a9ab7b6a591cbd0dc7ea23aadd47a0a6799b9723c805cc043eeb417771ca0b'
-            '2bfa838b22e88d51f2c8458405939088550220043ed62d48ab22388971f8f2e558bb247dca7fcaaacfe281a2b0c30bc0ac372bece4dbdb7122eb2f9d1689e105'
-            'a0a179942f3b6ee8ed1c8388f6a5234e2f84b3340c94ddc91b497dd7f12cc9cac80ae250c62e21bdaab9e52cfecaa6c78b13b6849ddc5ff7db65efe852d753d0'
-            '2c313908b83a023602e21696b516116892b377a7dee6a8d2b9bc12ec6ace78ca9e51bcc6968b7322eb60d3003cf1306fd27a8c5182b9e35a4f00691cea4f113b')
-sha512sums_x86_64=('1a171d33cbab2edfda600b8fb1923bb38ecdb2afadc3a2dffc11d4c0762e4a8b17ed1303dac67f183ea15ac689c7a4bbe75a8c8dfd457dfd8d0686b823e3ba0a')
-#sha512sums_aarch64=('970835669579bd1483a1ce9b2aea87732b099678ffe2d7975d9cf97c47735ebf0f8e772de0e9d397145b3cfd9eb00e0378b78cd077eded5de6c99153d291a548')
-#sha512sums_loong64=('c79380ed193703a5d2e3dec48375f183c9caa0e0b4f7ffc1ba4d1fb53e7998d8254c5bc234803233a90b2e806aeb15e9ece461d69c3a4aac4e61f8c1606d829c')
+sha512sums=('0ceec5e467471e6e4a654254ef4e9ea22bdfa6c6f53820ce83fc2ae2a55cd5347d16cd47b868f6681e39d472b71ac0f15c32a36b82425a3a52da0d363c4b6e0e'
+            '991d7b89511f3023cf96d967e475e8a6deb1ca3ca079c7cbf3455be03e9c89adb723956ad05129059f8093fb252718478e5faec3ee1590487f32ba8160dfde2c'
+            '4a36f5906f17eb2139536a2ce97a31da9c0509309665e35c1f4e28bb93984a7a24bbf5f17aa754629b38eb430eacf6d3eb9dc9a7ad9f6dd24deb1917f926f6da')
+sha512sums_x86_64=('5702f246cf896360dceac9d5b49a5289656e6c834e9835c5eac4025eb923655a1abe8e7eeca510a3f0f0069e634cb5d1a3a009b38c261cb0c7c941c78b152201')
+#sha512sums_aarch64=('122898bee3b3d986ef75e55b359b5eb359caf0e76fe06dfb8fe19deac6b7a3a494be0444ce03bd5c5020f0fd052a166e39acb074969217f9429b3481cc3b97de')
+#sha512sums_loong64=('64a0e6b27df4d665a955365901f41a4d7d67e055e4421af96e134a9c2ca439f466731b001c3a18f0a3a2e5669b5d3970dbdc12a756fa453f18d5a335cf0b537c')
 options=('!strip' '!debug')
 
 package_linuxqq() {
-	echo "  -> Extracting the data.tar.xz..."
-	bsdtar -xf data.tar.xz -C "${pkgdir}/"
-	rm -f "${pkgdir}/opt/QQ/resources/app/libssh2.so.1" # Temporary Fix
+    echo "  -> Extracting the data.tar.xz..."
+    bsdtar -xf data.tar.xz -C "${pkgdir}/"
+    rm -f "${pkgdir}/opt/QQ/resources/app/libssh2.so.1" # Temporary Fix
 
-	echo "  -> Installing..."
-	# Launcher
-	install -Dm755 "linuxqq.sh" "${pkgdir}/usr/bin/linuxqq"
+    echo "  -> Installing..."
+    # Launcher
+    install -Dm755 "linuxqq.sh" "${pkgdir}/usr/bin/linuxqq"
 
-	# Launcher Fix
-	sed -i '3s!/opt/QQ/qq!linuxqq!' "${pkgdir}/usr/share/applications/qq.desktop"
+    # Launcher Fix
+    sed -i '3s!/opt/QQ/qq!linuxqq!' "${pkgdir}/usr/share/applications/qq.desktop"
 
-	# support for LiteLoaderQQNT
-	# https://liteloaderqqnt.github.io/guide/install.html
-	install -Dm644 "app_launcher-index.js" "${pkgdir}/opt/QQ/resources/app/app_launcher/index.js"
+    # support for LiteLoaderQQNT
+    # https://liteloaderqqnt.github.io/guide/install.html
+    install -Dm644 "app_launcher-index-lite.js" "${pkgdir}/opt/QQ/resources/app/app_launcher/index-lite.js"
+    sed -e 's|"main":.*js",|"main": "./app_launcher/index-lite.js",|' \
+        -i "${pkgdir}/opt/QQ/resources/app/package.json"
 
-	# Icon Fix
-	sed -i '6s!/usr/share/icons/hicolor/512x512/apps/qq.png!qq!' "${pkgdir}/usr/share/applications/qq.desktop"
+    # Icon Fix
+    sed -i '6s!/usr/share/icons/hicolor/512x512/apps/qq.png!qq!' "${pkgdir}/usr/share/applications/qq.desktop"
 
-	# License
-	install -Dm644 "${pkgdir}/opt/QQ/LICENSE.electron.txt" -t "${pkgdir}/usr/share/licenses/${pkgname}/"
-	install -Dm644 "${pkgdir}/opt/QQ/LICENSES.chromium.html" -t "${pkgdir}/usr/share/licenses/${pkgname}/"
+    # License
+    install -Dm644 "${pkgdir}/opt/QQ/LICENSE.electron.txt" -t "${pkgdir}/usr/share/licenses/${pkgname}/"
+    install -Dm644 "${pkgdir}/opt/QQ/LICENSES.chromium.html" -t "${pkgdir}/usr/share/licenses/${pkgname}/"
 
-	# Temporary Solution: Remove libvips which comes from package "linuxqq" itself
-	rm -f "${pkgdir}/opt/QQ/resources/app/sharp-lib/libvips-cpp.so.42"
+    # Temporary Solution: Remove libvips which comes from package "linuxqq" itself
+    # 28327: use libvips from QQ
+    #rm -f "${pkgdir}/opt/QQ/resources/app/sharp-lib/libvips-cpp.so.42"
 }
 
 package_linuxqq-liteloader() {
@@ -78,6 +79,4 @@ package_linuxqq-liteloader() {
     # ref https://liteloaderqqnt.github.io/guide/install.html
     install -dm755 "${pkgdir}/opt/QQ/resources/app/LiteLoaderQQNT"
     unzip "LiteLoaderQQNT-${_LiteLoader_VER}.zip" -d "${pkgdir}/opt/QQ/resources/app/LiteLoaderQQNT"
-    install -dm755 "${pkgdir}/opt/QQ/resources/app/application"
-    install -m644 -t "${pkgdir}/opt/QQ/resources/app/application" application/*.js
 }

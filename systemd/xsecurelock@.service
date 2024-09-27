@@ -1,0 +1,24 @@
+# path: /etc/systemd/system/xsecurelock@.service
+# need: XAUTHORITY=/run/user/%i/%i-Xauthority
+# cmd: systemctl enable xsecurelock@1000
+
+[Unit]
+Description=Lock screen using xsecurelock for UID %i, before suspend/sleep
+Before=sleep.target
+After=display-manager.service user@%i.service
+
+[Service]
+Type=simple
+User=%i
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/run/user/%i/%i-Xauthority
+Environment=XSECURELOCK_FONT="LXGW Neo XiHei Screen"
+Environment=XSECURELOCK_SHOW_DATETIME=1
+Environment=XSECURELOCK_DATETIME_FORMAT="%%c"
+Environment=XSECURELOCK_PASSWORD_PROMPT=time_hex
+Environment=XSECURELOCK_NO_COMPOSITE=1
+Environment=LC_ALL=zh_CN.UTF-8
+ExecStart=/usr/bin/xsecurelock
+
+[Install]
+WantedBy=sleep.target

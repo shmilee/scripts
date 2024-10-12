@@ -1,18 +1,9 @@
 "==============================
-" my vim configure
+" My vim/neovim configure
 "==============================
 set nu! "显示行号
 set fenc=utf-8 "设定默认解码
 set fencs=utf-8,usc-bom,euc-jp,gb18030,gbk,gb2312,cp936
-if has('nvim') 
-    if exists(':GuiFont')
-        " Use GuiFont! to ignore font errors
-        GuiFont! Monaco:h10 "设定字体
-    endif
-else
-    set guifont=Monaco\ 10 "设定字体
-endif
-set guifontwide=Consolas-with-Yahei\ 10 "中文字体
 set nocompatible "不要使用vi的键盘模式,而是vim自己的
 set ruler "开启右下角光标位置显示
 set cursorline "高亮光标所在行
@@ -29,6 +20,22 @@ set tabstop=4 "制表符的宽度,等于几个空格
 "set softtabstop=4 "按下tab键，插入的是空格和tab制表符的混合
 "set cindent "使用C语言的缩进方式,使用nocindent取消设置
 
+if has('nvim')
+    if exists(':GuiFont')
+        "Use GuiFont! to ignore font errors
+        GuiFont! Monaco:h10 "设定字体
+    endif
+    set guifontwide=Consolas-with-Yahei\ 10 "中文字体
+    "选中即复制 selection, add keymaps
+    set clipboard+=unnamedplus
+    "lua module path .config/nvim/lua/keymaps.lua
+    "for 'lua xxxx --comments' only can comment by --
+    lua require('keymaps')
+else
+    set guifont=Monaco\ 10 "设定字体
+    set guifontwide=Consolas-with-Yahei\ 10 "中文字体
+endif
+
 " GUI 标题 title
 " https://vimhelp.org/cmdline.txt.html#filename-modifiers
 if has("gui_running")
@@ -40,7 +47,7 @@ if has("gui_running")
     "set titlestring=%t%(\ (%{expand(\"%:~:h\")})%)\ -\ %{v:progname}
 endif
 
-"配置主题 /usr/share/vim/vim82/colors/
+"配置主题 /usr/share/vim/vim91/colors/
 if has("gui_running")
     colorscheme desert "lucius
 "else
@@ -130,29 +137,3 @@ inoremap <expr> <Down>     pumvisible() ? "\<C-n>" : "\<Down>"
 inoremap <expr> <Up>       pumvisible() ? "\<C-p>" : "\<Up>"
 inoremap <expr> <PageDown> pumvisible() ? "\<PageDown>\<C-p>\<C-n>" : "\<PageDown>"
 inoremap <expr> <PageUp>   pumvisible() ? "\<PageUp>\<C-p>\<C-n>" : "\<PageUp>"
-
-""youcompleteme  默认tab  s-tab 和自动补全冲突
-""let g:ycm_server_python_interpreter='/usr/bin/python'
-"let g:ycm_global_ycm_extra_conf = '/usr/share/vim/vimfiles/third_party/ycmd/cpp/ycm/.ycm_extra_conf.py'
-""let g:ycm_key_list_select_completion=['<c-n>']
-"let g:ycm_key_list_select_completion = ['<Down>']
-""let g:ycm_key_list_previous_completion=['<c-p>']
-"let g:ycm_key_list_previous_completion = ['<Up>']
-"let g:ycm_confirm_extra_conf=0 "关闭加载.ycm_extra_conf.py提示
-"
-"let g:ycm_collect_identifiers_from_tags_files=1	" 开启 YCM 基于标签引擎
-"let g:ycm_min_num_of_chars_for_completion=2	" 从第2个键入字符就开始罗列匹配项
-"let g:ycm_cache_omnifunc=0	" 禁止缓存匹配项,每次都重新生成匹配项
-"let g:ycm_seed_identifiers_with_syntax=1	" 语法关键字补全
-"nnoremap <F5> :YcmForceCompileAndDiagnostics<CR>	"force recomile with syntastic
-""nnoremap <leader>lo :lopen<CR>	"open locationlist
-""nnoremap <leader>lc :lclose<CR>	"close locationlist
-"inoremap <leader><leader> <C-x><C-o>
-""在注释输入中也能补全
-"let g:ycm_complete_in_comments = 1
-""在字符串输入中也能补全
-"let g:ycm_complete_in_strings = 1
-""注释和字符串中的文字也会被收入补全
-"let g:ycm_collect_identifiers_from_comments_and_strings = 0
-"
-"nnoremap <leader>jd :YcmCompleter GoToDefinitionElseDeclaration<CR> "跳转到定义处

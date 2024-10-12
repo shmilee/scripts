@@ -11,7 +11,8 @@ set hlsearch "搜索关键词高亮
 set confirm "在处理未保存或只读文件的时候,弹出确认
 "set foldlevelstart=99 "文件打开后所有折叠都自动展开
 set foldmethod=marker "代码折叠
-set backup "修改文件时备份
+set nobackup "修改文件时，无备份
+set noundofile "不保存操作记录
 set noswapfile "不要缓存
 set autoindent "自动缩进,继承前一行的缩进方式,特别适用于多行注释
 set expandtab "在缩进和遇到Tab键时使用空格 替代;使用noexpandtab取消设置

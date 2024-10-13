@@ -21,6 +21,15 @@ set tabstop=4 "制表符的宽度,等于几个空格
 "set softtabstop=4 "按下tab键，插入的是空格和tab制表符的混合
 "set cindent "使用C语言的缩进方式,使用nocindent取消设置
 
+" https://www.reddit.com/r/neovim/comments/f0qx2y/
+" trigger `autoread` when files changes on disk
+set autoread
+autocmd FocusGained,BufEnter,CursorHold,CursorHoldI * if mode() != 'c' | checktime | endif
+" notification after file change
+autocmd FileChangedShellPost *
+  \ echohl WarningMsg | echo "File changed on disk. Buffer reloaded." | echohl None
+
+
 if has('nvim')
     if exists(':GuiFont')
         "Use GuiFont! to ignore font errors

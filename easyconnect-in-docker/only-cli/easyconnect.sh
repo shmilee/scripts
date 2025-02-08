@@ -35,18 +35,20 @@ run_cmd() {
 }
 
 ## run CLI EC cmd easyconn
-ALL_OFF="\e[1;0m"
-BOLD="\e[1;1m"
-GREEN="${BOLD}\e[1;32m"
-BLUE="${BOLD}\e[1;34m"
-YELLOW="${BOLD}\e[1;33m"
-RED="${BOLD}\e[1;31m"
+ALL_OFF="\001\e[1;0m\002"
+BOLD="\001\e[1;1m\002"
+GREEN="\001${BOLD}\e[1;32m\002"
+BLUE="\001${BOLD}\e[1;34m\002"
+YELLOW="\001${BOLD}\e[1;33m\002"
+RED="\001${BOLD}\e[1;31m\002"
 readonly ALL_OFF BOLD GREEN BLUE YELLOW RED
 export TZ=Asia/Shanghai
 export HISTCONTROL=ignoredups:erasedups
 export HISTIGNORE="ls:history"
 export HISTSIZE=300
+export HISTFILESIZE=3000
 export HISTTIMEFORMAT="%F %T "
+export HISTFILE="${EasyConnectDir}/bash_history"
 msg() {
     local mesg=$1; shift
     printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
@@ -86,6 +88,7 @@ start_easyconn() {
 
     local CMD=${ResourcesDir}/bin/easyconn
     local cmd='login'
+    history -r  # read the history file
     while true; do
         if [ "$cmd" = 'login' ]; then
             msg "Run CMD: $CMD login $params"
@@ -113,8 +116,9 @@ start_easyconn() {
         fi
         history -s $cmd
         prompt1
-        read -e -p "$(prompt2 "Enter login/logout/mylogin/bash/exit/??")" cmd
+        read -p "$(prompt2 'Enter login/logout/mylogin/bash/exit/??')" -e cmd
     done
+    history -w  # write to the history file
 }
 
 ## from github.com/Hagb/docker-easyconnect/ start.sh

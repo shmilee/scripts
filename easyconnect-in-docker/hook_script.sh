@@ -151,12 +151,12 @@ hook_resources_bin() {
 }
 
 ## run CLI EC cmd easyconn
-ALL_OFF="\e[1;0m"
-BOLD="\e[1;1m"
-GREEN="${BOLD}\e[1;32m"
-BLUE="${BOLD}\e[1;34m"
-YELLOW="${BOLD}\e[1;33m"
-RED="${BOLD}\e[1;31m"
+ALL_OFF="\001\e[1;0m\002"
+BOLD="\001\e[1;1m\002"
+GREEN="\001${BOLD}\e[1;32m\002"
+BLUE="\001${BOLD}\e[1;34m\002"
+YELLOW="\001${BOLD}\e[1;33m\002"
+RED="\001${BOLD}\e[1;31m\002"
 readonly ALL_OFF BOLD GREEN BLUE YELLOW RED
 export TZ=Asia/Shanghai
 export HISTCONTROL=ignoredups:erasedups
@@ -232,7 +232,7 @@ start_easyconn() {
         fi
         history -s $cmd
         prompt1
-        read -e -p "$(prompt2 "Enter login/logout/mylogin/bash/exit/??")" cmd
+        read -p "$(prompt2 'Enter login/logout/mylogin/bash/exit/??')" -e cmd
     done
     history -w  # write to the history file
 }

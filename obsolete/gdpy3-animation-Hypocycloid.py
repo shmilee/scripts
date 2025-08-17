@@ -11,6 +11,8 @@ from gdpy3 import get_visplter
 import matplotlib.animation as animation
 pi, sin, cos = np.pi, np.sin, np.cos
 
+import matplotlib
+matplotlib.use('qtagg')
 
 class Hypocycloid(object):
     '''
@@ -207,6 +209,8 @@ class Hypocycloid(object):
         figlabel = ['%s-%s-%s' % (c.curve, hex(id(c)), c.info.replace(' ', ''))
                     for c in curves]
         fig = self.plotter.create_figure(';'.join(figlabel), axes)
+        print('[D] Using', fig.canvas.draw)
+        # backend_qtagg: show() ok; backend_gtk4agg: show() blank!
         fig.show()
         input('[I] Enter to continue: ')
         # fig.animation.save('a.mp4')  # time=n*nexample/speedup/fps s

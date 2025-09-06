@@ -11,3 +11,7 @@ linuxqq/LiteLoaderQQNT-*.zip
 *.pkg.tar.zst
 create-ap/transocks
 ffmpeg-flv-hevc-support/1*-*.patch
+moontv-app/download/
+moontv-app/build/
+moontv-app/dist/
+moontv-app/pkg/

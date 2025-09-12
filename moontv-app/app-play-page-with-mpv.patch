@@ -1,0 +1,67 @@
+--- page.tsx	2025-09-11 21:40:39.000000000 +0800
++++ app-play-page-with-mpv.tsx	2025-09-12 21:14:02.021496621 +0800
+@@ -248,6 +248,7 @@
+ 
+   // 视频播放地址
+   const [videoUrl, setVideoUrl] = useState('');
++  const [videoMPVUrl, setVideoMPVUrl] = useState('');
+ 
+   // 总集数
+   const totalEpisodes = detail?.episodes?.length || 0;
+@@ -858,6 +859,11 @@
+     return Math.round(score * 100) / 100; // 保留两位小数
+   };
+ 
++  // base64 utf8
++  const btou8 = (str: string) => {
++    return btoa(unescape(encodeURIComponent(str)));
++  };
++
+   // 更新视频地址
+   const updateVideoUrl = (
+     detailData: SearchResult | null,
+@@ -869,11 +875,23 @@
+       episodeIndex >= detailData.episodes.length
+     ) {
+       setVideoUrl('');
++      setVideoMPVUrl('');
+       return;
+     }
+     const newUrl = detailData?.episodes[episodeIndex] || '';
+     if (newUrl !== videoUrl) {
++      console.log('更新视频地址为：', newUrl);
+       setVideoUrl(newUrl);
++      const safeBase64Url = btou8(newUrl).replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
++      const episodetitle = detailData.episodes.length > 1
++        ?`${videoTitle || '影片标题'} - ${detailData?.episodes_titles?.[episodeIndex] || `第${episodeIndex + 1}集`}`
++        :`${videoTitle || '影片标题'}`;
++      console.log('更新MPV-episodetitle为：', episodetitle);
++      const safeBase64title = btou8(episodetitle).replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
++      console.log('更新MPV-encodetitle为：', safeBase64title);
++      const newMPVUrl = `mpv://play/${safeBase64Url}/?v_title=${safeBase64title}&startat=2`;
++      console.log('更新MPV播放地址为：', newMPVUrl);
++      setVideoMPVUrl(newMPVUrl);
+     }
+   };
+ 
+@@ -3409,6 +3427,20 @@
+                 {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
+               </span>
+             )}
++            {/* 同一行 MPV button */}
++            {videoUrl && videoUrl.length > 0 && (
++            <button
++              onClick={() =>
++                window.open(videoMPVUrl, "_self") //, "_blank")
++              }
++              className='ml-4 flex-shrink-0 hover:opacity-90 transition-all duration-200 hover:scale-105'
++              title={videoUrl}
++            >
++              <div className='flex items-center gap-1.5 bg-blue-200 hover:bg-blue-400 dark:bg-blue-600 dark:hover:bg-blue-800 text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-full text-sm font-semibold shadow-md'>
++                <span>MPV 播放</span>
++              </div>
++            </button>
++            )}
+           </h1>
+         </div>
+         {/* 第二行：播放器和选集 */}

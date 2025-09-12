@@ -1,5 +1,5 @@
 --- page.tsx	2025-09-11 21:40:39.000000000 +0800
-+++ app-play-page-with-mpv.tsx	2025-09-12 21:14:02.021496621 +0800
++++ app-play-page-with-mpv.tsx	2025-09-12 23:59:25.351318913 +0800
 @@ -248,6 +248,7 @@
  
    // 视频播放地址
@@ -38,22 +38,27 @@
 +      console.log('更新MPV-episodetitle为：', episodetitle);
 +      const safeBase64title = btou8(episodetitle).replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
 +      console.log('更新MPV-encodetitle为：', safeBase64title);
-+      const newMPVUrl = `mpv://play/${safeBase64Url}/?v_title=${safeBase64title}&startat=2`;
++      const newMPVUrl = `mpv://play/${safeBase64Url}/?v_title=${safeBase64title}`;
 +      console.log('更新MPV播放地址为：', newMPVUrl);
 +      setVideoMPVUrl(newMPVUrl);
      }
    };
  
-@@ -3409,6 +3427,20 @@
+@@ -3409,6 +3427,25 @@
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}
 +            {/* 同一行 MPV button */}
 +            {videoUrl && videoUrl.length > 0 && (
 +            <button
-+              onClick={() =>
-+                window.open(videoMPVUrl, "_self") //, "_blank")
-+              }
++              onClick={() => {
++                const currentPlayTime = artPlayerRef.current?.currentTime || 0;
++                if (currentPlayTime > 0) {
++                  window.open(`${videoMPVUrl}&startat=${currentPlayTime}`, "_self");
++                } else {
++                  window.open(videoMPVUrl, "_self"); //, "_blank")
++                }
++              }}
 +              className='ml-4 flex-shrink-0 hover:opacity-90 transition-all duration-200 hover:scale-105'
 +              title={videoUrl}
 +            >

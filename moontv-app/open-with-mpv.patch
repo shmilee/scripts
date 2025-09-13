@@ -1,6 +1,6 @@
---- page.tsx	2025-09-11 21:40:39.000000000 +0800
-+++ app-play-page-with-mpv.tsx	2025-09-12 23:59:25.351318913 +0800
-@@ -248,6 +248,7 @@
+--- v100/src/app/play/page.tsx	2025-08-27 01:15:12.000000000 +0800
++++ open-with-mpv/src/app/play/page.tsx	2025-09-13 14:00:52.911743898 +0800
+@@ -148,6 +148,7 @@
  
    // 视频播放地址
    const [videoUrl, setVideoUrl] = useState('');
@@ -8,7 +8,7 @@
  
    // 总集数
    const totalEpisodes = detail?.episodes?.length || 0;
-@@ -858,6 +859,11 @@
+@@ -407,6 +408,11 @@
      return Math.round(score * 100) / 100; // 保留两位小数
    };
  
@@ -20,7 +20,7 @@
    // 更新视频地址
    const updateVideoUrl = (
      detailData: SearchResult | null,
-@@ -869,11 +875,23 @@
+@@ -418,11 +424,23 @@
        episodeIndex >= detailData.episodes.length
      ) {
        setVideoUrl('');
@@ -44,7 +44,7 @@
      }
    };
  
-@@ -3409,6 +3427,25 @@
+@@ -1838,6 +1856,37 @@
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}
@@ -53,10 +53,22 @@
 +            <button
 +              onClick={() => {
 +                const currentPlayTime = artPlayerRef.current?.currentTime || 0;
-+                if (currentPlayTime > 0) {
-+                  window.open(`${videoMPVUrl}&startat=${currentPlayTime}`, "_self");
-+                } else {
-+                  window.open(videoMPVUrl, "_self"); //, "_blank")
++                const currentvideoMPVUrl = currentPlayTime > 5
++                    ?`${videoMPVUrl}&startat=${currentPlayTime}`
++                    :videoMPVUrl;
++                // 暂停播放器
++                if (artPlayerRef.current && !artPlayerRef.current.paused) {
++                    artPlayerRef.current.pause();
++                }
++                // target name
++                //  "_blank": 新窗口。artPlayer 仅暂停。
++                //  "_self": 页面卸载时, handleBeforeUnload, artPlayer 资源会被清理，比仅暂停更省资源。(NOT-TODO) 可添加状态判断，阻止清理。
++                //  "open-with-mpv": specified 新窗口，避免多个 blank 窗口。
++                const targetName = "open-with-mpv";
++                const targetTitle = `${document.title} | MPV`;
++                const mpvindow =window.open(currentvideoMPVUrl, targetName);
++                if (mpvindow && mpvindow.document) {
++                    mpvindow.document.title = targetTitle;
 +                }
 +              }}
 +              className='ml-4 flex-shrink-0 hover:opacity-90 transition-all duration-200 hover:scale-105'

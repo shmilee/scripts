@@ -4,7 +4,7 @@
 export DOCKER_ENV=false
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
-mkdir -pv $"$WORKDIR"/{download,build,dist}
+mkdir -pv "$WORKDIR"/{download,build,dist}
 
 build_app() {
     local name="$1"
@@ -35,6 +35,14 @@ build_app() {
     if [ ! -d "$buildir" ]; then
         tar zxf "$tarball" -C "${WORKDIR}/build/"
         mv -v "${WORKDIR}/build/${gitrepo}-${AppCommits[$name]}" "$buildir"
+        # patch
+        local patchfiles="${AppPatches[$name]}"
+        echo >"${WORKDIR}/build/${appdir}-patch.log"
+        for pf in ${patchfiles//:/' '};do
+            echo "applying patch file: ${WORKDIR}/$pf"
+            (patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3) \
+                | tee -a "${WORKDIR}/build/${appdir}-patch.log"
+        done
     fi
     # build, test w/ Node.js v24.7.0, Corepack 0.34.0, pnpm 10.15.1
     if [ ! -f "$buildir/.next/standalone/.next/BUILD_ID" ]; then

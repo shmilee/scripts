@@ -1,60 +1,63 @@
 --- v100/src/app/play/page.tsx	2025-08-27 01:15:12.000000000 +0800
-+++ open-with-mpv/src/app/play/page.tsx	2025-09-13 14:00:52.911743898 +0800
-@@ -148,6 +148,7 @@
- 
++++ open-with-mpv/src/app/play/page.tsx	2025-09-16 14:28:31.717495826 +0800
+@@ -149,6 +149,46 @@
    // 视频播放地址
    const [videoUrl, setVideoUrl] = useState('');
-+  const [videoMPVUrl, setVideoMPVUrl] = useState('');
  
++  // safe base64 for utf8
++  const safeU8Base64 = (str: string) => {
++    const b64 = btoa(unescape(encodeURIComponent(str)));
++    return b64.replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
++  };
++  // 根据 videoUrl 生成 mpv:// 播放地址
++  const genVideoMPVUrl = (
++    theVideoUrl: string,
++    theVideoTitle: string,
++    theDetailData: SearchResult | null,
++    theEpisodeIndex: number
++  ) => {
++    if (theVideoUrl) {
++      console.log('[MPV] 转换视频地址：', theVideoUrl);
++      const safeurl = safeU8Base64(theVideoUrl);
++      console.log('[MPV] 转换结果：', safeurl);
++      const v_title = (theDetailData?.episodes?.length || 0) > 1
++        ? `${theVideoTitle || '影片标题'} - ${theDetailData?.episodes_titles?.[theEpisodeIndex] || `第${theEpisodeIndex + 1}集`}`
++        : `${theVideoTitle || '影片标题'}`;
++      console.log('[MPV] 转换视频标题：', v_title);
++      const safetitle = safeU8Base64(v_title);
++      console.log('[MPV] 转换结果：', safetitle);
++      const mpvurl = `mpv://play/${safeurl}/?v_title=${safetitle}`;
++      console.log('[MPV] 播放地址：', mpvurl);
++      return mpvurl;
++    } else {
++      return '';
++    }
++  };
++  // 仅非移动设备，当 videoUrl 变化时，自动更新 mpv:// 播放地址
++  const [videoMPVUrl, setVideoMPVUrl] = useState('');
++  useEffect(() => {
++    const isMobile = typeof navigator !== 'undefined'
++        ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
++        : false;
++    if (!isMobile) {
++      setVideoMPVUrl(genVideoMPVUrl(videoUrl, videoTitle, detail, currentEpisodeIndex));
++    }
++  }, [videoUrl]);
++
    // 总集数
    const totalEpisodes = detail?.episodes?.length || 0;
-@@ -407,6 +408,11 @@
-     return Math.round(score * 100) / 100; // 保留两位小数
-   };
  
-+  // base64 utf8
-+  const btou8 = (str: string) => {
-+    return btoa(unescape(encodeURIComponent(str)));
-+  };
-+
-   // 更新视频地址
-   const updateVideoUrl = (
-     detailData: SearchResult | null,
-@@ -418,11 +424,23 @@
-       episodeIndex >= detailData.episodes.length
-     ) {
-       setVideoUrl('');
-+      setVideoMPVUrl('');
-       return;
-     }
-     const newUrl = detailData?.episodes[episodeIndex] || '';
-     if (newUrl !== videoUrl) {
-+      console.log('更新视频地址为：', newUrl);
-       setVideoUrl(newUrl);
-+      const safeBase64Url = btou8(newUrl).replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
-+      const episodetitle = detailData.episodes.length > 1
-+        ?`${videoTitle || '影片标题'} - ${detailData?.episodes_titles?.[episodeIndex] || `第${episodeIndex + 1}集`}`
-+        :`${videoTitle || '影片标题'}`;
-+      console.log('更新MPV-episodetitle为：', episodetitle);
-+      const safeBase64title = btou8(episodetitle).replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
-+      console.log('更新MPV-encodetitle为：', safeBase64title);
-+      const newMPVUrl = `mpv://play/${safeBase64Url}/?v_title=${safeBase64title}`;
-+      console.log('更新MPV播放地址为：', newMPVUrl);
-+      setVideoMPVUrl(newMPVUrl);
-     }
-   };
- 
-@@ -1838,6 +1856,37 @@
+@@ -1838,6 +1878,37 @@
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}
-+            {/* 同一行 MPV button */}
-+            {videoUrl && videoUrl.length > 0 && (
++            {/* 非移动设备，同一行 MPV button */}
++            {videoMPVUrl && videoMPVUrl.length > 0 && (
 +            <button
 +              onClick={() => {
 +                const currentPlayTime = artPlayerRef.current?.currentTime || 0;
 +                const currentvideoMPVUrl = currentPlayTime > 5
-+                    ?`${videoMPVUrl}&startat=${currentPlayTime}`
++                    ?`${videoMPVUrl}&startat=${Math.floor(currentPlayTime) - 1}`
 +                    :videoMPVUrl;
 +                // 暂停播放器
 +                if (artPlayerRef.current && !artPlayerRef.current.paused) {

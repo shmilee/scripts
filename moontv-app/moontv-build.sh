@@ -79,7 +79,7 @@ build_app() {
     ) | tee "${distdir}-install.log"
     ls "$distdir/node_modules/.pnpm/" \
         | sort >"${distdir}-node_modules.txt"
-    ls -l "$distdir/node_modules/" | awk '{print $9" -> "$11}' \
+    ls -l "$distdir/node_modules/" | awk '/^lr/{print $8" -> "$10}' \
         | sort >>"${distdir}-node_modules.txt"
 
     # squashfs compress

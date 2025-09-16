@@ -1,5 +1,7 @@
 #!/bin/bash
 # Copyright (C) 2025 shmilee
+#
+# depends: nodejs squashfuse valkey(redis)
 
 set -e
 
@@ -28,11 +30,13 @@ env-variables:
   - USERNAME=admin
   - PASSWORD=admin_password
   - PORT=3000
-  - NEXT_PUBLIC_STORAGE_TYPE=upstash or redis, valkey
+  - NEXT_PUBLIC_STORAGE_TYPE=upstash; kvrocks; redis;
+        or valkey: local redis replacement server
   - UPSTASH_URL=Your HTTPS ENDPOINT
   - UPSTASH_TOKEN=Your TOKEN
-  - and NEXT_PUBLIC_SITE_NAME, KVROCKS_URL,
-        REDIS_URL, VALKEY_PORT=16379 etc.
+  - and NEXT_PUBLIC_SITE_NAME, KVROCKS_URL, REDIS_URL,
+        VALKEY_SRVCMD=valkey-server, VALKEY_CLICMD=valkey-cli,
+        VALKEY_PORT=16379 etc.
 
 versions:
 EOF
@@ -48,7 +52,10 @@ EOF
 
 try_umount_dir() {
     if mountpoint -q "$1"; then
-        echo "[!] umount $1 ..." && umount "$1" && rmdir "$1"
+        echo "[!] umount $1 ..." && umount "$1"
+    fi
+    if [ -d "$1" ]; then
+        rmdir "$1"
     fi
 }
 
@@ -58,34 +65,49 @@ try_mount_squashfs() {
 
 # when NEXT_PUBLIC_STORAGE_TYPE=valkey -> redis
 VALKEYDIR="${WORKDIR}"
+VALKEY_SRVCMD="${VALKEY_SRVCMD:-valkey-server}" # or redis-server
+_VALKEY="${VALKEY_SRVCMD/%-server/}" # valkey or redis
+VALKEY_CLICMD="${VALKEY_CLICMD:-${_VALKEY}-cli}" # valkey-cli or redis-cli
 start_valkey_server() {
     local name="$1"
     local vkport="${VALKEY_PORT:-16379}"
     local vkdbfile="$(get_valkeydbfile $name)"
     export REDIS_URL="redis://127.0.0.1:$vkport"
-    echo -e "\nStarting valkey-server $REDIS_URL ..."
+    echo -e "\nStarting $VALKEY_SRVCMD $REDIS_URL ..."
     echo "
 bind 127.0.0.1
 port $vkport
 daemonize yes
-pidfile ${VALKEYDIR}/valkey-$name.pid
+pidfile ${VALKEYDIR}/${_VALKEY}-$name.pid
 dir ${VALKEYDIR}
+logfile ${_VALKEY}-$name.log
+save 600 1 90 10 20 50
 dbfilename $vkdbfile
-logfile valkey-$name.log
-" | valkey-server - || exit 4
-    while true; do
-        if [ -f "${VALKEYDIR}/valkey-$name.pid" ]; then
-            break
+" | $VALKEY_SRVCMD - || exit 4
+    for i in $(seq 0 15); do
+        if [ -f "${VALKEYDIR}/${_VALKEY}-$name.pid" ]; then
+            valkey_pid="$(cat ${VALKEYDIR}/${_VALKEY}-$Name.pid)"            
+            #echo "'$(ps -q $valkey_pid -o comm=)' == '$VALKEY_SRVCMD'"
+            if ps -q $valkey_pid -o comm= >/dev/null; then
+                break
+            else
+                echo -e "\n[E] Failed to start $VALKEY_SRVCMD!" && exit 4
+            fi
         fi
+        if [ "$i" -ge 15 ]; then
+            echo -e "\n[E] Failed to start $VALKEY_SRVCMD!" && exit 4
+        fi
+        echo -n -e "\\r[I] Waiting for $VALKEY_SRVCMD ... ${i}s ..."
         sleep 1
     done
-    echo "Valkey:"
-    echo "  - pid: $(cat ${VALKEYDIR}/valkey-$name.pid)"
-    echo "  - dir: ${VALKEYDIR}"
-    echo "  - logfile: valkey-$name.log"
-    echo "  - dbfile:  $vkdbfile"
-    echo "  - connect: PING <-> $(valkey-cli -h 127.0.0.1 -p ${vkport} ping)"
     export NEXT_PUBLIC_STORAGE_TYPE=redis
+    echo
+    echo "${_VALKEY^}:"
+    echo "  - pid: $(cat ${VALKEYDIR}/${_VALKEY}-$name.pid)"
+    echo "  - dir: ${VALKEYDIR}"
+    echo "  - logfile: ${_VALKEY}-$name.log"
+    echo "  - dbfile:  $vkdbfile"
+    #echo "  - connect: PING <-> $(${VALKEY_CLICMD} -u $REDIS_URL ping)"
 }
 
 
@@ -132,11 +154,21 @@ trap "echo; umount_squashf" EXIT # exit 0-255
 if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]; then
     start_valkey_server $Name
     stop_valkey_server() {
-        valkey_pid="$(cat ${VALKEYDIR}/valkey-$Name.pid)"
-        echo "[!] Stop valkey-server($valkey_pid) $REDIS_URL ..."
+        valkey_pid="$(cat ${VALKEYDIR}/${_VALKEY}-$Name.pid)"
+        echo "[!] Stop $VALKEY_SRVCMD($valkey_pid) $REDIS_URL ..."
         kill $valkey_pid
     }
     trap "echo; stop_valkey_server; umount_squashf" EXIT # exit 0-255
+fi
+
+if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]; then
+    pong="$(${VALKEY_CLICMD} -u "$REDIS_URL" ping)"
+    if [ -n "$pong" ]; then
+        echo "$REDIS_URL connection: PING <-> $pong"
+    else
+        echo -e "\n[E] Failed to connect $REDIS_URL!"
+        exit 3
+    fi
 fi
 
 echo -e "\n[$Name] Running ${StartJS} ...\n"

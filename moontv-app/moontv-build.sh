@@ -88,16 +88,16 @@ build_app() {
     local mksqfsopts="-comp zstd -all-root"
     mksquashfs "${distdir}" "$appsqfs" $mksqfsopts \
         -e "$distdir/node_modules" | tee -a "${distdir}-install.log"
-    if [ "$gitrepo" == 'KatelyaTV' ]; then
-        local exclude="${distdir}-node_modules-exclude.txt"
-        grep '\-linux' "${distdir}-node_modules.txt" \
-            | sed "s|^|${distdir}/node_modules/.pnpm/|" >"$exclude"
-        mksquashfs "${distdir}/node_modules" "$modsqfs" $mksqfsopts \
-            -ef "$exclude" | tee -a "${distdir}-install.log"
+    local excludepat="$(get_nodemodsexclude $name)"
+    local excludelist="${distdir}-node_modules-exclude.txt"
+    if [ -n "$excludepat" ]; then
+        grep -E "$excludepat" "${distdir}-node_modules.txt" \
+            | sed "s|^|${distdir}/node_modules/.pnpm/|" >"$excludelist"
     else
-        mksquashfs "${distdir}/node_modules" "$modsqfs" $mksqfsopts \
-            | tee -a "${distdir}-install.log"
+        echo >"$excludelist"
     fi
+    mksquashfs "${distdir}/node_modules" "$modsqfs" $mksqfsopts \
+        -ef "$excludelist" | tee -a "${distdir}-install.log"
 
     # check files
     cd "${WORKDIR}/dist/"

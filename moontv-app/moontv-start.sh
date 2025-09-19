@@ -24,7 +24,7 @@ in_array() {
 
 usage() {
     cat <<EOF
-usage: [env_vars] $(basename "$0") [versions | or/path/to/start.js]
+usage: [env_vars] $(basename "$0") [versions | /app/path[/xx.js]]
 
 env-variables:
   - USERNAME=admin
@@ -86,7 +86,7 @@ dbfilename $vkdbfile
 " | $VALKEY_SRVCMD - || exit 4
     for i in $(seq 0 15); do
         if [ -f "${VALKEYDIR}/${_VALKEY}-$name.pid" ]; then
-            valkey_pid="$(cat ${VALKEYDIR}/${_VALKEY}-$Name.pid)"            
+            valkey_pid="$(cat ${VALKEYDIR}/${_VALKEY}-$Name.pid)"
             #echo "'$(ps -q $valkey_pid -o comm=)' == '$VALKEY_SRVCMD'"
             if ps -q $valkey_pid -o comm= >/dev/null; then
                 break
@@ -137,15 +137,35 @@ if in_array "$1" ${AppNames[@]}; then
         try_umount_dir "${WORKDIR}/${Modsdir}"
     }
 
-elif [ -f "$1" -a "$(basename "$1")" == "start.js" ]; then
-    AppPath="$(dirname "$(readlink -f "$1")")"
+elif [ -f "$1" -o -d "$1" ]; then
+    if [ -f "$1" ]; then
+        AppPath="$(dirname "$(readlink -f "$1")")"
+    else
+        AppPath="$(readlink -f "$1")"
+    fi
+    for dir in .next/{server,static} public scripts node_modules; do
+        if [ ! -d "$AppPath/$dir" ]; then
+            echo "[E] Dir $dir not found in $AppPath!"
+            exit 3
+        fi
+    done
+    for file in package.json server.js start.js public/manifest.json \
+            .next/{BUILD_ID,server/app-paths-manifest.json}; do
+        if [ ! -f "$AppPath/$file" ]; then
+            echo "[E] File $file not found in $AppPath!"
+            exit 3
+        fi
+    done
     Name="$(basename "$AppPath")"
-    StartJS="$1"
+    StartJS="$AppPath/start.js"
     umount_squashf() { :; }
     if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]; then
         VALKEYDIR="$AppPath"
     fi
 else
+    if [ -n "$1" ]; then
+        echo -e "[E] '$1' not found!\n"
+    fi
     usage
     exit 1
 fi
@@ -167,7 +187,7 @@ if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]; then
         echo "$REDIS_URL connection: PING <-> $pong"
     else
         echo -e "\n[E] Failed to connect $REDIS_URL!"
-        exit 3
+        exit 5
     fi
 fi
 

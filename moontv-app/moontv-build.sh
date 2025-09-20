@@ -4,7 +4,7 @@
 export DOCKER_ENV=false
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
-mkdir -pv "$WORKDIR"/{download,build,dist}
+mkdir -pv "$WORKDIR"/{download,build,dist/config-collections/{moontv,iptv}}
 
 build_app() {
     local name="$1"
@@ -22,7 +22,8 @@ build_app() {
     local downurl="${AppUrls[$name]}/archive/${AppCommits[$name]}.tar.gz"
     local tarball="${WORKDIR}/download/${appdir}.tar.gz"
     if [ ! -f "$tarball" ]; then
-        wget -c "$downurl" -O "$tarball" || return
+        echo "=> download: $tarball"
+        $CURLCMD -o "$tarball" "$downurl" || return
         # rm screenshotX.png
         gzip -d "$tarball"
         tar -v -f "${tarball/.gz/}" --delete ${gitrepo}-${AppCommits[$name]}/public/screenshot{1,2,3}.png
@@ -43,6 +44,10 @@ build_app() {
             (patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3) \
                 | tee -a "${WORKDIR}/build/${appdir}-patch.log"
         done
+        # public/config-collections shouldSkipAuth: Done by patch
+        ##mv -v "$buildir/src/middleware.ts" "$buildir/src/middleware.ts.orig"
+        ##awk '/manifest.json/ {print; print "    '\''/config-collections/'\'',"; next} 1' \
+        ##    "$buildir/src/middleware.ts.orig" >"$buildir/src/middleware.ts"
     fi
     # build, test w/ Node.js v24.7.0, Corepack 0.34.0, pnpm 10.15.1
     if [ ! -f "$buildir/.next/standalone/.next/BUILD_ID" ]; then
@@ -75,6 +80,8 @@ build_app() {
             "${distdir}-manifest.json"
         ln -sv ../../"${appdir}-manifest.json" \
             "$distdir/public/manifest.json"
+        # link config-collections/{moontv,iptv}
+        ln -sv ../../config-collections "$distdir/public/config-collections"
         printf "\n[I] %s installed to ${distdir}\n\n" "$name"
     ) | tee "${distdir}-install.log"
     ls "$distdir/node_modules/.pnpm/" \
@@ -109,5 +116,16 @@ build_app() {
 echo "=== ${AppNames[@]} ==="
 for name in ${AppNames[@]}; do
     build_app "$name"
+done
+
+if [ -n "$ConfigCollectionsProxy" ]; then
+    curl_cmd="curl -L --proxy $ConfigCollectionsProxy"
+else
+    curl_cmd="curl -L"
+fi
+for conf in ${!ConfigCollections[@]}; do
+    echo "=> download: config-collections/$conf"
+    echo $CURLCMD "${ConfigCollections[$conf]}"
+    $CURLCMD -o "$WORKDIR/dist/config-collections/$conf" "${ConfigCollections[$conf]}"
 done
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (C) 2025 shmilee
 #
-# depends: nodejs squashfuse valkey(redis)
+# depends: nodejs squashfuse valkey(redis) curl
 
 set -e
 
@@ -37,6 +37,7 @@ env-variables:
   - and NEXT_PUBLIC_SITE_NAME, KVROCKS_URL, REDIS_URL,
         VALKEY_SRVCMD=valkey-server, VALKEY_CLICMD=valkey-cli,
         VALKEY_PORT=16379 etc.
+  - UPDATE_COLLECTIONS=0
 
 versions:
 EOF
@@ -189,6 +190,14 @@ if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]; then
         echo -e "\n[E] Failed to connect $REDIS_URL!"
         exit 5
     fi
+fi
+
+if [ "${UPDATE_COLLECTIONS:-0}" == "1" ]; then
+    for conf in ${!ConfigCollections[@]}; do
+        echo "=> Updating $conf from ${ConfigCollections[$conf]} ..."
+        $CURLCMD -o "$WORKDIR/config-collections/$conf" \
+            "${ConfigCollections[$conf]}"
+    done
 fi
 
 echo -e "\n[$Name] Running ${StartJS} ...\n"

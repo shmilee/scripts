@@ -1,0 +1,89 @@
+diff -Nur v100/src/app/api/admin/config_subscription/fetch/route.ts config-collections/src/app/api/admin/config_subscription/fetch/route.ts
+--- v100/src/app/api/admin/config_subscription/fetch/route.ts	2025-08-27 01:15:12.000000000 +0800
++++ config-collections/src/app/api/admin/config_subscription/fetch/route.ts	2025-09-20 16:53:05.425774278 +0800
+@@ -3,6 +3,7 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ 
+ import { getAuthInfoFromCookie } from '@/lib/auth';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -28,7 +29,7 @@
+     }
+ 
+     // 直接 fetch URL 获取配置内容
+-    const response = await fetch(url);
++    const response = await fetch(completeCollectionPath(url));
+ 
+     if (!response.ok) {
+       return NextResponse.json(
+diff -Nur v100/src/app/api/cron/route.ts config-collections/src/app/api/cron/route.ts
+--- v100/src/app/api/cron/route.ts	2025-08-27 01:15:12.000000000 +0800
++++ config-collections/src/app/api/cron/route.ts	2025-09-20 16:52:04.123775376 +0800
+@@ -8,6 +8,7 @@
+ import { fetchVideoDetail } from '@/lib/fetchVideoDetail';
+ import { refreshLiveChannels } from '@/lib/live';
+ import { SearchResult } from '@/lib/types';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -71,7 +72,7 @@
+   let config = await getConfig();
+   if (config && config.ConfigSubscribtion && config.ConfigSubscribtion.URL && config.ConfigSubscribtion.AutoUpdate) {
+     try {
+-      const response = await fetch(config.ConfigSubscribtion.URL);
++      const response = await fetch(completeCollectionPath(config.ConfigSubscribtion.URL));
+ 
+       if (!response.ok) {
+         throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+diff -Nur v100/src/lib/config.collections.ts config-collections/src/lib/config.collections.ts
+--- v100/src/lib/config.collections.ts	1970-01-01 08:00:00.000000000 +0800
++++ config-collections/src/lib/config.collections.ts	2025-09-20 17:15:24.161750304 +0800
+@@ -0,0 +1,14 @@
++/* eslint-disable no-console */
++export function completeCollectionPath(path: string): string {
++    const pathPattern = /^\/config-collections\//;
++    // const fullUrlPattern = /^(http:\/\/|https:\/\/)[^\s/$.?#].[^\s]*$/i;
++    if (pathPattern.test(path)) {  // 用 server address 补全
++        const baseUrl = `http://${process.env.HOSTNAME || 'localhost'}:${process.env.PORT || 3000}`;
++        const fullUrl = new URL(path, baseUrl).toString();
++        console.log(`Get config-collection URL:`, fullUrl);
++        return fullUrl;
++    } else {  // do nothing
++        console.log(`Get URL:`, path);        
++        return path;
++    }
++}
+diff -Nur v100/src/lib/live.ts config-collections/src/lib/live.ts
+--- v100/src/lib/live.ts	2025-08-27 01:15:12.000000000 +0800
++++ config-collections/src/lib/live.ts	2025-09-20 16:53:18.725774040 +0800
+@@ -2,6 +2,7 @@
+ 
+ import { getConfig } from "@/lib/config";
+ import { db } from "@/lib/db";
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ const defaultUA = 'AptvPlayer/1.4.10'
+ 
+@@ -62,7 +63,7 @@
+     delete cachedLiveChannels[liveInfo.key];
+   }
+   const ua = liveInfo.ua || defaultUA;
+-  const response = await fetch(liveInfo.url, {
++  const response = await fetch(completeCollectionPath(liveInfo.url), {
+     headers: {
+       'User-Agent': ua,
+     },
+diff -Nur v100/src/middleware.ts config-collections/src/middleware.ts
+--- v100/src/middleware.ts	2025-08-27 01:15:12.000000000 +0800
++++ config-collections/src/middleware.ts	2025-09-20 16:20:20.547235601 +0800
+@@ -122,6 +122,7 @@
+     '/favicon.ico',
+     '/robots.txt',
+     '/manifest.json',
++    '/config-collections/',
+     '/icons/',
+     '/logo.png',
+     '/screenshot.png',

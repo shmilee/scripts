@@ -33,4 +33,5 @@ for name in ${AppNames[@]}; do
 done
 cp -v "${WORKDIR}/github-repos.conf" "${WORKDIR}/pkg/"
 cp -v "${WORKDIR}/moontv-start.sh" "${WORKDIR}/pkg/"
+cp -rv "$WORKDIR/dist/config-collections" "${WORKDIR}/pkg/"
 echo && ls -lh "$WORKDIR/pkg/"

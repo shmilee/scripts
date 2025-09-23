@@ -4,7 +4,7 @@
 export DOCKER_ENV=false
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
-mkdir -pv "$WORKDIR"/{download,build,dist/config-collections/{moontv,iptv}}
+mkdir -pv "$WORKDIR"/{download,build,dist/config-collections}
 
 build_app() {
     local name="$1"

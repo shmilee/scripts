@@ -1,0 +1,19 @@
+--- v5s/src/app/api/cron/route.ts	2025-09-23 15:43:37.000000000 +0800
++++ config-collections/src/app/api/cron/route.ts	2025-09-23 16:53:17.744731931 +0800
+@@ -7,6 +7,7 @@
+ import { fetchVideoDetail } from '@/lib/fetchVideoDetail';
+ import { refreshLiveChannels } from '@/lib/live';
+ import { SearchResult } from '@/lib/types';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -125,7 +126,7 @@
+       const controller = new AbortController();
+       const timeoutId = setTimeout(() => controller.abort(), 30000);
+ 
+-      const response = await fetch(config.ConfigSubscribtion.URL, {
++      const response = await fetch(completeCollectionPath(config.ConfigSubscribtion.URL), {
+         signal: controller.signal,
+         headers: {
+           'User-Agent': 'LunaTV-ConfigFetcher/1.0'

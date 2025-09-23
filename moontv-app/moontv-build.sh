@@ -40,9 +40,10 @@ build_app() {
         local patchfiles="${AppPatches[$name]}"
         echo >"${WORKDIR}/build/${appdir}-patch.log"
         for pf in ${patchfiles//:/' '};do
-            echo "applying patch file: ${WORKDIR}/$pf"
-            (patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3) \
-                | tee -a "${WORKDIR}/build/${appdir}-patch.log"
+            (
+                echo "[I] Applying patch file: ${WORKDIR}/$pf"
+                patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3
+            ) | tee -a "${WORKDIR}/build/${appdir}-patch.log"
         done
         # public/config-collections shouldSkipAuth: Done by patch
         ##mv -v "$buildir/src/middleware.ts" "$buildir/src/middleware.ts.orig"

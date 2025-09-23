@@ -18,26 +18,6 @@ diff -Nur v100/src/app/api/admin/config_subscription/fetch/route.ts config-colle
  
      if (!response.ok) {
        return NextResponse.json(
-diff -Nur v100/src/app/api/cron/route.ts config-collections/src/app/api/cron/route.ts
---- v100/src/app/api/cron/route.ts	2025-08-27 01:15:12.000000000 +0800
-+++ config-collections/src/app/api/cron/route.ts	2025-09-20 16:52:04.123775376 +0800
-@@ -8,6 +8,7 @@
- import { fetchVideoDetail } from '@/lib/fetchVideoDetail';
- import { refreshLiveChannels } from '@/lib/live';
- import { SearchResult } from '@/lib/types';
-+import { completeCollectionPath } from '@/lib/config.collections';
- 
- export const runtime = 'nodejs';
- 
-@@ -71,7 +72,7 @@
-   let config = await getConfig();
-   if (config && config.ConfigSubscribtion && config.ConfigSubscribtion.URL && config.ConfigSubscribtion.AutoUpdate) {
-     try {
--      const response = await fetch(config.ConfigSubscribtion.URL);
-+      const response = await fetch(completeCollectionPath(config.ConfigSubscribtion.URL));
- 
-       if (!response.ok) {
-         throw new Error(`请求失败: ${response.status} ${response.statusText}`);
 diff -Nur v100/src/lib/config.collections.ts config-collections/src/lib/config.collections.ts
 --- v100/src/lib/config.collections.ts	1970-01-01 08:00:00.000000000 +0800
 +++ config-collections/src/lib/config.collections.ts	2025-09-20 17:15:24.161750304 +0800

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (C) 2025 shmilee
 #
-# depends: nodejs squashfuse valkey(redis) curl
+# depends: nodejs squashfuse fusermount3 valkey(redis) curl
 
 set -e
 
@@ -53,7 +53,7 @@ EOF
 
 try_umount_dir() {
     if mountpoint -q "$1"; then
-        echo "[!] umount $1 ..." && umount "$1"
+        echo "[!] umount $1 ..." && fusermount3 -u "$1"
     fi
     if [ -d "$1" ]; then
         rmdir "$1"
@@ -178,6 +178,9 @@ if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]; then
         valkey_pid="$(cat ${VALKEYDIR}/${_VALKEY}-$Name.pid)"
         echo "[!] Stop $VALKEY_SRVCMD($valkey_pid) $REDIS_URL ..."
         kill $valkey_pid
+        if [ -f "${VALKEYDIR}/${_VALKEY}-$Name.pid" ]; then
+            rm ${VALKEYDIR}/${_VALKEY}-$Name.pid
+        fi
     }
     trap "echo; stop_valkey_server; umount_squashf" EXIT # exit 0-255
 fi

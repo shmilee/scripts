@@ -9,7 +9,7 @@ WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
 
 export NODE_ENV=production
-export USERNAME=${USERNAME:-admin}
+export ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
 export PASSWORD=${PASSWORD:-admin_password}
 export PORT=${PORT:-3000}
 export NEXT_PUBLIC_STORAGE_TYPE=${NEXT_PUBLIC_STORAGE_TYPE:-upstash}
@@ -27,7 +27,7 @@ usage() {
 usage: [env_vars] $(basename "$0") [versions | /app/path[/xx.js]]
 
 env-variables:
-  - USERNAME=admin
+  - ADMIN_USERNAME=admin
   - PASSWORD=admin_password
   - PORT=3000
   - NEXT_PUBLIC_STORAGE_TYPE=upstash; kvrocks; redis;

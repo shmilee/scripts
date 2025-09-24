@@ -39,16 +39,22 @@ build_app() {
         # patch
         local patchfiles="${AppPatches[$name]}"
         echo >"${WORKDIR}/build/${appdir}-patch.log"
-        for pf in ${patchfiles//:/' '};do
-            (
+        echo
+        (
+            for pf in ${patchfiles//:/' '};do
                 echo "[I] Applying patch file: ${WORKDIR}/$pf"
                 patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3
-            ) | tee -a "${WORKDIR}/build/${appdir}-patch.log"
-        done
-        # public/config-collections shouldSkipAuth: Done by patch
-        ##mv -v "$buildir/src/middleware.ts" "$buildir/src/middleware.ts.orig"
-        ##awk '/manifest.json/ {print; print "    '\''/config-collections/'\'',"; next} 1' \
-        ##    "$buildir/src/middleware.ts.orig" >"$buildir/src/middleware.ts"
+            done
+            echo -e "\n[I] process.env.USERNAME -> process.env.ADMIN_USERNAME"
+            for ts in $(cd "$buildir" && grep 'process.env.USERNAME' -Rl); do
+                echo " -> replacing 'process.env.USERNAME' in $ts ..."
+                sed -i "s|process.env.USERNAME|process.env.ADMIN_USERNAME|g" "$buildir/$ts"
+            done
+            for ts in $(cd "$buildir" && grep ' USERNAME' -Rl); do
+                echo " -> replacing ' USERNAME' in $ts ..."
+                sed -i "s| USERNAME| ADMIN_USERNAME|g" "$buildir/$ts"
+            done
+        ) | tee -a "${WORKDIR}/build/${appdir}-patch.log"
     fi
     # build, test w/ Node.js v24.7.0, Corepack 0.34.0, pnpm 10.15.1
     if [ ! -f "$buildir/.next/standalone/.next/BUILD_ID" ]; then

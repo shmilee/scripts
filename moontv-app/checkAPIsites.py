@@ -144,16 +144,24 @@ class SpeedTest(object):
             data_size = len(data)
             speed = round(data_size/(now-start)/1024, 3)
         except Exception as error:
-            eno = getattr(error, 'errno', None)
+            errno = getattr(error, 'errno', None)
             err = error
             while isinstance(err, Exception):
                 if len(err.args) > 0:
                     err = err.args[-1]
-                    eno = getattr(err, 'errno', None) or eno
+                    eno = getattr(err, 'errno', None)
+                    if eno:
+                        errno = eno
+                        break
+                    else:
+                        m = re.match(r'.*\[Errno (\d+)\]', str(err))
+                        if m:
+                            errno = int(m.groups()[0])
+                            break
                 else:
                     break
-            if eno:
-                status = 1000 + eno
+            if errno:
+                status = 1000 + errno
             print('(%s) \033[31m[Error %d]\033[0m, %s'
                   % (desc, status, url), error)
             info = dict(speed=0, time=int(time.time()), size=0)

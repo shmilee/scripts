@@ -495,6 +495,7 @@ class APISites(object):
         if callable(filter_out):
             select = [api for api in select if not filter_out(api, SA[api])]
         ordered = self.sort(select, key='rate+speed', reverse=True)
+        count = 0
         if unique:
             result, uniq_names = [], []
             for api in ordered:
@@ -512,14 +513,17 @@ class APISites(object):
                     result.append(api)
                     uniq_names.append(name)
                     action = '+Add'
+                    count += 1
                 else:
                     action = '\033[33mSkip'
-                print("[S] %s %s\033[0m (%s), %s"
-                      % (action, common_name, name, api))
+                print("[S%2d] %s %s\033[0m (%s), %s"
+                      % (count, action, common_name, name, api))
         else:
             for api in ordered:
+                count +=1
                 common_name = SA[api]['common_name']
-                print("[S] %s %s\033[0m, %s" % ('Add', common_name, api))
+                print("[S%2d] %s %s\033[0m, %s"
+                      % (count, 'Add', common_name, api))
             result = ordered
         print("==> \033[32m%d\033[0m APIs selected." % len(result))
         return result

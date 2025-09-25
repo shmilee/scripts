@@ -39,12 +39,19 @@ build_app() {
         # patch
         local patchfiles="${AppPatches[$name]}"
         echo >"${WORKDIR}/build/${appdir}-patch.log"
-        echo
         (
             for pf in ${patchfiles//:/' '};do
                 echo "[I] Applying patch file: ${WORKDIR}/$pf"
                 patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3
             done
+            if [ -f "$buildir/src/lib/shortdrama.client.ts" ]; then
+                con1=$(grep "User-Agent" "$buildir/src/lib/shortdrama.client.ts")
+                con2=$(grep "mode: 'cors'" "$buildir/src/lib/shortdrama.client.ts")
+                if [ -n "$con1" -a -n "$con2" ]; then
+                    echo -e "\nFix shortdrama：CORS 的 'Access-Control-Allow-Headers'，不允许使用 'user-agent'"
+                    sed -i '/User-Agent/d' "$buildir/src/lib/shortdrama.client.ts"
+                fi
+            fi
             echo -e "\n[I] process.env.USERNAME -> process.env.ADMIN_USERNAME"
             for ts in $(cd "$buildir" && grep 'process.env.USERNAME' -Rl); do
                 echo " -> replacing 'process.env.USERNAME' in $ts ..."

@@ -1,87 +1,993 @@
---- v100/src/app/play/page.tsx	2025-08-27 01:15:12.000000000 +0800
-+++ open-with-mpv/src/app/play/page.tsx	2025-09-16 14:28:31.717495826 +0800
-@@ -149,6 +149,46 @@
-   // 视频播放地址
-   const [videoUrl, setVideoUrl] = useState('');
- 
-+  // safe base64 for utf8
-+  const safeU8Base64 = (str: string) => {
-+    const b64 = btoa(unescape(encodeURIComponent(str)));
-+    return b64.replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
-+  };
-+  // 根据 videoUrl 生成 mpv:// 播放地址
-+  const genVideoMPVUrl = (
-+    theVideoUrl: string,
-+    theVideoTitle: string,
-+    theDetailData: SearchResult | null,
-+    theEpisodeIndex: number
-+  ) => {
-+    if (theVideoUrl) {
-+      console.log('[MPV] 转换视频地址：', theVideoUrl);
-+      const safeurl = safeU8Base64(theVideoUrl);
-+      console.log('[MPV] 转换结果：', safeurl);
-+      const v_title = (theDetailData?.episodes?.length || 0) > 1
-+        ? `${theVideoTitle || '影片标题'} - ${theDetailData?.episodes_titles?.[theEpisodeIndex] || `第${theEpisodeIndex + 1}集`}`
-+        : `${theVideoTitle || '影片标题'}`;
-+      console.log('[MPV] 转换视频标题：', v_title);
-+      const safetitle = safeU8Base64(v_title);
-+      console.log('[MPV] 转换结果：', safetitle);
-+      const mpvurl = `mpv://play/${safeurl}/?v_title=${safetitle}`;
-+      console.log('[MPV] 播放地址：', mpvurl);
-+      return mpvurl;
-+    } else {
-+      return '';
-+    }
-+  };
-+  // 仅非移动设备，当 videoUrl 变化时，自动更新 mpv:// 播放地址
-+  const [videoMPVUrl, setVideoMPVUrl] = useState('');
-+  useEffect(() => {
-+    const isMobile = typeof navigator !== 'undefined'
-+        ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-+        : false;
-+    if (!isMobile) {
-+      setVideoMPVUrl(genVideoMPVUrl(videoUrl, videoTitle, detail, currentEpisodeIndex));
-+    }
-+  }, [videoUrl]);
+diff -Nur v100/src/app/api/danmaku-xmlurl/route.ts open-with-mpv/src/app/api/danmaku-xmlurl/route.ts
+--- v100/src/app/api/danmaku-xmlurl/route.ts	1970-01-01 08:00:00.000000000 +0800
++++ open-with-mpv/src/app/api/danmaku-xmlurl/route.ts	2025-09-28 15:15:16.347623959 +0800
+@@ -0,0 +1,558 @@
++/* eslint-disable @typescript-eslint/no-explicit-any, no-console */
 +
-   // 总集数
-   const totalEpisodes = detail?.episodes?.length || 0;
++import { NextRequest, NextResponse } from 'next/server';
++
++interface PlatformUrl {
++  platform: string;
++  url: string;
++}
++
++// 从caiji.cyou API搜索视频链接
++async function searchFromCaijiAPI(title: string, episode?: string | null): Promise<PlatformUrl[]> {// {{{
++  try {
++    console.log(`🔎 在caiji.cyou搜索: "${title}", 集数: ${episode || '未指定'}`);
++
++    // 尝试多种标题格式进行搜索
++    const searchTitles = [
++      title, // 原始标题
++      title.replace(/·/g, ''), // 移除中间点
++      title.replace(/·/g, ' '), // 中间点替换为空格
++      title.replace(/·/g, '-'), // 中间点替换为连字符
++    ];
++
++    // 去重
++    const uniqueTitles = Array.from(new Set(searchTitles));
++    console.log(`🔍 尝试搜索标题变体: ${uniqueTitles.map(t => `"${t}"`).join(', ')}`);
++
++    for (const searchTitle of uniqueTitles) {
++      console.log(`🔎 搜索标题: "${searchTitle}"`);
++      const searchUrl = `https://www.caiji.cyou/api.php/provide/vod/?wd=${encodeURIComponent(searchTitle)}`;
++      const response = await fetch(searchUrl, {
++        headers: {
++          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
++        },
++      });
++
++      if (!response.ok) {
++        console.log(`❌ 搜索"${searchTitle}"失败:`, response.status);
++        continue; // 尝试下一个标题
++      }
++
++      const data: any = await response.json();
++      if (!data.list || data.list.length === 0) {
++        console.log(`📭 搜索"${searchTitle}"未找到内容`);
++        continue; // 尝试下一个标题
++      }
++
++      console.log(`🎬 搜索"${searchTitle}"找到 ${data.list.length} 个匹配结果`);
++
++      // 智能选择最佳匹配结果
++      let bestMatch: any = null;
++      let exactMatch: any = null;
++
++      for (const result of data.list) {
++        console.log(`📋 候选: "${result.vod_name}" (类型: ${result.type_name})`);
++
++        // 标题完全匹配（优先级最高）
++        if (result.vod_name === searchTitle || result.vod_name === title) {
++          console.log(`🎯 找到完全匹配: "${result.vod_name}"`);
++          exactMatch = result;
++          break;
++        }
++
++        // 跳过明显不合适的内容
++        const isUnwanted = result.vod_name.includes('解说') || 
++                          result.vod_name.includes('预告') ||
++                          result.vod_name.includes('花絮') ||
++                          result.vod_name.includes('动态漫') ||
++                          result.vod_name.includes('之精彩');
++
++        if (isUnwanted) {
++          console.log(`❌ 跳过不合适内容: "${result.vod_name}"`);
++          continue;
++        }
++
++        // 选择第一个合适的结果
++        if (!bestMatch) {
++          bestMatch = result;
++          console.log(`✅ 选择为候选: "${result.vod_name}"`);
++        }
++      }
++
++      // 优先使用完全匹配，否则使用最佳匹配
++      const selectedResult = exactMatch || bestMatch;
++
++      if (selectedResult) {
++        console.log(`✅ 使用搜索结果"${searchTitle}": "${selectedResult.vod_name}"`);
++        // 找到结果就处理并返回，不再尝试其他标题变体
++        return await processSelectedResult(selectedResult, episode);
++      }
++    }
++
++    console.log('📭 所有标题变体都未找到匹配内容');
++    return [];
++
++  } catch (error) {
++    console.error('❌ Caiji API搜索失败:', error);
++    return [];
++  }
++}
++
++// 处理选中的结果
++async function processSelectedResult(selectedResult: any, episode?: string | null): Promise<PlatformUrl[]> {
++  try {
++    console.log(`🔄 处理选中的结果: "${selectedResult.vod_name}"`);
++    const firstResult: any = selectedResult;
++    const detailUrl = `https://www.caiji.cyou/api.php/provide/vod/?ac=detail&ids=${firstResult.vod_id}`;
++
++    const detailResponse = await fetch(detailUrl, {
++      headers: {
++        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
++      },
++    });
++
++    if (!detailResponse.ok) return [];
++
++    const detailData: any = await detailResponse.json();
++    if (!detailData.list || detailData.list.length === 0) return [];
++
++    const videoInfo: any = detailData.list[0];
++    console.log(`🎭 视频详情: "${videoInfo.vod_name}" (${videoInfo.vod_year})`);
++
++    const urls: PlatformUrl[] = [];
++
++    // 解析播放链接
++    if (videoInfo.vod_play_url) {
++      const playUrls = videoInfo.vod_play_url.split('#');
++      console.log(`📺 找到 ${playUrls.length} 集`);
++
++      // 如果指定了集数，尝试找到对应集数的链接
++      let targetUrl = '';
++      if (episode && parseInt(episode) > 0) {
++        const episodeNum = parseInt(episode);
++        // 支持多种集数格式: "20$", "第20集$", "E20$", "EP20$" 等
++        const targetEpisode = playUrls.find((url: string) => {
++          return url.startsWith(`${episodeNum}$`) || 
++                 url.startsWith(`第${episodeNum}集$`) ||
++                 url.startsWith(`E${episodeNum}$`) ||
++                 url.startsWith(`EP${episodeNum}$`);
++        });
++        if (targetEpisode) {
++          targetUrl = targetEpisode.split('$')[1];
++          console.log(`🎯 找到第${episode}集: ${targetUrl}`);
++        } else {
++          console.log(`❌ 未找到第${episode}集的链接`);
++        }
++      }
++
++      // 如果没有指定集数或找不到指定集数，使用第一集
++      if (!targetUrl && playUrls.length > 0) {
++        targetUrl = playUrls[0].split('$')[1];
++        console.log(`📺 使用第1集: ${targetUrl}`);
++      }
++
++      if (targetUrl) {
++        // 根据URL判断平台
++        let platform = 'unknown';
++        if (targetUrl.includes('bilibili.com')) {
++          platform = 'bilibili_caiji';
++        } else if (targetUrl.includes('v.qq.com') || targetUrl.includes('qq.com')) {
++          platform = 'tencent_caiji';
++        } else if (targetUrl.includes('iqiyi.com')) {
++          platform = 'iqiyi_caiji';
++        } else if (targetUrl.includes('youku.com') || targetUrl.includes('v.youku.com')) {
++          platform = 'youku_caiji';
++        } else if (targetUrl.includes('mgtv.com') || targetUrl.includes('w.mgtv.com')) {
++          platform = 'mgtv_caiji';
++        }
++
++        // 统一修复所有平台的链接格式：将.htm转换为.html
++        if (targetUrl.endsWith('.htm')) {
++          targetUrl = targetUrl.replace(/\.htm$/, '.html');
++          console.log(`🔧 修复${platform}链接格式: ${targetUrl}`);
++        }
++
++        console.log(`🎯 识别平台: ${platform}, URL: ${targetUrl}`);
++
++        urls.push({
++          platform: platform,
++          url: targetUrl,
++        });
++      }
++    }
++
++    console.log(`✅ Caiji API返回 ${urls.length} 个播放链接`);
++    return urls;
++
++  } catch (error) {
++    console.error('❌ Caiji API搜索失败:', error);
++    return [];
++  }
++}// }}}
++
++// 用户代理池 - 防止被封IP
++const USER_AGENTS = [
++  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
++  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
++  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
++];
++
++// 请求限制器 - 防止被封IP
++let lastDoubanRequestTime = 0;
++const MIN_DOUBAN_REQUEST_INTERVAL = 1000; // 1秒最小间隔
++
++function getRandomUserAgent(): string {
++  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
++}
++
++function randomDelay(min = 500, max = 1500): Promise<void> {
++  const delay = Math.floor(Math.random() * (max - min + 1)) + min;
++  return new Promise(resolve => setTimeout(resolve, delay));
++}
++
++// 从豆瓣页面提取平台视频链接
++async function extractPlatformUrls(doubanId: string, episode?: string | null): Promise<PlatformUrl[]> {// {{{
++  if (!doubanId) return [];
++
++  // 添加超时控制 - 在try块外定义以便catch块使用
++  const controller = new AbortController();
++  let timeoutId: NodeJS.Timeout | undefined;
++
++  try {
++    // 请求限流：确保请求间隔 - 防止被封IP
++    const now = Date.now();
++    const timeSinceLastRequest = now - lastDoubanRequestTime;
++    if (timeSinceLastRequest < MIN_DOUBAN_REQUEST_INTERVAL) {
++      await new Promise(resolve => 
++        setTimeout(resolve, MIN_DOUBAN_REQUEST_INTERVAL - timeSinceLastRequest)
++      );
++    }
++    lastDoubanRequestTime = Date.now();
++
++    // 添加随机延时 - 防止被封IP
++    await randomDelay(300, 1000);
++
++    // 设置超时控制
++    timeoutId = setTimeout(() => controller.abort(), 10000);
++
++    const response = await fetch(`https://movie.douban.com/subject/${doubanId}/`, {
++      signal: controller.signal,
++      headers: {
++        'User-Agent': getRandomUserAgent(),
++        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
++        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
++        'Accept-Encoding': 'gzip, deflate, br',
++        'DNT': '1',
++        'Connection': 'keep-alive',
++        'Upgrade-Insecure-Requests': '1',
++        'Cache-Control': 'max-age=0',
++        // 随机添加Referer - 防止被封IP
++        ...(Math.random() > 0.5 ? { 'Referer': 'https://www.douban.com/' } : {}),
++      },
++    });
++
++    clearTimeout(timeoutId);
++
++    if (!response.ok) {
++      console.log(`❌ 豆瓣页面请求失败: ${response.status}`);
++      return [];
++    }
++
++    const html = await response.text();
++    console.log(`📄 豆瓣页面HTML长度: ${html.length}`);
++    const urls: PlatformUrl[] = [];
++
++    // 提取豆瓣跳转链接中的各种视频平台URL
++
++    // 腾讯视频
++    const doubanLinkMatches = html.match(/play_link:\s*"[^"]*v\.qq\.com[^"]*"/g);
++    if (doubanLinkMatches && doubanLinkMatches.length > 0) {
++      console.log(`🎬 找到 ${doubanLinkMatches.length} 个腾讯视频链接`);
++
++      // 如果指定了集数，尝试找到对应集数的链接
++      let selectedMatch = doubanLinkMatches[0]; // 默认使用第一个
++      if (episode && doubanLinkMatches.length > 1) {
++        const episodeNum = parseInt(episode);
++        if (episodeNum > 0 && episodeNum <= doubanLinkMatches.length) {
++          selectedMatch = doubanLinkMatches[episodeNum - 1];
++          console.log(`🎯 选择第${episode}集腾讯视频链接`);
++        }
++      }
++
++      const urlMatch = selectedMatch.match(/https%3A%2F%2Fv\.qq\.com[^"&]*/);
++      if (urlMatch) {
++        const decodedUrl = decodeURIComponent(urlMatch[0]).split('?')[0];
++        console.log(`🔗 腾讯视频链接: ${decodedUrl}`);
++        urls.push({ platform: 'tencent', url: decodedUrl });
++      }
++    }
++
++    // 爱奇艺
++    const iqiyiMatches = html.match(/play_link:\s*"[^"]*iqiyi\.com[^"]*"/g);
++    if (iqiyiMatches && iqiyiMatches.length > 0) {
++      console.log(`📺 找到 ${iqiyiMatches.length} 个爱奇艺链接`);
++
++      // 如果指定了集数，尝试找到对应集数的链接
++      let selectedMatch = iqiyiMatches[0]; // 默认使用第一个
++      if (episode && iqiyiMatches.length > 1) {
++        const episodeNum = parseInt(episode);
++        if (episodeNum > 0 && episodeNum <= iqiyiMatches.length) {
++          selectedMatch = iqiyiMatches[episodeNum - 1];
++          console.log(`🎯 选择第${episode}集爱奇艺链接`);
++        }
++      }
++
++      const urlMatch = selectedMatch.match(/https?%3A%2F%2F[^"&]*iqiyi\.com[^"&]*/);
++      if (urlMatch) {
++        const decodedUrl = decodeURIComponent(urlMatch[0]).split('?')[0];
++        console.log(`🔗 爱奇艺链接: ${decodedUrl}`);
++        urls.push({ platform: 'iqiyi', url: decodedUrl });
++      }
++    }
++
++    // 优酷
++    const youkuMatches = html.match(/play_link:\s*"[^"]*youku\.com[^"]*"/g);
++    if (youkuMatches && youkuMatches.length > 0) {
++      console.log(`🎞️ 找到 ${youkuMatches.length} 个优酷链接`);
++
++      // 如果指定了集数，尝试找到对应集数的链接
++      let selectedMatch = youkuMatches[0]; // 默认使用第一个
++      if (episode && youkuMatches.length > 1) {
++        const episodeNum = parseInt(episode);
++        if (episodeNum > 0 && episodeNum <= youkuMatches.length) {
++          selectedMatch = youkuMatches[episodeNum - 1];
++          console.log(`🎯 选择第${episode}集优酷链接`);
++        }
++      }
++
++      const urlMatch = selectedMatch.match(/https?%3A%2F%2F[^"&]*youku\.com[^"&]*/);
++      if (urlMatch) {
++        const decodedUrl = decodeURIComponent(urlMatch[0]).split('?')[0];
++        console.log(`🔗 优酷链接: ${decodedUrl}`);
++        urls.push({ platform: 'youku', url: decodedUrl });
++      }
++    }
++
++    // 直接提取腾讯视频链接
++    const qqMatches = html.match(/https:\/\/v\.qq\.com\/x\/cover\/[^"'\s]+/g);
++    if (qqMatches && qqMatches.length > 0) {
++      console.log(`🎭 找到直接腾讯链接: ${qqMatches[0]}`);
++      urls.push({
++        platform: 'tencent_direct',
++        url: qqMatches[0].split('?')[0],
++      });
++    }
++
++    // B站链接提取（直接链接）
++    const biliMatches = html.match(/https:\/\/www\.bilibili\.com\/video\/[^"'\s]+/g);
++    if (biliMatches && biliMatches.length > 0) {
++      console.log(`📺 找到B站直接链接: ${biliMatches[0]}`);
++      urls.push({
++        platform: 'bilibili', 
++        url: biliMatches[0].split('?')[0],
++      });
++    }
++
++    // B站链接提取（豆瓣跳转链接）
++    const biliDoubanMatches = html.match(/play_link:\s*"[^"]*bilibili\.com[^"]*"/g);
++    if (biliDoubanMatches && biliDoubanMatches.length > 0) {
++      console.log(`📱 找到 ${biliDoubanMatches.length} 个B站豆瓣链接`);
++
++      // 如果指定了集数，尝试找到对应集数的链接
++      let selectedMatch = biliDoubanMatches[0]; // 默认使用第一个
++      if (episode && biliDoubanMatches.length > 1) {
++        const episodeNum = parseInt(episode);
++        if (episodeNum > 0 && episodeNum <= biliDoubanMatches.length) {
++          selectedMatch = biliDoubanMatches[episodeNum - 1];
++          console.log(`🎯 选择第${episode}集B站豆瓣链接`);
++        }
++      }
++
++      const urlMatch = selectedMatch.match(/https?%3A%2F%2F[^"&]*bilibili\.com[^"&]*/);
++      if (urlMatch) {
++        const decodedUrl = decodeURIComponent(urlMatch[0]).split('?')[0];
++        console.log(`🔗 B站豆瓣链接: ${decodedUrl}`);
++        urls.push({ platform: 'bilibili_douban', url: decodedUrl });
++      }
++    }
++
++    // 转换移动版链接为PC版链接（弹幕库API需要PC版）
++    const convertedUrls = urls.map(urlObj => {
++      let convertedUrl = urlObj.url;
++
++      // 优酷移动版转PC版
++      if (convertedUrl.includes('m.youku.com/alipay_video/id_')) {
++        convertedUrl = convertedUrl.replace(
++          /https:\/\/m\.youku\.com\/alipay_video\/id_([^.]+)\.html/,
++          'https://v.youku.com/v_show/id_$1.html'
++        );
++        console.log(`🔄 优酷移动版转PC版: ${convertedUrl}`);
++      }
++
++      // 爱奇艺移动版转PC版
++      if (convertedUrl.includes('m.iqiyi.com/')) {
++        convertedUrl = convertedUrl.replace('m.iqiyi.com', 'www.iqiyi.com');
++        console.log(`🔄 爱奇艺移动版转PC版: ${convertedUrl}`);
++      }
++
++      // 腾讯视频移动版转PC版
++      if (convertedUrl.includes('m.v.qq.com/')) {
++        convertedUrl = convertedUrl.replace('m.v.qq.com', 'v.qq.com');
++        console.log(`🔄 腾讯移动版转PC版: ${convertedUrl}`);
++      }
++
++      // B站移动版转PC版
++      if (convertedUrl.includes('m.bilibili.com/')) {
++        convertedUrl = convertedUrl.replace('m.bilibili.com', 'www.bilibili.com');
++        // 移除豆瓣来源参数
++        convertedUrl = convertedUrl.split('?')[0];
++        console.log(`🔄 B站移动版转PC版: ${convertedUrl}`);
++      }
++
++      return { ...urlObj, url: convertedUrl };
++    });
++
++    console.log(`✅ 总共提取到 ${convertedUrls.length} 个平台链接`);
++    return convertedUrls;
++  } catch (error) {
++    // 清理超时定时器
++    if (timeoutId) {
++      clearTimeout(timeoutId);
++    }
++
++    if (error instanceof DOMException && error.name === 'AbortError') {
++      console.error('❌ 豆瓣请求超时 (10秒):', doubanId);
++    } else {
++      console.error('❌ 提取平台链接失败:', error);
++    }
++    return [];
++  }
++}// }}}
++
++
++// 获取首个可用的 URL from XML API, https://github.com/lyz05/danmaku
++async function firstDanmuXmlUrl(platform: string, videoUrl: string, timeout: number): Promise<string> {
++  const xmlApiUrls = [
++    'https://fc.lyz05.cn',
++    'https://danmu.smone.us'
++  ];
++
++  // 尝试每个API URL
++  for (let i = 0; i < xmlApiUrls.length; i++) {
++    const baseUrl = xmlApiUrls[i];
++    const apiName = i === 0 ? '主用XML API' : `备用XML API ${i}`;
++    const controller = new AbortController();
++    const timeoutId = setTimeout(() => controller.abort(), timeout);
++
++    try {
++      const apiUrl = `${baseUrl}/?url=${encodeURIComponent(videoUrl)}`;
++      console.log(`🌐 [平台 ${platform}] 正在测试请求${apiName}:`, apiUrl);
++      const response = await fetch(apiUrl, {
++        method: 'HEAD', // 使用 HEAD 方法，只检查响应头
++        signal: controller.signal,
++        headers: {
++          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
++          'Accept': 'application/xml, text/xml, */*',
++          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
++        },
++      });
++
++      clearTimeout(timeoutId);
++      console.log(`📡 [平台 ${platform}] ${apiName}响应状态:`, response.status, response.statusText);
++
++      if (!response.ok) {
++        console.log(`❌ [平台 ${platform}] ${apiName}响应失败:`, response.status);
++        continue; // 尝试下一个API
++      } else {
++        // 返回第一个成功的API
++        return apiUrl;
++      }
++    } catch (error) {
++      clearTimeout(timeoutId);
++      if (error instanceof DOMException && error.name === 'AbortError') {
++        console.error(`❌ [平台 ${platform}] ${apiName}请求超时 (${timeout/1000}秒):`, videoUrl);
++      } else {
++        console.error(`❌ [平台 ${platform}] ${apiName}请求失败:`, error);
++      }
++      // 继续尝试下一个API
++    }
++  }
++
++  // 所有API都失败了
++  console.log(`❌ [平台 ${platform}] 所有弹幕 XML API 均请求失败！`);
++  return '';
++}
++
++export async function GET(request: NextRequest) {
++  const { searchParams } = new URL(request.url);
++  const doubanId = searchParams.get('douban_id');
++  const title = searchParams.get('title');
++  const episode = searchParams.get('episode'); // 集数参数，默认第1集
++  const timeout = parseInt(searchParams.get('timeout') ?? '8') || 8; // 测试超时 second
++
++  console.log(`==> 弹幕API请求参数: 豆瓣ID = ${doubanId}, 标题 = ${title}, 集数 = ${episode}, 超时 = ${timeout}s`);
++
++  if (!doubanId && !title) {
++    console.log("❌ 缺少参数：douban_id or title");
++    return NextResponse.json({
++      error: 'Missing required parameters: douban_id or title'
++    }, { status: 400 });
++  }
++
++  try {
++    let platformUrls: PlatformUrl[] = [];
++
++    // 优先从豆瓣页面提取链接
++    if (doubanId) {
++      console.log('🔍 优先从豆瓣页面提取链接...');
++      platformUrls = await extractPlatformUrls(doubanId, episode);
++      console.log('📝 豆瓣提取结果:', platformUrls);
++    }
++
++    // 如果豆瓣没有结果，使用caiji.cyou API作为备用
++    if (platformUrls.length === 0 && title) {
++      console.log('🔍 豆瓣未找到链接，使用Caiji API备用搜索...');
++      const caijiUrls = await searchFromCaijiAPI(title, episode);
++      if (caijiUrls.length > 0) {
++        platformUrls = caijiUrls;
++        console.log('📺 Caiji API备用结果:', platformUrls);
++      }
++    }
++
++    // 找不到任何链接
++    if (platformUrls.length === 0) {
++      console.log(`❌ 未找到任何"${title}"的视频平台链接，无弹幕 XML URL`);
++      return NextResponse.json({
++        error: 'No video link found'
++      }, { status: 404 });
++    }
++
++    // 并发测试多个平台的 XML API
++    const danmuXmlPromises = platformUrls.map(async ({ platform, url }) => {
++      const xmlurl = await firstDanmuXmlUrl(platform, url, timeout*1000);
++      return { platform, xmlurl };
++    });
++    const results = await Promise.allSettled(danmuXmlPromises);
++
++    const platforms: string[] = [];
++    const xmlurls: string[] = [];
++    results.forEach((result) => {
++      if (result.status === 'fulfilled' && result.value.xmlurl) {
++        platforms.push(result.value.platform);
++        xmlurls.push(result.value.xmlurl);
++      }
++    });
++
++    return NextResponse.json({
++      platforms: platforms,
++      xmlurls: xmlurls,
++      total: xmlurls.length,
++    });
++
++  } catch (error) {
++    console.error('获取弹幕 XML URL 失败:', error);
++    return NextResponse.json({ 
++      error: 'Failed to get the danmaku XML URL',
++    }, { status: 500 });
++  }
++}
+diff -Nur v100/src/app/api/m3u8filter-register/route.ts open-with-mpv/src/app/api/m3u8filter-register/route.ts
+--- v100/src/app/api/m3u8filter-register/route.ts	1970-01-01 08:00:00.000000000 +0800
++++ open-with-mpv/src/app/api/m3u8filter-register/route.ts	2025-09-28 19:01:21.275381037 +0800
+@@ -0,0 +1,2 @@
++export const runtime = 'nodejs';
++export { POST } from '@/lib/m3u8filter';
+diff -Nur v100/src/app/api/registered-m3u8filter/route.ts open-with-mpv/src/app/api/registered-m3u8filter/route.ts
+--- v100/src/app/api/registered-m3u8filter/route.ts	1970-01-01 08:00:00.000000000 +0800
++++ open-with-mpv/src/app/api/registered-m3u8filter/route.ts	2025-09-28 19:01:43.241380644 +0800
+@@ -0,0 +1,2 @@
++export const runtime = 'nodejs';
++export { GET } from '@/lib/m3u8filter';
+diff -Nur v100/src/app/play/page.tsx open-with-mpv/src/app/play/page.tsx
+--- v100/src/app/play/page.tsx	2025-09-25 00:54:27.000000000 +0800
++++ open-with-mpv/src/app/play/page.tsx	2025-09-28 10:17:46.267943620 +0800
+@@ -42,6 +42,8 @@
+   removeEventListener(type: 'release', listener: () => void): void;
+ }
  
-@@ -1838,6 +1878,37 @@
++import MPVPlayButton from '@/components/MPVPlayButton';
++
+ function PlayPageClient() {
+   const router = useRouter();
+   const searchParams = useSearchParams();
+@@ -1838,6 +1840,15 @@
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}
-+            {/* 非移动设备，同一行 MPV button */}
-+            {videoMPVUrl && videoMPVUrl.length > 0 && (
-+            <button
-+              onClick={() => {
-+                const currentPlayTime = artPlayerRef.current?.currentTime || 0;
-+                const currentvideoMPVUrl = currentPlayTime > 5
-+                    ?`${videoMPVUrl}&startat=${Math.floor(currentPlayTime) - 1}`
-+                    :videoMPVUrl;
-+                // 暂停播放器
-+                if (artPlayerRef.current && !artPlayerRef.current.paused) {
-+                    artPlayerRef.current.pause();
-+                }
-+                // target name
-+                //  "_blank": 新窗口。artPlayer 仅暂停。
-+                //  "_self": 页面卸载时, handleBeforeUnload, artPlayer 资源会被清理，比仅暂停更省资源。(NOT-TODO) 可添加状态判断，阻止清理。
-+                //  "open-with-mpv": specified 新窗口，避免多个 blank 窗口。
-+                const targetName = "open-with-mpv";
-+                const targetTitle = `${document.title} | MPV`;
-+                const mpvindow =window.open(currentvideoMPVUrl, targetName);
-+                if (mpvindow && mpvindow.document) {
-+                    mpvindow.document.title = targetTitle;
-+                }
-+              }}
-+              className='ml-4 flex-shrink-0 hover:opacity-90 transition-all duration-200 hover:scale-105'
-+              title={videoUrl}
-+            >
-+              <div className='flex items-center gap-1.5 bg-blue-200 hover:bg-blue-400 dark:bg-blue-600 dark:hover:bg-blue-800 text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-full text-sm font-semibold shadow-md'>
-+                <span>MPV 播放</span>
-+              </div>
-+            </button>
-+            )}
++            {/* 非移动设备，同一行使用 MPVPlayButton 组件 */}
++            <MPVPlayButton
++              videoUrl={videoUrl}
++              videoTitle={videoTitle}
++              videoDoubanId={videoDoubanId}
++              detail={detail}
++              currentEpisodeIndex={currentEpisodeIndex}
++              artPlayerRef={artPlayerRef}
++            />
            </h1>
          </div>
          {/* 第二行：播放器和选集 */}
+diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPVPlayButton.tsx
+--- v100/src/components/MPVPlayButton.tsx	1970-01-01 08:00:00.000000000 +0800
++++ open-with-mpv/src/components/MPVPlayButton.tsx	2025-09-28 19:11:34.623370053 +0800
+@@ -0,0 +1,325 @@
++'use client';
++
++import { useState, useEffect, useRef, useCallback } from 'react';
++import { SearchResult } from '@/lib/types';
++
++interface MPVPlayButtonProps {
++  videoUrl: string;
++  videoTitle: string;
++  videoDoubanId: number;
++  detail: SearchResult | null;
++  currentEpisodeIndex: number;
++  artPlayerRef: React.MutableRefObject<any>;
++}
++
++// 工具函数：安全 base64 编码
++const safeU8Base64 = (str: string): string => {
++  const b64 = btoa(unescape(encodeURIComponent(str)));
++  return b64.replace(/\//g, "_").replace(/\+/g, "-").replaceAll("=", "");
++};
++
++// 工具函数：检测是否为移动设备
++const isMobileDevice = (): boolean => {
++  if (typeof navigator === 'undefined') return false;
++  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
++};
++
++// 弹幕 URL 地址 API 响应类型
++interface DanmakuUrlsResponse {
++  total: number;
++  platforms: string[];
++  xmlurls: string[];
++}
++
++// 缓存接口
++interface CacheEntry {
++  data: DanmakuUrlsResponse | null;
++  timestamp: number;
++  loading: boolean;
++}
++
++// 弹幕 URL 地址 API 缓存（内存缓存）
++const danmakuUrlsCache = new Map<string, CacheEntry>();
++
++// 获取缓存键
++const getCacheKey = (doubanId: number, title: string, episode: number): string => {
++  return `${doubanId}-${title}-${episode}`;
++};
++
++export default function MPVPlayButton({
++  videoUrl,
++  videoTitle,
++  videoDoubanId,
++  detail,
++  currentEpisodeIndex,
++  artPlayerRef
++}: MPVPlayButtonProps) {
++  const [isMobile, setIsMobile] = useState(false);
++  const [filteredVideoUrl, setFilteredVideoUrl] = useState<string>(''); // 过滤后的视频地址
++  const [danmakuUrlsStatus, setDanmakuUrlsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
++
++  // 使用 ref 存储当前缓存键，避免重复请求
++  const currentCacheKeyRef = useRef<string>('');
++
++  // 检测设备类型
++  useEffect(() => {
++    setIsMobile(isMobileDevice());
++  }, []);
++
++  // 生成唯一的临时 key for filteredVideoUrl
++  const generateTempKey = useCallback((url: string): string => {
++    // 使用简单的哈希函数处理 url
++    let hash = 0;
++    for (let i = 0; i < url.length; i++) {
++      const char = url.charCodeAt(i);
++      hash = ((hash << 5) - hash) + char;
++      hash = hash & hash; // Convert to 32bit integer
++    }
++    // timestamp
++    const random = (Math.floor(Date.now()*Math.random())).toString(36);
++    return `${Math.abs(hash).toString(36)}-${random}`;
++  }, []);
++
++  // 过滤 M3U8 地址 - 使用临时认证的 key
++  const filterM3U8Url = useCallback(async (url: string): Promise<string> => {
++    // 如果不是 m3u8 地址或者去过滤功能关闭，直接返回原地址
++    if (!url.includes('.m3u8') || process.env.MPV_FILTER_M3U8 === 'off') {
++      return url;
++    }
++
++    try {
++      console.log('[MPV] 开始注册过滤 M3U8 地址:', url);
++      // 生成临时 key
++      const tmpKey = generateTempKey(url);
++      const urlKey = `${tmpKey}.m3u8`;
++
++      // 发送 POST 请求注册 key
++      const response = await fetch('/api/m3u8filter-register', {
++        method: 'POST',
++        headers: {
++          'Content-Type': 'application/json',
++        },
++        body: JSON.stringify({
++          url_key: urlKey,
++          original_url: url
++        })
++      });
++
++      if (response.ok) {
++        const result = await response.json();
++        if (result.success) {
++          // 构建新的过滤地址
++          // 通过 middleware 匹配: api/register，mpv 跳过认证
++          const filteredUrl = `${window.location.origin}/api/registered-m3u8filter?url_key=${urlKey}`;
++          console.log('[MPV] M3U8 过滤注册成功，使用过滤后地址:', filteredUrl);
++          return filteredUrl;
++        } else {
++          console.warn('[MPV] M3U8 过滤注册失败，使用原始地址');
++          return url;
++        }
++      } else {
++        console.warn('[MPV] M3U8 过滤注册请求失败，使用原始地址');
++        return url;
++      }
++    } catch (error) {
++      console.error('[MPV] M3U8 过滤注册错误:', error);
++      return url;
++    }
++  }, [generateTempKey]);
++
++  // 处理视频地址过滤
++  useEffect(() => {
++    const processVideoUrl = async () => {
++      if (!videoUrl) {
++        setFilteredVideoUrl('');
++        return;
++      }
++      console.log('[MPV] 原始视频地址：', videoUrl);
++      const filteredUrl = await filterM3U8Url(videoUrl);
++      setFilteredVideoUrl(filteredUrl);
++      console.log('[MPV] 最终视频地址：', filteredUrl);
++    };
++    processVideoUrl();
++  }, [videoUrl, filterM3U8Url]);
++
++  // 预先加载弹幕 URL 地址
++  useEffect(() => {
++    if (isMobile || (!videoDoubanId && !videoTitle)) return;
++
++    const cacheKey = getCacheKey(videoDoubanId, videoTitle, currentEpisodeIndex + 1);
++    currentCacheKeyRef.current = cacheKey;
++
++    // 检查缓存
++    const cachedEntry = danmakuUrlsCache.get(cacheKey);
++    if (cachedEntry) {
++      setDanmakuUrlsStatus(cachedEntry.data ? 'ready' : 'error');
++      return; // 使用有效缓存
++    }
++
++    // 标记为弹幕 URL 加载中
++    setDanmakuUrlsStatus('loading');
++    danmakuUrlsCache.set(cacheKey, { data: null, timestamp: Date.now(), loading: true });
++
++    const preloadDanmakuUrls = async () => {
++      try {
++        const params = new URLSearchParams();
++        if (videoDoubanId > 0) {
++          params.append('douban_id', videoDoubanId.toString());
++        }
++        if (videoTitle) {
++          params.append('title', videoTitle);
++        }
++        if (currentEpisodeIndex > 0) {
++          params.append('episode', (currentEpisodeIndex + 1).toString());
++        }
++        params.append('timeout', '10');
++
++        console.log('[MPV] 预加载弹幕 URL 请求参数:', params.toString());
++        const response = await fetch(`/api/danmaku-xmlurl?${params.toString()}`, {
++          headers: { 'Content-Type': 'application/json' },
++        });
++
++        if (response.ok) {
++          const urlsData = await response.json();
++          if (urlsData && urlsData.total > 0) {
++            // 更新缓存
++            danmakuUrlsCache.set(cacheKey, {
++              data: urlsData,
++              timestamp: Date.now(),
++              loading: false
++            });
++            setDanmakuUrlsStatus('ready');
++            console.log('[MPV] 弹幕 URL 地址预加载完成');
++          } else {
++            // 即使没有数据也缓存结果，避免重复请求
++            danmakuUrlsCache.set(cacheKey, {
++              data: null,
++              timestamp: Date.now(),
++              loading: false
++            });
++            setDanmakuUrlsStatus('error');
++            console.log('[MPV] 弹幕 URL 地址为空');
++          }
++        } else {
++          const errorText = await response.text();
++          console.error('[MPV] 弹幕 URL 地址预加载失败:', response.status, errorText);
++          danmakuUrlsCache.set(cacheKey, {
++            data: null,
++            timestamp: Date.now(),
++            loading: false
++          });
++          setDanmakuUrlsStatus('error');
++        }
++      } catch (error) {
++        console.error('[MPV] 弹幕 URL 地址预加载异常:', error);
++        danmakuUrlsCache.set(cacheKey, {
++          data: null,
++          timestamp: Date.now(),
++          loading: false
++        });
++        setDanmakuUrlsStatus('error');
++      }
++    };
++
++    preloadDanmakuUrls();
++  }, [videoDoubanId, videoTitle, currentEpisodeIndex, isMobile]);
++
++  // 工具函数：生成 MPV 播放地址（同步函数，使用预加载的弹幕 URL 地址）
++  const generateMPVUrl = (currentTime?: number): string => {
++    const finalVideoUrl = filteredVideoUrl || videoUrl;
++    console.log('[MPV] 视频地址：', finalVideoUrl);
++    const v_title = (detail?.episodes?.length || 0) > 1
++      ? `${videoTitle || '影片标题'} - ${detail?.episodes_titles?.[currentEpisodeIndex] || `第${currentEpisodeIndex + 1}集`}`
++      : `${videoTitle || '影片标题'}`;
++    console.log('[MPV] 视频标题：', v_title);
++    let mpvurl = `mpv://play/${safeU8Base64(finalVideoUrl)}/?v_title=${safeU8Base64(v_title)}`;
++
++    // 使用预加载的弹幕 URL 地址
++    const cacheKey = currentCacheKeyRef.current;
++    const cachedEntry = danmakuUrlsCache.get(cacheKey);
++    if (cachedEntry && cachedEntry.data && cachedEntry.data.total > 0) {
++      console.log('[MPV] 使用预加载的弹幕 URL 地址');
++      const urlsData = cachedEntry.data;
++      // platforms, xmlurls
++      for (let i = 0; i < urlsData.total; i++) {
++        const danmurl = urlsData.xmlurls[i];
++        const platform = urlsData.platforms[i];
++        console.log(`[MPV] 添加 ${platform} 弹幕地址：`, danmurl);
++        mpvurl += `&danmaku_xmlurl=${safeU8Base64(danmurl)}`;
++      }
++    } else {
++      console.log('[MPV] 无弹幕 URL 地址可用');
++    }
++
++    // 添加开始时间，若播放时间大于5秒
++    if (currentTime && currentTime > 5) {
++      mpvurl += `&startat=${Math.floor(currentTime) - 1}`;
++    }
++
++    console.log('[MPV] 播放地址：', mpvurl);
++    return mpvurl;
++  };
++
++  // 如果没有视频地址或是移动设备，不渲染按钮
++  if (!videoUrl || isMobile) {
++    return null;
++  }
++
++  const handleMPVPlay = () => {
++    const currentPlayTime = artPlayerRef.current?.currentTime || 0;
++    const finalMpvUrl = generateMPVUrl(currentPlayTime);
++
++    // 暂停播放器
++    if (artPlayerRef.current && !artPlayerRef.current.paused) {
++      artPlayerRef.current.pause();
++    }
++
++    // 打开 MPV 播放窗口
++    //  "_blank": 新窗口。artPlayer 仅暂停。
++    //  "_self": 页面卸载时, handleBeforeUnload, artPlayer 资源会被清理，比仅暂停更省资源。(NOT-TODO) 可添加状态判断，阻止清理。
++    //  "open-with-mpv": specified 新窗口，避免多个 blank 窗口。
++    const targetName = "open-with-mpv";
++    const targetTitle = `${document.title} | MPV`;
++    const mpvWindow = window.open(finalMpvUrl, targetName);
++
++    if (mpvWindow && mpvWindow.document) {
++      mpvWindow.document.title = targetTitle;
++    }
++  };
++
++  // 根据 filteredVideoUrl显示不同的按钮 title
++  const getButtonTitle = () => {
++    if (filteredVideoUrl !== videoUrl) {
++        return `${videoUrl} -> ${filteredVideoUrl}`;
++    } else {
++      return videoUrl;
++    }
++  };
++
++  // 根据弹幕 URL 地址预加载状态显示不同的按钮文本
++  const getButtonText = () => {
++    switch (danmakuUrlsStatus) {
++      case 'loading':
++        return <span>MPV 播放 (弹幕URL加载中...)</span>;
++      case 'ready':
++        return <span>MPV 播放 ✓</span>;
++      case 'error':
++        return <span>MPV 播放 (无弹幕)</span>;
++      default:
++        return <span>MPV 播放</span>;
++    }
++  };
++
++  return (
++    <button
++      onClick={handleMPVPlay}
++      disabled={danmakuUrlsStatus === 'loading'}
++      className="ml-4 flex-shrink-0 hover:opacity-90 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
++      title={getButtonTitle()}
++    >
++      <div className="flex items-center gap-1.5 bg-blue-200 hover:bg-blue-400 dark:bg-blue-600 dark:hover:bg-blue-800 text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-full text-sm font-semibold shadow-md">
++        {getButtonText()}
++      </div>
++    </button>
++  );
++}
+diff -Nur v100/src/lib/m3u8filter.ts open-with-mpv/src/lib/m3u8filter.ts
+--- v100/src/lib/m3u8filter.ts	1970-01-01 08:00:00.000000000 +0800
++++ open-with-mpv/src/lib/m3u8filter.ts	2025-09-28 18:25:00.623420088 +0800
+@@ -0,0 +1,58 @@
++/* eslint-disable no-console */
++
++import { NextRequest, NextResponse } from 'next/server';
++import { getAuthInfoFromCookie } from '@/lib/auth';
++
++export const runtime = 'nodejs';
++
++const registeredKeys = new Map<string, { url: string; timestamp: number }>();
++
++export async function POST(request: NextRequest) {
++  try {
++    // 从 cookie 获取用户信息
++    const authInfo = getAuthInfoFromCookie(request);
++    if (!authInfo || !authInfo.username) {
++      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
++    }
++
++    const { url_key, original_url } = await request.json();
++    // 验证参数
++    if (!url_key || !original_url) {
++      return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
++    }
++    // 注册 key
++    registeredKeys.set(url_key, {
++      url: original_url,
++      timestamp: Date.now()
++    });
++    // 设置过期时间: 1小时
++    setTimeout(() => {
++      registeredKeys.delete(url_key);
++    }, 60 * 60 * 1000);
++    return NextResponse.json({ success: true });
++  } catch (error) {
++    return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
++  }
++}
++
++export async function GET(request: NextRequest) {
++  // "不"验证用户信息，方便 mpv 访问
++  const { searchParams } = new URL(request.url);
++  const url_key = searchParams.get('url_key');
++  if (!url_key || !registeredKeys.has(url_key)) {
++    return new Response('Not Found', { status: 404 });
++  }
++  const entry = registeredKeys.get(url_key);
++  if (!entry) {
++    return new Response('Not Found', { status: 404 });
++  }
++
++  // 在这里实现 m3u8 过滤逻辑
++  // 使用 entry.url 获取原始 m3u8 内容并过滤
++
++  return new Response('Filtered m3u8 content', {
++    headers: {
++      'Content-Type': 'application/vnd.apple.mpegurl',
++    },
++  });
++}

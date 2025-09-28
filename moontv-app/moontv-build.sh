@@ -61,6 +61,10 @@ build_app() {
                 echo " -> replacing ' USERNAME' in $ts ..."
                 sed -i "s| USERNAME| ADMIN_USERNAME|g" "$buildir/$ts"
             done
+            if [ -f "$buildir/.eslintrc.js" ]; then
+                echo -e "\n[I] Ignore no-console Warning ..."
+                sed -i "s|'no-console': 'warn'|'no-console': 'off'|" "$buildir/.eslintrc.js"
+            fi
         ) | tee -a "${WORKDIR}/build/${appdir}-patch.log"
     fi
     # build, test w/ Node.js v24.7.0, Corepack 0.34.0, pnpm 10.15.1

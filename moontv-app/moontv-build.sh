@@ -74,6 +74,7 @@ build_app() {
         # 确保 Next.js 在编译时即选择 Node Runtime 而不是 Edge Runtime
         find ./src -type f -name "route.ts" -print0 \
             | xargs -0 sed -i "s/export const runtime = 'edge';/export const runtime = 'nodejs';/g"
+        # 修复 pnpm lint --fix
         (pnpm install --frozen-lockfile && pnpm run build) \
             | tee "${WORKDIR}/build/${appdir}-build.log"
         cd "${WORKDIR}/"

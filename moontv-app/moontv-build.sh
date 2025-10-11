@@ -4,7 +4,7 @@
 export DOCKER_ENV=false
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
-mkdir -pv "$WORKDIR"/{download,build,dist/config-collections}
+mkdir -pv "$WORKDIR"/{download,build,dist/{config-collections,next-cache}}
 
 build_app() {
     local name="$1"
@@ -70,7 +70,11 @@ build_app() {
             if [ -f "$buildir/$tsfile" ]; then
                 if grep "console.log('更新用户统计数据" "$buildir/$tsfile" >/dev/null; then
                     echo -e "\n[I] //commit log '更新用户统计数据' in $tsfile"
-                    sed -i "s|console.log('更新用户统计数据|//console.log('更新用户统计数据|" "$buildir/$tsfile"
+                    sed -i "s|\(console.log('更新用户统计数据\)|//\1|" "$buildir/$tsfile"
+                fi
+                if grep "console.log.*my-stats - 开始处理请求" "$buildir/$tsfile" >/dev/null; then
+                    echo -e "\n[I] //commit log 'my-stats - 开始处理请求' in $tsfile"
+                    sed -i "s|\(console.log.*my-stats - 开始处理请求\)|//\1|" "$buildir/$tsfile"
                 fi
             fi
             tsfile="src/lib/downstream.ts"
@@ -119,6 +123,8 @@ build_app() {
             "${distdir}-manifest.json"
         ln -sv ../../"${appdir}-manifest.json" \
             "$distdir/public/manifest.json"
+        # link .next/cache dir
+        ln -sv ../../next-cache "${distdir}/.next/cache"
         # link config-collections/{moontv,iptv}
         ln -sv ../../config-collections "$distdir/public/config-collections"
         printf "\n[I] %s installed to ${distdir}\n\n" "$name"

@@ -27,7 +27,7 @@ build_app() {
         # rm screenshotX.png
         gzip -d "$tarball"
         tar -v -f "${tarball/.gz/}" --delete ${gitrepo}-${AppCommits[$name]}/public/screenshot{1,2,3}.png
-        if [ "$gitrepo" == 'KatelyaTV' ]; then
+        if [ "$gitrepo" == 'KatelyaTV' -o "$gitrepo" == 'DecoTV' ]; then
             tar -v -f "${tarball/.gz/}" --delete ${gitrepo}-${AppCommits[$name]}/public/{screenshot4.png,wechat.jpg}
         fi
         gzip "${tarball/.gz/}"
@@ -44,6 +44,7 @@ build_app() {
                 echo "[I] Applying patch file: ${WORKDIR}/$pf"
                 patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3
             done
+
             if [ -f "$buildir/src/lib/shortdrama.client.ts" ]; then
                 con1=$(grep "User-Agent" "$buildir/src/lib/shortdrama.client.ts")
                 con2=$(grep "mode: 'cors'" "$buildir/src/lib/shortdrama.client.ts")
@@ -52,6 +53,8 @@ build_app() {
                     sed -i '/User-Agent/d' "$buildir/src/lib/shortdrama.client.ts"
                 fi
             fi
+
+            # ADMIN_USERNAME
             echo -e "\n[I] process.env.USERNAME -> process.env.ADMIN_USERNAME"
             for ts in $(cd "$buildir" && grep 'process.env.USERNAME' -Rl); do
                 echo " -> replacing 'process.env.USERNAME' in $ts ..."
@@ -61,6 +64,23 @@ build_app() {
                 echo " -> replacing ' USERNAME' in $ts ..."
                 sed -i "s| USERNAME| ADMIN_USERNAME|g" "$buildir/$ts"
             done
+
+            # commit some console.log
+            tsfile="src/app/api/user/my-stats/route.ts"
+            if [ -f "$buildir/$tsfile" ]; then
+                if grep "console.log('更新用户统计数据" "$buildir/$tsfile" >/dev/null; then
+                    echo -e "\n[I] //commit log '更新用户统计数据' in $tsfile"
+                    sed -i "s|console.log('更新用户统计数据|//console.log('更新用户统计数据|" "$buildir/$tsfile"
+                fi
+            fi
+            tsfile="src/lib/downstream.ts"
+            if [ -f "$buildir/$tsfile" ]; then
+                if grep 'console.log(`\[DEBUG\]' "$buildir/$tsfile" >/dev/null; then
+                    echo -e "\n[I] //commit log [DEBUG] in $tsfile"
+                    sed -i 's|console.log(`\[DEBUG\]|//console.log(`\[DEBUG\]|' "$buildir/$tsfile"
+                fi
+            fi
+
             if [ -f "$buildir/.eslintrc.js" ]; then
                 echo -e "\n[I] Ignore no-console Warning ..."
                 sed -i "s|'no-console': 'warn'|'no-console': 'off'|" "$buildir/.eslintrc.js"

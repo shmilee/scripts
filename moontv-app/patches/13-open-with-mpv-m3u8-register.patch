@@ -1,0 +1,835 @@
+diff --git a/src/app/api/m3u8-register/route.ts b/src/app/api/m3u8-register/route.ts
+new file mode 100644
+index 0000000..f885f89
+--- /dev/null
++++ b/src/app/api/m3u8-register/route.ts
+@@ -0,0 +1,2 @@
++export const runtime = 'nodejs';
++export { POST } from '@/lib/m3u8.register';
+diff --git a/src/app/api/registered.m3u8/route.ts b/src/app/api/registered.m3u8/route.ts
+new file mode 100644
+index 0000000..b753efe
+--- /dev/null
++++ b/src/app/api/registered.m3u8/route.ts
+@@ -0,0 +1,2 @@
++export const runtime = 'nodejs';
++export { GET } from '@/lib/m3u8.register';
+diff --git a/src/components/UserMenu.tsx b/src/components/UserMenu.tsx
+index 2d55278..84493f2 100644
+--- a/src/components/UserMenu.tsx
++++ b/src/components/UserMenu.tsx
+@@ -127,6 +127,8 @@ export const UserMenu: React.FC = () => {
+   }, []);
+ 
+   // 从 localStorage 读取设置
++  // 设置 m3u8 filter 相关状态. 在此补充添加, 提高补丁成功率
++  const [mpvM3u8Filter, setMpvM3u8Filter] = useState(true);
+   useEffect(() => {
+     if (typeof window !== 'undefined') {
+       const savedAggregateSearch = localStorage.getItem(
+@@ -191,6 +193,13 @@ export const UserMenu: React.FC = () => {
+         setFluidSearch(defaultFluidSearch);
+       }
+ 
++      const savedMpvM3u8Filter = localStorage.getItem('mpvM3u8Filter');
++      if (savedMpvM3u8Filter !== null) {
++        setMpvM3u8Filter(JSON.parse(savedMpvM3u8Filter));
++      } else {
++        setMpvM3u8Filter(true); // 默认值为 true
++      }
++
+       const savedLiveDirectConnect = localStorage.getItem('liveDirectConnect');
+       if (savedLiveDirectConnect !== null) {
+         setLiveDirectConnect(JSON.parse(savedLiveDirectConnect));
+@@ -370,6 +379,13 @@ export const UserMenu: React.FC = () => {
+     }
+   };
+ 
++  const handleMpvM3u8FilterToggle = (value: boolean) => {
++    setMpvM3u8Filter(value);
++    if (typeof window !== 'undefined') {
++      localStorage.setItem('mpvM3u8Filter', JSON.stringify(value));
++    }
++  };
++
+   const handleLiveDirectConnectToggle = (value: boolean) => {
+     setLiveDirectConnect(value);
+     if (typeof window !== 'undefined') {
+@@ -432,6 +448,7 @@ export const UserMenu: React.FC = () => {
+     setDefaultAggregateSearch(true);
+     setEnableOptimization(true);
+     setFluidSearch(defaultFluidSearch);
++    setMpvM3u8Filter(true);
+     setLiveDirectConnect(false);
+     setDoubanProxyUrl(defaultDoubanProxy);
+     setDoubanDataSource(defaultDoubanProxyType);
+@@ -442,6 +459,7 @@ export const UserMenu: React.FC = () => {
+       localStorage.setItem('defaultAggregateSearch', JSON.stringify(true));
+       localStorage.setItem('enableOptimization', JSON.stringify(true));
+       localStorage.setItem('fluidSearch', JSON.stringify(defaultFluidSearch));
++      localStorage.setItem('mpvM3u8Filter', JSON.stringify(true));
+       localStorage.setItem('liveDirectConnect', JSON.stringify(false));
+       localStorage.setItem('doubanProxyUrl', defaultDoubanProxy);
+       localStorage.setItem('doubanDataSource', defaultDoubanProxyType);
+@@ -931,6 +949,30 @@ export const UserMenu: React.FC = () => {
+               </label>
+             </div>
+ 
++            {/* MPV m3u8 流广告过滤 */}
++            <div className='flex items-center justify-between'>
++              <div>
++                <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300'>
++                  MPV m3u8 流广告过滤
++                </h4>
++                <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
++                  是否过滤 #EXT-X-DISCONTINUITY 标签之间的疑似广告内容，关闭后仅移除 #EXT-X-DISCONTINUITY 标签以修复 mpv 的播放时间轴问题
++                </p>
++              </div>
++              <label className='flex items-center cursor-pointer'>
++                <div className='relative'>
++                  <input
++                    type='checkbox'
++                    className='sr-only peer'
++                    checked={mpvM3u8Filter}
++                    onChange={(e) => handleMpvM3u8FilterToggle(e.target.checked)}
++                  />
++                  <div className='w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-green-500 transition-colors dark:bg-gray-600'></div>
++                  <div className='absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-5'></div>
++                </div>
++              </label>
++            </div>
++
+             {/* 直播视频浏览器直连 */}
+             <div className='flex items-center justify-between'>
+               <div>
+diff --git a/src/lib/m3u8.register.ts b/src/lib/m3u8.register.ts
+new file mode 100644
+index 0000000..72f5cd9
+--- /dev/null
++++ b/src/lib/m3u8.register.ts
+@@ -0,0 +1,725 @@
++/* eslint-disable no-console */
++
++import * as http from 'http';
++import * as https from 'https';
++import { NextRequest, NextResponse } from 'next/server';
++
++import { getAuthInfoFromCookie } from '@/lib/auth';
++import { getBaseUrl, resolveUrl } from "@/lib/live";
++
++export const runtime = 'nodejs';
++
++interface responseM3u8Text {
++  ok: boolean;
++  status: number;
++  statusText: string;
++  url: string;
++  textType: string;
++  textLength: number;
++  textLines: string[];
++}
++
++interface m3u8keyEntry {
++  url: string;
++  timestamp: number;
++  responseCache: responseM3u8Text | null;
++}
++
++// register m3u8: key & url
++const registeredKeys = new Map<string, m3u8keyEntry>();
++const EXPIRATION_TIME = 8 * 60 * 60 * 1000; // 8小时
++const MAX_ENTRIES = 50; // 注册数量上限
++
++// 清理过期条目
++function cleanupExpiredKeys(): void {
++  const now = Date.now();
++  registeredKeys.forEach((entry, key) => {
++    if (now - entry.timestamp > EXPIRATION_TIME) {
++      console.log('M3U8: 🧹cleanup expired key=', key);
++      registeredKeys.delete(key);
++    }
++  });
++}
++setInterval(cleanupExpiredKeys, 30 * 60 * 1000); // 半小时清理一次
++
++// 检查 URL 格式
++function isValidUrl(url: string): boolean {
++  try {
++    new URL(url);
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++export async function POST(request: NextRequest) {
++  try {
++    // 从 cookie 获取用户信息
++    const authInfo = getAuthInfoFromCookie(request);
++    if (!authInfo || !authInfo.username) {
++      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
++    }
++
++    const { key, original_url } = await request.json();
++    // 验证参数
++    if (!key || !original_url) {
++      return NextResponse.json({ success: false, error: 'Missing parameters' }, { status: 400 });
++    }
++    // 验证 URL
++    if (!isValidUrl(original_url)) {
++      return NextResponse.json({ success: false, error: 'Invalid URL format' }, { status: 400 });
++    }
++    // 注册 key
++    const entry: m3u8keyEntry = {
++      url: original_url,
++      timestamp: Date.now(),
++      responseCache: null,
++    };
++    registeredKeys.set(key, entry);
++
++    // 注册后立即检查数量限制
++    if (registeredKeys.size > MAX_ENTRIES) {
++      const oldestKey = Array.from(registeredKeys.entries())
++        .sort(([, a], [, b]) => a.timestamp - b.timestamp)[0][0];
++      console.log(`M3U8: Auto cleanup oldest key ${oldestKey}, after registered ${key}`);
++      registeredKeys.delete(oldestKey);
++    }
++
++    return NextResponse.json({ success: true, expires: 4 });
++  } catch (error) {
++    console.error('M3U8 registration error:', error);
++    return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
++  }
++}
++
++
++// GET: 连接池管理
++const httpsAgent = new https.Agent({
++  keepAlive: true,
++  maxSockets: 50,
++  maxFreeSockets: 10,
++  timeout: 60000,
++  keepAliveMsecs: 30000,
++});
++
++const httpAgent = new http.Agent({
++  keepAlive: true,
++  maxSockets: 50,
++  maxFreeSockets: 10,
++  timeout: 60000,
++  keepAliveMsecs: 30000,
++});
++
++// GET: fetch headers, 参考 hls.js fetch-loader
++const fetchHeaders = new Headers({
++  'User-Agent': 'AptvPlayer/1.4.10',
++  'Accept': 'application/vnd.apple.mpegurl, application/x-mpegurl, application/octet-stream, */*',
++  'Accept-Encoding': 'identity', // 避免gzip压缩导致的处理复杂性
++  'Accept-Language': 'en-US,en;q=0.9',
++  'Cache-Control': 'no-cache',
++  'Pragma': 'no-cache',
++  'Connection': 'keep-alive'
++});
++
++const MAX_RECURSION_DEPTH = 3;
++// GET: fetch m3u8 textLines. 结果已 trim 且无空行.
++async function fetchM3u8Content(url: string, depth: number): Promise<responseM3u8Text> {
++  const responu8: responseM3u8Text = {
++    ok: false, status: 500, statusText: 'not set',
++    url: '', textType: '', textLength: 0, textLines: [],
++  };
++
++  if (depth > MAX_RECURSION_DEPTH) {
++    responu8.statusText = 'Maximum recursion depth exceeded';
++    console.error(`M3U8: ${responu8.statusText}`);
++    return responu8;
++  }
++
++  let response: Response | null = null;
++  let responseUsed = false;
++  const controller = new AbortController();
++  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
++  const agent = url.startsWith('https:') ? httpsAgent : httpAgent; // 选择 agent
++  try {
++    console.log(`M3U8: 正在获取源 ${url} ...`);
++    response = await fetch(url, {
++      cache: 'no-cache',
++      redirect: 'follow',
++      credentials: 'same-origin',
++      signal: controller.signal,
++      headers: fetchHeaders,
++      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
++      // @ts-ignore - Node.js specific option
++      agent: typeof window === 'undefined' ? agent : undefined,
++    });
++    clearTimeout(timeoutId);
++    responu8.ok = response.ok;
++    responu8.status = response.status;
++    responu8.statusText = response.statusText;
++    if (response.ok) {
++      // 获取最终的响应URL（处理重定向后的URL）
++      responu8.url = response.url;
++      // 检查内容是否为 M3U8
++      responu8.textType = response.headers.get('Content-Type') || '';
++      const isM3U8 = responu8.textType.toLowerCase().includes('mpegurl') ||
++                     responu8.textType.toLowerCase().includes('octet-stream') ||
++                     url.includes('.m3u8');
++      if (isM3U8) {
++        console.log(`M3U8: 检查 ${responu8.url} 的内容.`);
++        const m3u8Content = await response.text();
++        responseUsed = true;
++        responu8.textLength = parseInt(response.headers.get('Content-Length') || '0', 10);
++        if (responu8.textLength === 0) {
++          responu8.textLength = m3u8Content.length;
++        }
++        responu8.textLines = m3u8Content.split('\n')
++            .map(line => line.trim())
++            .filter(Boolean);  // 使用 Boolean 过滤空行
++        // 检查只包含一行 #EXT-X-STREAM-INF 和一行子 /xx/XXXX.m3u8 的 m3u8
++        const nonCommentLines = responu8.textLines.filter(line => !line.startsWith('#'));
++        const m3u8LineIndex = responu8.textLines.findIndex(line => !line.startsWith('#') && line.endsWith('.m3u8'));
++        if (nonCommentLines.length === 1 && m3u8LineIndex > 0
++            &&  responu8.textLines[m3u8LineIndex - 1].startsWith('#EXT-X-STREAM-INF')) {
++          // 使用最终的响应 URL 作为 baseUrl 和子 /xx/XXXX.m3u8 组合后重新请求
++          const baseUrl = getBaseUrl(responu8.url);
++          const resolvedUrl = resolveUrl(baseUrl, responu8.textLines[m3u8LineIndex]);
++          console.log(`M3U8: Get a master m3u8, 切换到子播放列表 ${resolvedUrl}`);
++          const responu88 = await fetchM3u8Content(resolvedUrl, depth + 1);
++          if (responu88.ok) {
++            return responu88;
++          } else {
++            console.error(`M3U8: 切换子播放列表 ${resolvedUrl} 失败，仍用原始 URL!`);
++          }
++        }
++      } else {
++        responu8.ok = false;
++        responu8.status = 415;
++        responu8.statusText = `Non-M3U8 Content-Type: ${responu8.textType}`;
++      }
++    }
++  } catch (error) {
++    clearTimeout(timeoutId);
++    console.error('M3U8 filter fetch error:', error);
++    responu8.ok = false;
++    responu8.status = 500;
++    responu8.statusText = `M3U8 filter fetch error: ${error}`;
++  } finally {
++    clearTimeout(timeoutId);
++    // 确保 response 被正确关闭以释放资源
++    if (response && !responseUsed && response.body) {
++      try {
++        const reader = response.body.getReader();
++        await reader.cancel();
++      } catch (error) {
++        console.warn('M3U8: Failed to close response body:', error);
++      }
++    }
++  }
++
++  return responu8;
++}
++
++//// 临时注册 test key
++//registeredKeys.set('testkey1', {
++//  url: 'https://play.maoyanplay.top/20250829/7vgEmaba/index.m3u8',
++//  timestamp: Date.now(),
++//  responseCache: null,
++//});
++//registeredKeys.set('testkey2', {
++//  url: 'https://cdn.yzzy29-play.com/20251008/4619_1bf2efbb/2000k/hls/mixed.m3u8',
++//  timestamp: Date.now(),
++//  responseCache: null,
++//});
++
++// GET: 性能统计
++const stats = {
++  requests: 0,
++  errors: 0,
++  avgResponseTime: 0,
++  totalBytes: 0,
++};
++
++// GET: 简单的频率限制 - 只记录每个IP的最后请求时间和累计次数
++const lastRequestTime = new Map<string, [number, number]>();
++// 8秒最小间隔，每隔六次请求检查（方便 mpv 连续多(5?)次访问）
++const MIN_REQUEST_INTERVAL = [8000, 7];
++// 清理长时间未活动的IP记录，防止内存泄漏
++function cleanupOldRequestTimes(): void {
++  const now = Date.now();
++  lastRequestTime.forEach(([timestamp, ], ip) => {
++    if (now - timestamp > 1800000) {
++      lastRequestTime.delete(ip);
++    }
++  });
++}
++// 半小时清理一次
++setInterval(cleanupOldRequestTimes, 1800000);
++
++// GET: 简单的 10*MIN_REQUEST_INTERVAL[0] 毫秒 modifiedContent 缓存实现
++// 此处 key 由 registered url key 和 filter: on, off 拼接而成
++const modifiedContentCache = new Map<string, {value: string, timeoutId: NodeJS.Timeout}>();
++function setModifiedContentCache(key: string, value: string) {
++  // 如果已存在相同的key，先清除之前的定时器
++  const entry = modifiedContentCache.get(key);
++  if (entry && entry.timeoutId) {
++    clearTimeout(entry.timeoutId);
++  }
++  // 设置 X 秒后删除 entry 以及 entry.timeoutId clears itself automatically.
++  const timeoutId = setTimeout(() => {
++    modifiedContentCache.delete(key);
++    console.log(`M3U8: 🧹key='${key}' 的 filtered & modified 缓存（即 modifiedContent）已清理`);
++  }, Math.max(1000, MIN_REQUEST_INTERVAL[0]*10));
++
++  // 存储值和定时器ID
++  modifiedContentCache.set(key, {
++    value,
++    timeoutId,
++  });
++}
++
++// Ref: https://github.com/SzeMeng76/LunaTV/blob/main/src/app/api/proxy/m3u8/route.ts
++// "不"验证用户信息，但限制请求频率，方便 mpv 访问: /api/registered.m3u8?key=xx&filter=xx
++//  key: registered url key
++//  filter: on, off
++//    on: filter #EXT-X-DISCONTINUITY adjump ad.ts etc.
++//    off: only delete #EXT-X-DISCONTINUITY tag
++export async function GET(request: NextRequest) {
++  const startTime = Date.now();
++  stats.requests++;
++  const { searchParams } = new URL(request.url);
++  const key = searchParams.get('key');
++  let filter = searchParams.get('filter');
++  // 获取客户端IP，检查请求间隔
++  let clientIP = request.headers.get('x-forwarded-for');
++  if (clientIP) {
++    // x-forwarded-for 可包含多个 IP，第一个是 client
++    clientIP = clientIP.split(',')[0].trim();
++  }
++  if (!clientIP) {
++    clientIP = request.headers.get('x-real-ip') ||
++               request.headers.get('cf-connecting-ip') ||
++               'unknown';
++  }
++  console.log('------------------------------');
++  console.log(`M3U8: 🌐GET Request from IP ${clientIP}`);
++
++  try {
++    // 请求频率限制
++    const [lastTime, clcount] = lastRequestTime.get(clientIP) || [null, 0];
++    if (lastTime && (startTime - lastTime) < MIN_REQUEST_INTERVAL[0]) {
++      if (clcount % MIN_REQUEST_INTERVAL[1] === 0) {
++        stats.errors++;
++        return new Response(`Too Many Requests - Please wait at least ${MIN_REQUEST_INTERVAL[0]/1000} seconds between requests`, {
++          status: 429, headers: { 'Retry-After': `${MIN_REQUEST_INTERVAL[0]/1000}` }
++        });
++      }
++      // 更新最后请求时间和累计次数
++      lastRequestTime.set(clientIP, [startTime, clcount+1]);
++    } else {
++      // 大于最小间隔后，重置累计次数
++      lastRequestTime.set(clientIP, [startTime, 1]);
++    }
++
++    // 请求参数检查
++    if (!key || !registeredKeys.has(key)) {
++      stats.errors++;
++      return new Response('Not Found url key', { status: 404 });
++    }
++    const entry = registeredKeys.get(key);
++    if (!entry) {
++      stats.errors++;
++      return new Response('Not Found url entry', { status: 404 });
++    }
++    if (!entry.url) {
++      stats.errors++;
++      return new Response('Missing url', { status: 404 });
++    }
++    if (!filter || !(filter === 'off' || filter === 'on')) {
++      filter = 'on';
++    }
++
++    // 使用 entry.url 获取原始 m3u8 内容
++    const decodedUrl = decodeURIComponent(entry.url);
++    let responu8: responseM3u8Text | null =  null;
++    const fetchStartTime = Date.now();
++    let duration: number | null = null;
++    if (entry.responseCache) {
++      responu8 = entry.responseCache;
++      duration = Date.now() - fetchStartTime;
++      console.log(`M3U8: 💫Fetch cached ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
++    } else {
++      responu8 = await fetchM3u8Content(decodedUrl, 1);
++      // 参考 hls.js fetch-loader 的错误处理逻辑
++      if (!responu8 || !responu8.ok) {
++        stats.errors++;
++        // 直接返回原始的 HTTP 错误，让 mpv 处理
++        // 不返回JSON，因为 mpv 期望的是M3U8内容或标准 HTTP 错误
++        return new NextResponse(
++          `HTTP Error ${responu8.status}: ${responu8.statusText}`,
++          {
++            status: responu8.status,
++            statusText: responu8.statusText,
++            headers: {
++              'Content-Type': 'text/plain',
++              'Access-Control-Allow-Origin': '*',
++            }
++          }
++        );
++      }
++      duration = Date.now() - fetchStartTime;
++      console.log(`M3U8: ✅Fetch ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
++      // fetch 成功后，更新长期 cache
++      entry.responseCache = responu8;
++    }
++
++    // 更新统计信息
++    stats.totalBytes += responu8.textLength;
++
++    // 过滤、重写原始 M3U8 内容
++    const filterStartTime = Date.now();
++    const contentCache: string | null = modifiedContentCache.get(`${key}:filter=${filter}`)?.value || null;
++    let modifiedContent: string | null = null;
++    if (contentCache) {
++        modifiedContent = contentCache;
++        duration = Date.now() - filterStartTime;
++        console.log(`M3U8: 💫Find filtered & modified cache for key=${key} in ${duration}ms`);
++    } else {
++      let filterLines: string[] = responu8.textLines;
++      const originalLength = filterLines.length;
++      const discontinuityFirstIndex = filterLines.indexOf('#EXT-X-DISCONTINUITY');
++      if (discontinuityFirstIndex === -1) {
++        duration = Date.now() - filterStartTime;      
++        console.log(`M3U8: ✅没有 DISCONTINUITY 标签，无需过滤清理，done in ${duration}ms`);
++      } else {
++        if (filter === 'on') {
++          // on: 过滤 #EXT-X-DISCONTINUITY 以及疑似广告 adjump 等
++          console.log('M3U8: 🔄Aggressive filter (DISCONTINUITY + ads)');
++          filterLines = filterDiscontinuityAdJump(filterLines);
++        } else if (filter === 'off') {
++          // off: 仅过滤 #EXT-X-DISCONTINUITY 标签
++          console.log('M3U8: 🔄Basic filter (DISCONTINUITY only)');
++          filterLines = filterLines.filter(line => !line.startsWith('#EXT-X-DISCONTINUITY'));
++        }
++        const removedCount = originalLength - filterLines.length;
++        duration = Date.now() - filterStartTime;
++        console.log(`M3U8: ✅Filtered ${removedCount}/${originalLength} lines in ${duration}ms`);
++      }
++      // 切片、URI 等更新为绝对地址, 使用最终的响应 URL 获取 baseUrl
++      const baseUrl = getBaseUrl(responu8.url);
++      const rewriteStartTime = Date.now();
++      modifiedContent = rewriteM3U8Content(filterLines, baseUrl);
++      duration = Date.now() - rewriteStartTime;
++      console.log(`M3U8: ✅Modified ${filterLines.length} lines in ${duration}ms`);
++      // 过滤、重写完成后，更新短期 cache
++      setModifiedContentCache(`${key}:filter=${filter}`, modifiedContent);
++    }
++
++    const resHeaders = new Headers({
++      'Content-Type': responu8.textType || 'application/vnd.apple.mpegurl',
++      'Access-Control-Allow-Origin': '*',
++      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
++      'Access-Control-Allow-Headers': 'Content-Type, Range, Origin, Accept, User-Agent',
++      'Cache-Control': 'no-cache, no-store, must-revalidate',
++      'Pragma': 'no-cache',
++      'Expires': '0',
++      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Content-Type',
++      'Content-Length': modifiedContent.length.toString(),
++    });
++    return new Response(modifiedContent, { headers: resHeaders, status: 200 });
++  } catch (error) {
++    stats.errors++;
++    console.error('M3U8 filter error:', error);
++    return new Response(`M3U8 filter error: ${error}`, { status: 500 });
++  } finally {
++    // 更新性能统计
++    const responseTime = Date.now() - startTime;
++    console.log(`M3U8: ✅Response for IP ${clientIP} in ${responseTime}ms`);
++    stats.avgResponseTime = (stats.avgResponseTime * (stats.requests - 1) + responseTime) / stats.requests;
++    const totalM3u8TextCache = Array.from(registeredKeys.values()).reduce((sum, entry) => sum + (entry.responseCache?.textLength || 0), 0);
++    // 定期打印统计信息
++    //if (stats.requests % 10 === 0 && process.env.NODE_ENV === 'development') {
++    console.log(`M3U8: 📈Filter Stats - Requests: ${stats.requests}, Errors: ${stats.errors}, Avg Response Time: ${stats.avgResponseTime.toFixed(1)}ms`);
++    console.log(`M3U8: 📈Filter Stats - Total Bytes: ${(stats.totalBytes / 1024).toFixed(1)}KB, Cached Bytes: ${(totalM3u8TextCache / 1024).toFixed(1)}KB`);
++    //}
++  }
++}
++
++function filterDiscontinuityAdJump(lines: string[]): string[] {
++  const result: string[] = [];
++  // 1. 统计所有 #EXT-X-DISCONTINUITY 行的索引，以及 非#开头 行的目录频次
++  const discontinuityIndexes: number[] = [];
++  const lineDirCount = new Map<string, number>();
++  for (let i = 0; i < lines.length; i++) {
++    if (lines[i] === '#EXT-X-DISCONTINUITY') {
++      discontinuityIndexes.push(i);
++    } else if (!lines[i].startsWith('#')) {
++      const dir = lines[i].substring(0, lines[i].lastIndexOf('/') + 1);
++      lineDirCount.set(dir, (lineDirCount.get(dir) || 0) + 1);
++    }
++  }
++  const totalCount = Array.from(lineDirCount.values()).reduce((sum, count) => sum + count, 0);
++  const lineDirPercentage = new Map(
++    Array.from(lineDirCount.entries())
++      .map(([dir, count]): [string, number] => [dir, count / totalCount * 100])
++      .sort((a, b) => a[1] - b[1])
++  );
++  // DEBUG 统计结果
++  console.log(`M3U8: 找到 ${discontinuityIndexes.length} 个 #EXT-X-DISCONTINUITY 标签, 索引位置:`, discontinuityIndexes);
++  console.log('M3U8: 目录频次百分比（升序）:');
++  let rank = 1;
++  lineDirPercentage.forEach((percentage, dir) => {
++    console.log(`M3U8:   → ${rank}) ${percentage.toFixed(2)}% : '${dir}'`);
++    rank++;
++  });
++
++  // 2. 添加开始 #EXTM3U 到 第0个 #EXT-X-DISCONTINUITY
++  // re-check 第一行的 #EXTM3U
++  if (lines[0] !== '#EXTM3U') {
++    result.push('#EXTM3U');
++  }
++  console.log(`M3U8: 🟢保留第 0 组, Head: (索引 0-${discontinuityIndexes[0]-1}, 共复制 ${discontinuityIndexes[0]} 行)`);
++  for (let i = 0; i < discontinuityIndexes[0]; i++) {
++    result.push(lines[i]);
++  }
++
++  // 3. 按 #EXT-X-DISCONTINUITY 索引分组. Video、Ad 组交替出现
++  // 重新设置 #EXT-X-KEY 的行不需处理，不删除无影响
++  for (let j = 0; j < discontinuityIndexes.length; j++) {
++    // 定位当前组（从当前 DISCONTINUITY 到下一个 DISCONTINUITY 或文件结束，仅包含组起始的 #EXT-X-DISCONTINUITY 标签）
++    const discIndex = discontinuityIndexes[j];
++    const nextDiscIndex = j + 1 < discontinuityIndexes.length ? discontinuityIndexes[j + 1] : lines.length;
++    // 提取当前组
++    const currentGroup = lines.slice(discIndex, nextDiscIndex);
++    console.log(`M3U8: 🚩检测第 ${j+1} 个 DISCONTINUITY 组`);
++    // 判断是否需要过滤
++    if (skipDiscontinuityGroup(currentGroup, lineDirPercentage)) { // Ad 组
++      console.log(`M3U8: 🔴过滤第 ${j+1} 组, Ad: (索引 ${discIndex}-${nextDiscIndex-1}), 共删除 ${currentGroup.length} 行`);
++    } else {
++      console.log(`M3U8: 🟢保留第 ${j+1} 组, Video: (索引 ${discIndex}-${nextDiscIndex-1}), 共复制 ${currentGroup.length}-1 行)`);
++      for (let i = discIndex + 1; i < nextDiscIndex; i++) { //注意跳过 #EXT-X-DISCONTINUITY 标签
++        if (i < lines.length) {
++          result.push(lines[i]);
++        } else {
++          console.warn(`M3U8: 索引 ${i} 超出范围 0-${lines.length-1}`);
++        }
++      }
++    }
++  }
++  // re-check 最后一行的 #EXT-X-ENDLIST
++  if (result[result.length - 1] !== '#EXT-X-ENDLIST') {
++    result.push('#EXT-X-ENDLIST');
++  }
++
++  return result;
++}
++
++function skipDiscontinuityGroup(
++  group: string[], 
++  dirPercentage: Map<string, number>
++): boolean {
++  // 提取组中的所有 URL 行
++  const urlLines = group.filter(line => !line.startsWith('#'));
++  if (urlLines.length === 0) return false; // 无 URL 行，可能是纯标签组，保留
++
++  // 1. 检查明确的广告特征
++  const hasExplicitAdIndicators = urlLines.some(url =>
++    url.includes('/adjump/') ||
++    url.includes('/ad/') ||
++    url.toLowerCase().includes('advertisement')
++  );
++  if (hasExplicitAdIndicators) {
++    console.log("M3U8:   → 广告特征: 有明确特征, 如 '/adjump/' 等");
++    return true;
++  } else {
++    console.log(`M3U8:   → 广告特征: 无 '/adjump/' 等`);
++  }
++
++  // 2. 检查目录频次（低频目录很可能是广告）
++  const discDirs: string[] = [];
++  for (const urlLine of urlLines) {
++    const dir = urlLine.substring(0, urlLine.lastIndexOf('/') + 1);
++    if (!discDirs.includes(dir)) {
++      discDirs.push(dir);
++    }
++  }
++  let lowFreqSum = 0;
++  discDirs.forEach((dir) => {
++    const percentage = dirPercentage.get(dir);
++    if (percentage !== undefined) {
++      lowFreqSum += percentage;
++      console.log(`M3U8:   → 目录频次: '${dir}' (${percentage.toFixed(2)}%)`);
++    } else {
++      console.log(`M3U8:   → 目录频次: '${dir}' (丢失 percentage！！！)`);
++    }
++  });
++  // 如果组中的 URL 目录总频次低于 3%，认为均是广告目录，过滤整个组
++  if (discDirs.length > 0 && lowFreqSum < 3) {
++    console.log(`M3U8:   → 目录频次: 判断为低频目录组, 疑似广告, 总频次=${lowFreqSum.toFixed(2)}% < 3%`);
++    return true;
++  }
++
++  // 3. 检查组长度（广告段通常较短）
++  if (urlLines.length < 8 && group.length < 17) {
++    console.log(`M3U8:   → 本组长度: 过短, 疑似广告, (${urlLines.length}<8, ${group.length}<17)`);
++    return true;
++  } else {
++    console.log(`M3U8:   → 本组长度: 判断为正常视频，非广告`);
++  }
++
++  return false;
++}
++
++function rewriteM3U8Content(lines: string[], baseUrl: string): string {
++  const rewrittenLines: string[] = [];
++  const variables = new Map<string, string>(); // 用于 EXT-X-DEFINE 变量替换
++
++  for (let i = 0; i < lines.length; i++) {
++    let line = lines[i];
++    // 处理非标签行（TS片段、嵌套M3U8等）
++    if (!line.startsWith('#')) {
++      const resolvedUrl = resolveUrl(baseUrl, line);
++      rewrittenLines.push(resolvedUrl);
++      continue;
++    }
++    // 使用 switch 处理各种标签
++    switch (true) {
++      // 处理变量定义 (EXT-X-DEFINE)
++      case line.startsWith('#EXT-X-DEFINE:'):
++        line = processDefineVariables(line, variables);
++        break;
++      // 处理 EXT-X-MAP 标签中的 URI
++      case line.startsWith('#EXT-X-MAP:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理 EXT-X-KEY 标签中的 URI
++      case line.startsWith('#EXT-X-KEY:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理 EXT-X-MEDIA 标签中的 URI (音频轨道等)，无效音轨留给 mpv
++      case line.startsWith('#EXT-X-MEDIA:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理 LL-HLS 部分片段 (EXT-X-PART)
++      case line.startsWith('#EXT-X-PART:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理预加载提示 (EXT-X-PRELOAD-HINT)
++      case line.startsWith('#EXT-X-PRELOAD-HINT:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理会话数据 (EXT-X-SESSION-DATA) - 可能包含 URI
++      case line.startsWith('#EXT-X-SESSION-DATA:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理会话密钥 (EXT-X-SESSION-KEY)
++      case line.startsWith('#EXT-X-SESSION-KEY:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理内容导向 (EXT-X-CONTENT-STEERING)
++      case line.startsWith('#EXT-X-CONTENT-STEERING:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'SERVER-URI');
++        break;
++      // 处理渲染报告 (EXT-X-RENDITION-REPORT)
++      case line.startsWith('#EXT-X-RENDITION-REPORT:'):
++        line = rewriteTagUri(line, baseUrl, variables, 'URI');
++        break;
++      // 处理日期范围标签中的 URI (EXT-X-DATERANGE)
++      case line.startsWith('#EXT-X-DATERANGE:'):
++        line = rewriteDateRangeUris(line, baseUrl, variables);
++        break;
++
++      case line.startsWith('#EXT-X-STREAM-INF:'):
++        rewrittenLines.push(line);
++        // 处理下一行的嵌套M3U8 URL
++        if (i + 1 < lines.length) {
++          i++;
++          const nextLine = lines[i].trim();
++          if (nextLine && !nextLine.startsWith('#')) {
++            let resolvedUrl = resolveUrl(baseUrl, nextLine);
++            resolvedUrl = substituteVariables(resolvedUrl, variables);
++            rewrittenLines.push(resolvedUrl);
++          } else {
++            rewrittenLines.push(nextLine);
++          }
++        }
++        continue;
++
++      // 这些标签不需要处理，直接保留
++      // 服务器控制 (EXT-X-SERVER-CONTROL)
++      //case line.startsWith('#EXT-X-SERVER-CONTROL:'):
++      // 跳过片段 (EXT-X-SKIP)
++      //case line.startsWith('#EXT-X-SKIP:'):
++      //  break;
++      // 其他未知标签直接保留
++      default:
++        break;
++    }
++    rewrittenLines.push(line);
++  }
++
++  return rewrittenLines.join('\n');
++}
++
++// 处理变量定义
++function processDefineVariables(line: string, variables: Map<string, string>): string {
++  const nameMatch = line.match(/NAME="([^"]+)"/);
++  const valueMatch = line.match(/VALUE="([^"]+)"/);
++  if (nameMatch && valueMatch) {
++    variables.set(nameMatch[1], valueMatch[1]);
++  }
++  return line; // 返回原始标签，让客户端处理
++}
++
++// 变量替换函数 - 参考 hls.js 标准实现
++const VARIABLE_REPLACEMENT_REGEX = /\{\$([a-zA-Z0-9-_]+)\}/g;
++
++function substituteVariables(text: string, variables: Map<string, string>): string {
++  if (variables.size === 0) {
++    return text;
++  }
++
++  return text.replace(VARIABLE_REPLACEMENT_REGEX, (variableReference: string, variableName: string) => {
++    const variableValue = variables.get(variableName);
++    if (variableValue === undefined) {
++      if (process.env.NODE_ENV === 'development') {
++        console.warn(`Missing variable definition for: "${variableName}"`);
++      }
++      return variableReference; // 保持原始引用如果变量未定义
++    }
++    return variableValue;
++  });
++}
++
++// 通用的 URI 重写函数，或其他 attrName
++function rewriteTagUri(line: string, baseUrl: string, variables: Map<string, string>, attrName: string): string {
++  const regex = new RegExp(`${attrName}="([^"]+)"`);
++  const match = line.match(regex);
++  if (match) {
++    let originalUri = match[1];
++    // 变量替换
++    if (variables) {
++      originalUri = substituteVariables(originalUri, variables);
++    }
++    const resolvedUrl = resolveUrl(baseUrl, originalUri);
++    return line.replace(match[0], `${attrName}="${resolvedUrl}"`);
++  }
++  return line;
++}
++
++// 处理日期范围中的多个URI
++function rewriteDateRangeUris(line: string, baseUrl: string, variables: Map<string, string>): string {
++  const uriMatches = Array.from(line.matchAll(/([A-Z-]+)="([^"]*(?:https?:\/\/|\/)[^"]*)"/g));
++  let result = line;
++  for (const match of uriMatches) {
++    const [fullMatch, , originalUri] = match;
++    if (originalUri.includes('://') || originalUri.startsWith('/')) {
++      let uri = originalUri;
++      if (variables) {
++        uri = substituteVariables(uri, variables);
++      }
++      const resolvedUrl = resolveUrl(baseUrl, uri);
++      result = result.replace(fullMatch, fullMatch.replace(originalUri, resolvedUrl));
++    }
++  }
++  return result;
++}

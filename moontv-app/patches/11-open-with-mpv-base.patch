@@ -1,7 +1,8 @@
-diff -Nur v100/src/app/play/page.tsx open-with-mpv/src/app/play/page.tsx
---- v100/src/app/play/page.tsx	2025-09-25 00:54:27.000000000 +0800
-+++ open-with-mpv/src/app/play/page.tsx	2025-09-28 10:17:46.267943620 +0800
-@@ -42,6 +42,8 @@
+diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
+index 99886e2..5c8bc77 100644
+--- a/src/app/play/page.tsx
++++ b/src/app/play/page.tsx
+@@ -42,6 +42,8 @@ interface WakeLockSentinel {
    removeEventListener(type: 'release', listener: () => void): void;
  }
  
@@ -10,7 +11,7 @@ diff -Nur v100/src/app/play/page.tsx open-with-mpv/src/app/play/page.tsx
  function PlayPageClient() {
    const router = useRouter();
    const searchParams = useSearchParams();
-@@ -1838,6 +1840,15 @@
+@@ -1838,6 +1840,15 @@ function PlayPageClient() {
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}
@@ -26,10 +27,14 @@ diff -Nur v100/src/app/play/page.tsx open-with-mpv/src/app/play/page.tsx
            </h1>
          </div>
          {/* 第二行：播放器和选集 */}
-diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPVPlayButton.tsx
---- v100/src/components/MPVPlayButton.tsx	1970-01-01 08:00:00.000000000 +0800
-+++ open-with-mpv/src/components/MPVPlayButton.tsx	2025-09-28 14:28:18.600771852 +0800
-@@ -0,0 +1,333 @@
+diff --git a/src/components/MPVPlayButton.tsx b/src/components/MPVPlayButton.tsx
+new file mode 100644
+index 0000000..3cd131c
+--- /dev/null
++++ b/src/components/MPVPlayButton.tsx
+@@ -0,0 +1,348 @@
++/* eslint-disable no-console */
++
 +'use client';
 +
 +import { useCallback,useEffect, useRef, useState } from 'react';
@@ -96,6 +101,7 @@ diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPV
 +}: MPVPlayButtonProps) {
 +  const [isMobile, setIsMobile] = useState(false);
 +  const [filteredVideoUrl, setFilteredVideoUrl] = useState<string>(''); // 过滤后的视频地址
++  const [m3u8Filter, setM3u8Filter] = useState('on'); // on(default), off
 +  const [danmakuUrlsStatus, setDanmakuUrlsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
 +
 +  // 使用 ref 存储当前缓存键，避免重复请求
@@ -113,34 +119,44 @@ diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPV
 +    for (let i = 0; i < url.length; i++) {
 +      const char = url.charCodeAt(i);
 +      hash = ((hash << 5) - hash) + char;
-+      hash = hash & hash; // Convert to 32bit integer
++      hash = hash | 0; // Convert to 32bit integer
 +    }
-+    // timestamp
-+    const random = (Math.floor(Date.now()*Math.random())).toString(36);
-+    return `${Math.abs(hash).toString(36)}-${random}`;
++    // timestamp, 8小时毫秒数内不变
++    const ts8h = Math.floor(Date.now()/3600/8000);
++    // 简单哈希('mpv')=3*7*7*11*67=108339; 8339=31*269
++    const hashstr = (Math.abs(hash)*ts8h*8339).toString(36);
++    return hashstr.length >= 9 ? hashstr.substring(2, 9) : hashstr.substring(0, 7);
 +  }, []);
++
++  // 在组件挂载时从 localStorage 读取 mpvM3u8Filter: 'true', 'false', null
++  useEffect(() => {
++    const savedMpvM3u8Filter = localStorage.getItem('mpvM3u8Filter');
++    if (savedMpvM3u8Filter && !JSON.parse(savedMpvM3u8Filter)) {
++      setM3u8Filter('off');
++    }
++  }, []); // 空依赖数组表示只在挂载时执行
 +
 +  // 过滤 M3U8 地址 - 使用临时认证的 key
 +  const filterM3U8Url = useCallback(async (url: string): Promise<string> => {
-+    // 如果不是 m3u8 地址或者去过滤功能关闭，直接返回原地址
-+    if (!url.includes('.m3u8') || process.env.MPV_FILTER_M3U8 === 'off') {
++    // 如果不是 m3u8 地址，直接返回原地址
++    if (!url.endsWith('.m3u8')) {
++      console.warn('[MPV] 非 M3U8 地址，使用原始地址');
 +      return url;
 +    }
 +
 +    try {
 +      console.log('[MPV] 开始注册过滤 M3U8 地址:', url);
 +      // 生成临时 key
-+      const tmpKey = generateTempKey(url);
-+      const urlKey = `${tmpKey}.m3u8`;
++      const urlKey = generateTempKey(url);
 +
 +      // 发送 POST 请求注册 key
-+      const response = await fetch('/api/m3u8filter-register', {
++      const response = await fetch('/api/m3u8-register', {
 +        method: 'POST',
 +        headers: {
 +          'Content-Type': 'application/json',
 +        },
 +        body: JSON.stringify({
-+          url_key: urlKey,
++          key: urlKey,
 +          original_url: url
 +        })
 +      });
@@ -150,7 +166,7 @@ diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPV
 +        if (result.success) {
 +          // 构建新的过滤地址
 +          // 通过 middleware 匹配: api/register，mpv 跳过认证
-+          const filteredUrl = `${window.location.origin}/api/registered-m3u8filter?url_key=${urlKey}`;
++          const filteredUrl = `${window.location.origin}/api/registered.m3u8?key=${urlKey}&filter=${m3u8Filter}`;
 +          console.log('[MPV] M3U8 过滤注册成功，使用过滤后地址:', filteredUrl);
 +          return filteredUrl;
 +        } else {
@@ -165,7 +181,7 @@ diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPV
 +      console.error('[MPV] M3U8 过滤注册错误:', error);
 +      return url;
 +    }
-+  }, [generateTempKey]);
++  }, [generateTempKey, m3u8Filter]);
 +
 +  // 处理视频地址过滤
 +  useEffect(() => {
@@ -330,7 +346,9 @@ diff -Nur v100/src/components/MPVPlayButton.tsx open-with-mpv/src/components/MPV
 +  // 根据 filteredVideoUrl显示不同的按钮 title
 +  const getButtonTitle = () => {
 +    if (filteredVideoUrl !== videoUrl) {
-+        return `${videoUrl}&#013;&#010; -> ${filteredVideoUrl}`;
++      //return `${videoUrl}&#013;&#010; -> ${filteredVideoUrl}`; // HOWTO &#?
++      return `${videoUrl}
++-> ${filteredVideoUrl}`;
 +    } else {
 +      return videoUrl;
 +    }

@@ -1,6 +1,8 @@
---- v100/src/app/api/cron/route.ts	2025-08-27 01:15:12.000000000 +0800
-+++ config-collections/src/app/api/cron/route.ts	2025-09-20 16:52:04.123775376 +0800
-@@ -8,6 +8,7 @@
+diff --git a/src/app/api/cron/route.ts b/src/app/api/cron/route.ts
+index 93db66a..edb0c6a 100644
+--- a/src/app/api/cron/route.ts
++++ b/src/app/api/cron/route.ts
+@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
  import { fetchVideoDetail } from '@/lib/fetchVideoDetail';
  import { refreshLiveChannels } from '@/lib/live';
  import { SearchResult } from '@/lib/types';
@@ -8,7 +10,7 @@
  
  export const runtime = 'nodejs';
  
-@@ -71,7 +72,7 @@
+@@ -71,7 +72,7 @@ async function refreshConfig() {
    let config = await getConfig();
    if (config && config.ConfigSubscribtion && config.ConfigSubscribtion.URL && config.ConfigSubscribtion.AutoUpdate) {
      try {

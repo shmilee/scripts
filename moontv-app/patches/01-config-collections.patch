@@ -1,6 +1,7 @@
-diff -Nur v100/src/app/api/admin/config_subscription/fetch/route.ts config-collections/src/app/api/admin/config_subscription/fetch/route.ts
---- v100/src/app/api/admin/config_subscription/fetch/route.ts	2025-08-27 01:15:12.000000000 +0800
-+++ config-collections/src/app/api/admin/config_subscription/fetch/route.ts	2025-09-20 16:53:05.425774278 +0800
+diff --git a/src/app/api/admin/config_subscription/fetch/route.ts b/src/app/api/admin/config_subscription/fetch/route.ts
+index 1480691..249ff51 100644
+--- a/src/app/api/admin/config_subscription/fetch/route.ts
++++ b/src/app/api/admin/config_subscription/fetch/route.ts
 @@ -3,6 +3,7 @@
  import { NextRequest, NextResponse } from 'next/server';
  
@@ -9,7 +10,7 @@ diff -Nur v100/src/app/api/admin/config_subscription/fetch/route.ts config-colle
  
  export const runtime = 'nodejs';
  
-@@ -28,7 +29,7 @@
+@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
      }
  
      // 直接 fetch URL 获取配置内容
@@ -18,9 +19,11 @@ diff -Nur v100/src/app/api/admin/config_subscription/fetch/route.ts config-colle
  
      if (!response.ok) {
        return NextResponse.json(
-diff -Nur v100/src/lib/config.collections.ts config-collections/src/lib/config.collections.ts
---- v100/src/lib/config.collections.ts	1970-01-01 08:00:00.000000000 +0800
-+++ config-collections/src/lib/config.collections.ts	2025-09-20 17:15:24.161750304 +0800
+diff --git a/src/lib/config.collections.ts b/src/lib/config.collections.ts
+new file mode 100644
+index 0000000..76a22fe
+--- /dev/null
++++ b/src/lib/config.collections.ts
 @@ -0,0 +1,14 @@
 +/* eslint-disable no-console */
 +export function completeCollectionPath(path: string): string {
@@ -36,9 +39,10 @@ diff -Nur v100/src/lib/config.collections.ts config-collections/src/lib/config.c
 +        return path;
 +    }
 +}
-diff -Nur v100/src/lib/live.ts config-collections/src/lib/live.ts
---- v100/src/lib/live.ts	2025-08-27 01:15:12.000000000 +0800
-+++ config-collections/src/lib/live.ts	2025-09-20 16:53:18.725774040 +0800
+diff --git a/src/lib/live.ts b/src/lib/live.ts
+index fa4a5e9..3eefe48 100644
+--- a/src/lib/live.ts
++++ b/src/lib/live.ts
 @@ -2,6 +2,7 @@
  
  import { getConfig } from "@/lib/config";
@@ -47,7 +51,7 @@ diff -Nur v100/src/lib/live.ts config-collections/src/lib/live.ts
  
  const defaultUA = 'AptvPlayer/1.4.10'
  
-@@ -62,7 +63,7 @@
+@@ -62,7 +63,7 @@ export async function refreshLiveChannels(liveInfo: {
      delete cachedLiveChannels[liveInfo.key];
    }
    const ua = liveInfo.ua || defaultUA;
@@ -56,10 +60,11 @@ diff -Nur v100/src/lib/live.ts config-collections/src/lib/live.ts
      headers: {
        'User-Agent': ua,
      },
-diff -Nur v100/src/middleware.ts config-collections/src/middleware.ts
---- v100/src/middleware.ts	2025-08-27 01:15:12.000000000 +0800
-+++ config-collections/src/middleware.ts	2025-09-20 16:20:20.547235601 +0800
-@@ -122,6 +122,7 @@
+diff --git a/src/middleware.ts b/src/middleware.ts
+index b672d79..2227851 100644
+--- a/src/middleware.ts
++++ b/src/middleware.ts
+@@ -122,6 +122,7 @@ function shouldSkipAuth(pathname: string): boolean {
      '/favicon.ico',
      '/robots.txt',
      '/manifest.json',

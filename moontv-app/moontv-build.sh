@@ -65,22 +65,22 @@ build_app() {
                 sed -i "s| USERNAME| ADMIN_USERNAME|g" "$buildir/$ts"
             done
 
-            # commit some console.log
+            # comment some console.log
             tsfile="src/app/api/user/my-stats/route.ts"
             if [ -f "$buildir/$tsfile" ]; then
                 if grep "console.log('更新用户统计数据" "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //commit log '更新用户统计数据' in $tsfile"
+                    echo -e "\n[I] //comment log '更新用户统计数据' in $tsfile"
                     sed -i "s|\(console.log('更新用户统计数据\)|//\1|" "$buildir/$tsfile"
                 fi
                 if grep "console.log.*my-stats - 开始处理请求" "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //commit log 'my-stats - 开始处理请求' in $tsfile"
+                    echo -e "\n[I] //comment log 'my-stats - 开始处理请求' in $tsfile"
                     sed -i "s|\(console.log.*my-stats - 开始处理请求\)|//\1|" "$buildir/$tsfile"
                 fi
             fi
             tsfile="src/lib/downstream.ts"
             if [ -f "$buildir/$tsfile" ]; then
                 if grep 'console.log(`\[DEBUG\]' "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //commit log [DEBUG] in $tsfile"
+                    echo -e "\n[I] //comment log [DEBUG] in $tsfile"
                     sed -i 's|console.log(`\[DEBUG\]|//console.log(`\[DEBUG\]|' "$buildir/$tsfile"
                 fi
             fi

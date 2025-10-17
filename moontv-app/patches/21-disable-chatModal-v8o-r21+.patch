@@ -1,0 +1,243 @@
+diff -Nur OrangeTV-old/package.json OrangeTV-new/package.json
+--- OrangeTV-old/package.json	2025-09-25 11:08:27.000000000 +0800
++++ OrangeTV-new/package.json	2025-10-17 14:54:37.427837226 +0800
+@@ -45,7 +45,7 @@
+     "hls.js": "^1.6.10",
+     "lucide-react": "^0.438.0",
+     "media-icons": "^1.1.5",
+-    "next": "^14.2.30",
++    "next": "^14.2.23",
+     "next-pwa": "^5.6.0",
+     "next-themes": "^0.4.6",
+     "react": "^18.2.0",
+diff -Nur OrangeTV-old/pnpm-lock.yaml OrangeTV-new/pnpm-lock.yaml
+--- OrangeTV-old/pnpm-lock.yaml	2025-09-25 11:08:27.000000000 +0800
++++ OrangeTV-new/pnpm-lock.yaml	2025-10-17 15:47:42.417780189 +0800
+@@ -69,7 +69,7 @@
+         specifier: ^1.1.5
+         version: 1.1.5
+       next:
+-        specifier: ^14.2.30
++        specifier: ^14.2.23
+         version: 14.2.30(@babel/core@7.27.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+       next-pwa:
+         specifier: ^5.6.0
+@@ -1586,8 +1586,8 @@
+   '@types/trusted-types@2.0.7':
+     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+ 
+-  '@types/validator@13.15.3':
+-    resolution: {integrity: sha512-7bcUmDyS6PN3EuD9SlGGOxM77F8WLVsrwkxyWxKnxzmXoequ6c7741QBrANq6htVRGOITJ7z72mTP6Z4XyuG+Q==}
++  '@types/validator@13.15.2':
++    resolution: {integrity: sha512-y7pa/oEJJ4iGYBxOpfAKn5b9+xuihvzDVnC/OSvlVnGxVg0pOqmjiMafiJ1KVNQEaPZf9HsEp5icEwGg8uIe5Q==}
+ 
+   '@types/ws@8.18.1':
+     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+@@ -2132,8 +2132,8 @@
+     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
+     hasBin: true
+ 
+-  browserslist@4.25.4:
+-    resolution: {integrity: sha512-4jYpcjabC606xJ3kw2QwGEZKX0Aw7sgQdZCvIK9dhVSPh76BKo+C+btT1RRofH7B+8iNpEbgGNVWiLki5q93yg==}
++  browserslist@4.25.2:
++    resolution: {integrity: sha512-0si2SJK3ooGzIawRu61ZdPCO1IncZwS8IzuX73sPZsXW6EQ/w/DAfPyKI8l1ETTCr2MnvqWitmlCUxgdul45jA==}
+     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
+     hasBin: true
+ 
+@@ -2189,8 +2189,8 @@
+   caniuse-lite@1.0.30001723:
+     resolution: {integrity: sha512-1R/elMjtehrFejxwmexeXAtae5UO9iSyFn6G/I806CYC/BLyyBk1EPhrKBkWhy6wM6Xnm47dSJQec+tLJ39WHw==}
+ 
+-  caniuse-lite@1.0.30001741:
+-    resolution: {integrity: sha512-QGUGitqsc8ARjLdgAfxETDhRbJ0REsP6O3I96TAth/mVjh2cYzN2u+3AzPP3aVSm2FehEItaJw1xd+IGBXWeSw==}
++  caniuse-lite@1.0.30001734:
++    resolution: {integrity: sha512-uhE1Ye5vgqju6OI71HTQqcBCZrvHugk0MjLak7Q+HfoBgoq5Bi+5YnwjP4fjDgrtYr/l8MVRBvzz9dPD4KyK0A==}
+ 
+   chalk@3.0.0:
+     resolution: {integrity: sha512-4D3B6Wf41KOYRFdszmDqMCGq5VV/uMAB273JILmO+3jAlh8X4qDtdtgCR3fxtbLEMzSx22QdhnDcJvu2u1fVwg==}
+@@ -2579,8 +2579,8 @@
+   electron-to-chromium@1.5.168:
+     resolution: {integrity: sha512-RUNQmFLNIWVW6+z32EJQ5+qx8ci6RGvdtDC0Ls+F89wz6I2AthpXF0w0DIrn2jpLX0/PU9ZCo+Qp7bg/EckJmA==}
+ 
+-  electron-to-chromium@1.5.215:
+-    resolution: {integrity: sha512-TIvGp57UpeNetj/wV/xpFNpWGb0b/ROw372lHPx5Aafx02gjTBtWnEEcaSX3W2dLM3OSdGGyHX/cHl01JQsLaQ==}
++  electron-to-chromium@1.5.199:
++    resolution: {integrity: sha512-3gl0S7zQd88kCAZRO/DnxtBKuhMO4h0EaQIN3YgZfV6+pW+5+bf2AdQeHNESCoaQqo/gjGVYEf2YM4O5HJQqpQ==}
+ 
+   emittery@0.8.1:
+     resolution: {integrity: sha512-uDfvUjVrfGJJhymx/kz6prltenw1u7WrCg1oa94zYY8xxVpLLUu045LAT0dhDZdXG58/EpPL/5kA180fQ/qudg==}
+@@ -3674,8 +3674,8 @@
+     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
+     engines: {node: '>= 0.8.0'}
+ 
+-  libphonenumber-js@1.12.15:
+-    resolution: {integrity: sha512-TMDCtIhWUDHh91wRC+wFuGlIzKdPzaTUHHVrIZ3vPUEoNaXFLrsIQ1ZpAeZeXApIF6rvDksMTvjrIQlLKaYxqQ==}
++  libphonenumber-js@1.12.13:
++    resolution: {integrity: sha512-QZXnR/OGiDcBjF4hGk0wwVrPcZvbSSyzlvkjXv5LFfktj7O2VZDrt4Xs8SgR/vOFco+qk1i8J43ikMXZoTrtPw==}
+ 
+   lilconfig@2.0.5:
+     resolution: {integrity: sha512-xaYmXZtTHPAw5m+xLN8ab9C+3a8YmV3asNSPOATITbtwrfbwaLJj8h66H1WMIpALCkqsIzK3h7oQ+PdX+LQ9Eg==}
+@@ -3958,9 +3958,6 @@
+   node-releases@2.0.19:
+     resolution: {integrity: sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw==}
+ 
+-  node-releases@2.0.20:
+-    resolution: {integrity: sha512-7gK6zSXEH6neM212JgfYFXe+GmZQM+fia5SsusuBIUgnPheLFBmIPhtFoAQRj8/7wASYQnbDlHPVwY0BefoFgA==}
+-
+   normalize-package-data@2.5.0:
+     resolution: {integrity: sha512-/5CMN3T0R4XTj4DcGaexo+roZSdSFW/0AOOTROrjxzCG1wrWXEsGbRKevjlIL+ZDE4sZlJr5ED4YW0yqmkK+eA==}
+ 
+@@ -4822,8 +4820,8 @@
+     engines: {node: '>=14.0.0'}
+     hasBin: true
+ 
+-  tapable@2.2.3:
+-    resolution: {integrity: sha512-ZL6DDuAlRlLGghwcfmSn9sK3Hr6ArtyudlSAiCqQ6IfE+b+HHbydbYDIG15IfS5do+7XQQBdBiubF/cV2dnDzg==}
++  tapable@2.2.2:
++    resolution: {integrity: sha512-Re10+NauLTMCudc7T5WLFLAwDhQ0JWdrMK+9B2M8zR5hRExKmsRDCBA7/aV/pNJFltmBFO5BAMlQFi/vq3nKOg==}
+     engines: {node: '>=6'}
+ 
+   temp-dir@2.0.0:
+@@ -7079,7 +7077,7 @@
+ 
+   '@types/trusted-types@2.0.7': {}
+ 
+-  '@types/validator@13.15.3': {}
++  '@types/validator@13.15.2': {}
+ 
+   '@types/ws@8.18.1':
+     dependencies:
+@@ -7685,12 +7683,12 @@
+       node-releases: 2.0.19
+       update-browserslist-db: 1.1.3(browserslist@4.25.0)
+ 
+-  browserslist@4.25.4:
++  browserslist@4.25.2:
+     dependencies:
+-      caniuse-lite: 1.0.30001741
+-      electron-to-chromium: 1.5.215
+-      node-releases: 2.0.20
+-      update-browserslist-db: 1.1.3(browserslist@4.25.4)
++      caniuse-lite: 1.0.30001734
++      electron-to-chromium: 1.5.199
++      node-releases: 2.0.19
++      update-browserslist-db: 1.1.3(browserslist@4.25.2)
+ 
+   bs58@6.0.0:
+     dependencies:
+@@ -7741,7 +7739,7 @@
+ 
+   caniuse-lite@1.0.30001723: {}
+ 
+-  caniuse-lite@1.0.30001741: {}
++  caniuse-lite@1.0.30001734: {}
+ 
+   chalk@3.0.0:
+     dependencies:
+@@ -7781,8 +7779,8 @@
+ 
+   class-validator@0.14.1:
+     dependencies:
+-      '@types/validator': 13.15.3
+-      libphonenumber-js: 1.12.15
++      '@types/validator': 13.15.2
++      libphonenumber-js: 1.12.13
+       validator: 13.15.15
+ 
+   clean-stack@2.2.0: {}
+@@ -8116,7 +8114,7 @@
+ 
+   electron-to-chromium@1.5.168: {}
+ 
+-  electron-to-chromium@1.5.215: {}
++  electron-to-chromium@1.5.199: {}
+ 
+   emittery@0.8.1: {}
+ 
+@@ -8129,7 +8127,7 @@
+   enhanced-resolve@5.18.3:
+     dependencies:
+       graceful-fs: 4.2.11
+-      tapable: 2.2.3
++      tapable: 2.2.2
+ 
+   entities@4.5.0: {}
+ 
+@@ -9639,7 +9637,7 @@
+       prelude-ls: 1.2.1
+       type-check: 0.4.0
+ 
+-  libphonenumber-js@1.12.15: {}
++  libphonenumber-js@1.12.13: {}
+ 
+   lilconfig@2.0.5: {}
+ 
+@@ -9905,7 +9903,7 @@
+       '@next/env': 14.2.30
+       '@swc/helpers': 0.5.5
+       busboy: 1.6.0
+-      caniuse-lite: 1.0.30001741
++      caniuse-lite: 1.0.30001723
+       graceful-fs: 4.2.11
+       postcss: 8.4.31
+       react: 18.3.1
+@@ -9934,8 +9932,6 @@
+ 
+   node-releases@2.0.19: {}
+ 
+-  node-releases@2.0.20: {}
+-
+   normalize-package-data@2.5.0:
+     dependencies:
+       hosted-git-info: 2.8.9
+@@ -10803,7 +10799,7 @@
+     transitivePeerDependencies:
+       - ts-node
+ 
+-  tapable@2.2.3: {}
++  tapable@2.2.2: {}
+ 
+   temp-dir@2.0.0: {}
+ 
+@@ -11052,9 +11048,9 @@
+       escalade: 3.2.0
+       picocolors: 1.1.1
+ 
+-  update-browserslist-db@1.1.3(browserslist@4.25.4):
++  update-browserslist-db@1.1.3(browserslist@4.25.2):
+     dependencies:
+-      browserslist: 4.25.4
++      browserslist: 4.25.2
+       escalade: 3.2.0
+       picocolors: 1.1.1
+ 
+@@ -11155,7 +11151,7 @@
+       '@webassemblyjs/wasm-edit': 1.14.1
+       '@webassemblyjs/wasm-parser': 1.14.1
+       acorn: 8.15.0
+-      browserslist: 4.25.4
++      browserslist: 4.25.2
+       chrome-trace-event: 1.0.4
+       enhanced-resolve: 5.18.3
+       es-module-lexer: 1.7.0
+@@ -11168,7 +11164,7 @@
+       mime-types: 2.1.35
+       neo-async: 2.6.2
+       schema-utils: 4.3.2
+-      tapable: 2.2.3
++      tapable: 2.2.2
+       terser-webpack-plugin: 5.3.14(webpack@5.99.9)
+       watchpack: 2.4.4
+       webpack-sources: 3.3.3
+diff -Nur OrangeTV-old/src/components/ThemeToggle.tsx OrangeTV-new/src/components/ThemeToggle.tsx
+--- OrangeTV-old/src/components/ThemeToggle.tsx	2025-09-25 11:08:27.000000000 +0800
++++ OrangeTV-new/src/components/ThemeToggle.tsx	2025-10-17 15:51:55.233775661 +0800
+@@ -95,7 +95,7 @@
+   };
+ 
+   // 检查是否在登录页面
+-  const isLoginPage = pathname === '/login';
++  const isLoginPage = true; // 隐藏聊天按钮和模态框 //pathname === '/login';
+ 
+   return (
+     <>

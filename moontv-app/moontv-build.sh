@@ -42,7 +42,7 @@ build_app() {
         (
             for pf in ${patchfiles//:/' '};do
                 echo "[I] Applying patch file: ${WORKDIR}/$pf"
-                patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" || exit 3
+                patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" 2>&1 || exit 3
             done
 
             if [ -f "$buildir/src/lib/shortdrama.client.ts" ]; then
@@ -66,6 +66,13 @@ build_app() {
             done
 
             # comment some console.log
+            tsfile="src/app/api/admin/theme/route.ts"
+            if [ -f "$buildir/$tsfile" ]; then
+                if grep "console.log('完整配置对象" "$buildir/$tsfile" >/dev/null; then
+                    echo -e "\n[I] //comment log '完整配置对象' in $tsfile"
+                    sed -i "s|\(console.log('完整配置对象\)|//\1|" "$buildir/$tsfile"
+                fi
+            fi
             tsfile="src/app/api/user/my-stats/route.ts"
             if [ -f "$buildir/$tsfile" ]; then
                 if grep "console.log('更新用户统计数据" "$buildir/$tsfile" >/dev/null; then
@@ -89,7 +96,7 @@ build_app() {
                 echo -e "\n[I] Ignore no-console Warning ..."
                 sed -i "s|'no-console': 'warn'|'no-console': 'off'|" "$buildir/.eslintrc.js"
             fi
-        ) | tee -a "${WORKDIR}/build/${appdir}-patch.log"
+        )  2>&1 | tee -a "${WORKDIR}/build/${appdir}-patch.log"
     fi
     # build, test w/ Node.js v24.7.0, Corepack 0.34.0, pnpm 10.15.1
     if [ ! -f "$buildir/.next/standalone/.next/BUILD_ID" ]; then
@@ -98,9 +105,10 @@ build_app() {
         # 确保 Next.js 在编译时即选择 Node Runtime 而不是 Edge Runtime
         find ./src -type f -name "route.ts" -print0 \
             | xargs -0 sed -i "s/export const runtime = 'edge';/export const runtime = 'nodejs';/g"
-        # 修复 pnpm lint --fix
-        (pnpm install --frozen-lockfile && pnpm run build) \
-            | tee "${WORKDIR}/build/${appdir}-build.log"
+        (
+            # 修复 pnpm lint --fix
+            pnpm install --frozen-lockfile && pnpm run build
+        ) 2>&1 | tee "${WORKDIR}/build/${appdir}-build.log"
         cd "${WORKDIR}/"
     else
         printf "\n[I] Found builded %s in $buildir\n\n" "$name"
@@ -128,7 +136,7 @@ build_app() {
         # link config-collections/{moontv,iptv}
         ln -sv ../../config-collections "$distdir/public/config-collections"
         printf "\n[I] %s installed to ${distdir}\n\n" "$name"
-    ) | tee "${distdir}-install.log"
+    ) 2>&1 | tee "${distdir}-install.log"
     ls "$distdir/node_modules/.pnpm/" \
         | sort >"${distdir}-node_modules.txt"
     ls -l "$distdir/node_modules/" | awk '/^lr/{print $8" -> "$10}' \
@@ -139,7 +147,7 @@ build_app() {
     local modsqfs="${WORKDIR}/dist/$(get_nodemodsquashfs $name)"
     local mksqfsopts="-comp zstd -all-root"
     mksquashfs "${distdir}" "$appsqfs" $mksqfsopts \
-        -e "$distdir/node_modules" | tee -a "${distdir}-install.log"
+        -e "$distdir/node_modules" 2>&1 | tee -a "${distdir}-install.log"
     local excludepat="$(get_nodemodsexclude $name)"
     local excludelist="${distdir}-node_modules-exclude.txt"
     if [ -n "$excludepat" ]; then
@@ -149,7 +157,7 @@ build_app() {
         echo >"$excludelist"
     fi
     mksquashfs "${distdir}/node_modules" "$modsqfs" $mksqfsopts \
-        -ef "$excludelist" | tee -a "${distdir}-install.log"
+        -ef "$excludelist" 2>&1 | tee -a "${distdir}-install.log"
 
     # check files
     cd "${WORKDIR}/dist/"

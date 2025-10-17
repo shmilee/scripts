@@ -18,6 +18,7 @@ RUN echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/main > /etc/apk/repos
  && echo https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.22/community >> /etc/apk/repositories \
  && echo "==> add tini bash squashfuse valkey ..." \
  && apk --no-cache add tini coreutils bash iproute2 \
+        ca-certificates ca-certificates-bundle \
         squashfuse fuse3 procps-ng valkey valkey-cli curl tzdata \
  && cp /usr/share/zoneinfo/${TIMEZONE} /etc/localtime \
  && echo "${TIMEZONE}" > /etc/timezone \

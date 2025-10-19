@@ -29,16 +29,18 @@ index 99886e2..5c8bc77 100644
          {/* 第二行：播放器和选集 */}
 diff --git a/src/components/MPVPlayButton.tsx b/src/components/MPVPlayButton.tsx
 new file mode 100644
-index 0000000..3cd131c
+index 0000000..da6df09
 --- /dev/null
 +++ b/src/components/MPVPlayButton.tsx
-@@ -0,0 +1,348 @@
+@@ -0,0 +1,334 @@
 +/* eslint-disable no-console */
++/* Copyright (c) 2025 shmilee*/
 +
 +'use client';
 +
 +import { useCallback,useEffect, useRef, useState } from 'react';
 +
++import { generateM3u8TempKey } from '@/lib/m3u8.register';
 +import { SearchResult } from '@/lib/types';
 +
 +interface ArtPlayerInstance {
@@ -112,22 +114,6 @@ index 0000000..3cd131c
 +    setIsMobile(isMobileDevice());
 +  }, []);
 +
-+  // 生成唯一的临时 key for filteredVideoUrl
-+  const generateTempKey = useCallback((url: string): string => {
-+    // 使用简单的哈希函数处理 url
-+    let hash = 0;
-+    for (let i = 0; i < url.length; i++) {
-+      const char = url.charCodeAt(i);
-+      hash = ((hash << 5) - hash) + char;
-+      hash = hash | 0; // Convert to 32bit integer
-+    }
-+    // timestamp, 8小时毫秒数内不变
-+    const ts8h = Math.floor(Date.now()/3600/8000);
-+    // 简单哈希('mpv')=3*7*7*11*67=108339; 8339=31*269
-+    const hashstr = (Math.abs(hash)*ts8h*8339).toString(36);
-+    return hashstr.length >= 9 ? hashstr.substring(2, 9) : hashstr.substring(0, 7);
-+  }, []);
-+
 +  // 在组件挂载时从 localStorage 读取 mpvM3u8Filter: 'true', 'false', null
 +  useEffect(() => {
 +    const savedMpvM3u8Filter = localStorage.getItem('mpvM3u8Filter');
@@ -147,7 +133,7 @@ index 0000000..3cd131c
 +    try {
 +      console.log('[MPV] 开始注册过滤 M3U8 地址:', url);
 +      // 生成临时 key
-+      const urlKey = generateTempKey(url);
++      const urlKey = generateM3u8TempKey(url);
 +
 +      // 发送 POST 请求注册 key
 +      const response = await fetch('/api/m3u8-register', {
@@ -181,7 +167,7 @@ index 0000000..3cd131c
 +      console.error('[MPV] M3U8 过滤注册错误:', error);
 +      return url;
 +    }
-+  }, [generateTempKey, m3u8Filter]);
++  }, [m3u8Filter]);
 +
 +  // 处理视频地址过滤
 +  useEffect(() => {

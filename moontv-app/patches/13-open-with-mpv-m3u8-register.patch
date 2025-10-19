@@ -104,11 +104,12 @@ index 2d55278..84493f2 100644
                <div>
 diff --git a/src/lib/m3u8.register.ts b/src/lib/m3u8.register.ts
 new file mode 100644
-index 0000000..72f5cd9
+index 0000000..4ec90a6
 --- /dev/null
 +++ b/src/lib/m3u8.register.ts
-@@ -0,0 +1,725 @@
+@@ -0,0 +1,857 @@
 +/* eslint-disable no-console */
++/* Copyright (c) 2025 shmilee*/
 +
 +import * as http from 'http';
 +import * as https from 'https';
@@ -138,7 +139,52 @@ index 0000000..72f5cd9
 +// register m3u8: key & url
 +const registeredKeys = new Map<string, m3u8keyEntry>();
 +const EXPIRATION_TIME = 8 * 60 * 60 * 1000; // 8小时
-+const MAX_ENTRIES = 50; // 注册数量上限
++const MAX_ENTRIES = 60; // 注册数量上限
++
++// 生成唯一的临时 key for url
++export function generateM3u8TempKey(url: string): string {
++  // 使用简单的哈希函数处理 url
++  let hash = 0;
++  for (let i = 0; i < url.length; i++) {
++    const char = url.charCodeAt(i);
++    hash = ((hash << 5) - hash) + char;
++    hash = hash | 0; // Convert to 32bit integer
++  }
++  // timestamp, X小时毫秒数内不变
++  const ts8h = Math.floor(Date.now()/EXPIRATION_TIME);
++  // 简单哈希('mpv')=3*7*7*11*67=108339; 8339=31*269
++  const hashstr = (Math.abs(hash)*ts8h*8339).toString(36);
++  return hashstr.length >= 9 ? hashstr.substring(2, 9) : hashstr.substring(0, 7);
++}
++
++// 检查 URL 格式
++function isValidUrl(url: string | null): boolean {
++  if (!url) return false;
++  try {
++    new URL(url);
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++// 注册 key
++function registerM3u8(key: string, url: string): void {
++  const entry: m3u8keyEntry = {
++    url: url,
++    timestamp: Date.now(),
++    responseCache: null,
++  };
++  registeredKeys.set(key, entry);
++  // 注册后立即检查数量限制
++  if (registeredKeys.size > MAX_ENTRIES) {
++    // 获取最旧的 key（Map保持插入顺序）
++    const oldestKey = registeredKeys.keys().next().value;
++    if (oldestKey === undefined) return;
++    console.log(`M3U8: Auto cleanup oldest key ${oldestKey}, after registered ${key}`);
++    registeredKeys.delete(oldestKey);
++  }
++}
 +
 +// 清理过期条目
 +function cleanupExpiredKeys(): void {
@@ -151,16 +197,6 @@ index 0000000..72f5cd9
 +  });
 +}
 +setInterval(cleanupExpiredKeys, 30 * 60 * 1000); // 半小时清理一次
-+
-+// 检查 URL 格式
-+function isValidUrl(url: string): boolean {
-+  try {
-+    new URL(url);
-+    return true;
-+  } catch {
-+    return false;
-+  }
-+}
 +
 +export async function POST(request: NextRequest) {
 +  try {
@@ -179,23 +215,9 @@ index 0000000..72f5cd9
 +    if (!isValidUrl(original_url)) {
 +      return NextResponse.json({ success: false, error: 'Invalid URL format' }, { status: 400 });
 +    }
-+    // 注册 key
-+    const entry: m3u8keyEntry = {
-+      url: original_url,
-+      timestamp: Date.now(),
-+      responseCache: null,
-+    };
-+    registeredKeys.set(key, entry);
-+
-+    // 注册后立即检查数量限制
-+    if (registeredKeys.size > MAX_ENTRIES) {
-+      const oldestKey = Array.from(registeredKeys.entries())
-+        .sort(([, a], [, b]) => a.timestamp - b.timestamp)[0][0];
-+      console.log(`M3U8: Auto cleanup oldest key ${oldestKey}, after registered ${key}`);
-+      registeredKeys.delete(oldestKey);
-+    }
-+
-+    return NextResponse.json({ success: true, expires: 4 });
++    // 注册
++    registerM3u8(key, original_url);
++    return NextResponse.json({ success: true, expires: EXPIRATION_TIME });
 +  } catch (error) {
 +    console.error('M3U8 registration error:', error);
 +    return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
@@ -248,10 +270,10 @@ index 0000000..72f5cd9
 +  let response: Response | null = null;
 +  let responseUsed = false;
 +  const controller = new AbortController();
-+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超时
++  const timeoutId = setTimeout(() => controller.abort(), 17000); // 17秒超时
 +  const agent = url.startsWith('https:') ? httpsAgent : httpAgent; // 选择 agent
 +  try {
-+    console.log(`M3U8: 正在获取源 ${url} ...`);
++    console.log(`M3U8: 获取播放列表 ${url}`);
 +    response = await fetch(url, {
 +      cache: 'no-cache',
 +      redirect: 'follow',
@@ -275,7 +297,7 @@ index 0000000..72f5cd9
 +                     responu8.textType.toLowerCase().includes('octet-stream') ||
 +                     url.includes('.m3u8');
 +      if (isM3U8) {
-+        console.log(`M3U8: 检查 ${responu8.url} 的内容.`);
++        console.log(`M3U8: 检查播放列表 ${responu8.url}`);
 +        const m3u8Content = await response.text();
 +        responseUsed = true;
 +        responu8.textLength = parseInt(response.headers.get('Content-Length') || '0', 10);
@@ -293,7 +315,7 @@ index 0000000..72f5cd9
 +          // 使用最终的响应 URL 作为 baseUrl 和子 /xx/XXXX.m3u8 组合后重新请求
 +          const baseUrl = getBaseUrl(responu8.url);
 +          const resolvedUrl = resolveUrl(baseUrl, responu8.textLines[m3u8LineIndex]);
-+          console.log(`M3U8: Get a master m3u8, 切换到子播放列表 ${resolvedUrl}`);
++          console.log(`M3U8: 检测到主播放列表, 切换到子播放列表 ${resolvedUrl}`);
 +          const responu88 = await fetchM3u8Content(resolvedUrl, depth + 1);
 +          if (responu88.ok) {
 +            return responu88;
@@ -309,10 +331,10 @@ index 0000000..72f5cd9
 +    }
 +  } catch (error) {
 +    clearTimeout(timeoutId);
-+    console.error('M3U8 filter fetch error:', error);
++    console.error('M3U8: fetch error,', error);
 +    responu8.ok = false;
 +    responu8.status = 500;
-+    responu8.statusText = `M3U8 filter fetch error: ${error}`;
++    responu8.statusText = `Fetch error, ${error}`;
 +  } finally {
 +    clearTimeout(timeoutId);
 +    // 确保 response 被正确关闭以释放资源
@@ -329,17 +351,71 @@ index 0000000..72f5cd9
 +  return responu8;
 +}
 +
-+//// 临时注册 test key
-+//registeredKeys.set('testkey1', {
-+//  url: 'https://play.maoyanplay.top/20250829/7vgEmaba/index.m3u8',
-+//  timestamp: Date.now(),
-+//  responseCache: null,
-+//});
-+//registeredKeys.set('testkey2', {
-+//  url: 'https://cdn.yzzy29-play.com/20251008/4619_1bf2efbb/2000k/hls/mixed.m3u8',
-+//  timestamp: Date.now(),
-+//  responseCache: null,
-+//});
++// fetchM3u8Content 请求锁：避免对同一URL同时发起多个请求
++interface PendingRequest {
++  promise: Promise<responseM3u8Text>;
++  timestamp: number;
++  url: string;
++  requestCount: number;
++}
++
++const pendingRequests = new Map<string, PendingRequest>();
++const PENDING_REQUEST_TIMEOUT = 30000; // 30秒超时，防止挂起的请求永远不清理
++
++// 清理过期的挂起请求
++function cleanupPendingRequests(): void {
++  const now = Date.now();
++  pendingRequests.forEach((request, key) => {
++    if (now - request.timestamp > PENDING_REQUEST_TIMEOUT) {
++      console.log(`M3U8: 🧹清理超时的挂起请求: key=${key}, url=${request.url}`);
++      pendingRequests.delete(key);
++    }
++  });
++}
++// 每分钟清理一次
++setInterval(cleanupPendingRequests, 60000);
++
++// fetchM3u8Content 处理请求去重
++async function fetchM3u8ContentWithDeduplication(key: string, url: string, depth: number): Promise<responseM3u8Text> {
++  const fetchStartTime = Date.now();
++  // 检查是否有相同的请求正在进行中
++  const existingRequest = pendingRequests.get(key);
++  if (existingRequest) {
++    console.log(`M3U8: ⏳Waiting for existing ${existingRequest.requestCount} request(s) for key=${key}`);
++    existingRequest.requestCount++; // 增加等待计数
++    const responu8: responseM3u8Text = await existingRequest.promise;
++    if (responu8 && responu8.ok) {
++      const duration = Date.now() - fetchStartTime;
++      console.log(`M3U8: 💫Use fetched cache after waiting request ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
++      return responu8;
++    } else {
++      console.log(`M3U8: ❌Waiting request failed for key=${key}`);
++    }
++  }
++  // 没有正在进行的请求 或等待的请求失败
++  console.log(`M3U8: 🚀Fetching source for key=${key}, url=${url} ...`);
++  const promise = fetchM3u8Content(url, depth);
++  // 存储到挂起请求Map中
++  pendingRequests.set(key, {
++    promise, timestamp: Date.now(),
++    url, requestCount: 1,
++  });
++  const responu8: responseM3u8Text = await promise;
++  const duration = Date.now() - fetchStartTime;
++  console.log(`M3U8: ✅Fetch ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
++  // fetch 成功后，更新长期 cache
++  const entry = registeredKeys.get(key);
++  if (entry) {
++    console.log(`M3U8: 💫Set fetched cache for key=${key}`);
++    entry.responseCache = responu8;
++  }
++  try {
++    return responu8;
++  } finally {
++    // 确保从挂起请求中移除
++    pendingRequests.delete(key);
++  }
++}
 +
 +// GET: 性能统计
 +const stats = {
@@ -351,8 +427,8 @@ index 0000000..72f5cd9
 +
 +// GET: 简单的频率限制 - 只记录每个IP的最后请求时间和累计次数
 +const lastRequestTime = new Map<string, [number, number]>();
-+// 8秒最小间隔，每隔六次请求检查（方便 mpv 连续多(5?)次访问）
-+const MIN_REQUEST_INTERVAL = [8000, 7];
++// 5秒最小间隔，每隔3次请求检查（方便 mpv 连续多(2,5?)次访问）
++const MIN_REQUEST_INTERVAL = [5000, 4];
 +// 清理长时间未活动的IP记录，防止内存泄漏
 +function cleanupOldRequestTimes(): void {
 +  const now = Date.now();
@@ -388,8 +464,11 @@ index 0000000..72f5cd9
 +}
 +
 +// Ref: https://github.com/SzeMeng76/LunaTV/blob/main/src/app/api/proxy/m3u8/route.ts
-+// "不"验证用户信息，但限制请求频率，方便 mpv 访问: /api/registered.m3u8?key=xx&filter=xx
++// "不"验证用户信息，方便 mpv 访问，但限制请求频率
++//  /api/registered.m3u8?key=xx&filter=xx 或 /api/registered.m3u8?filter=xx&token=xxx&url=xx
 +//  key: registered url key
++//  url: any m3u8 source url, need token
++//  token: NEXT_PUBLIC_M3U8_URL_TOKEN, set by admin
 +//  filter: on, off
 +//    on: filter #EXT-X-DISCONTINUITY adjump ad.ts etc.
 +//    off: only delete #EXT-X-DISCONTINUITY tag
@@ -397,7 +476,9 @@ index 0000000..72f5cd9
 +  const startTime = Date.now();
 +  stats.requests++;
 +  const { searchParams } = new URL(request.url);
-+  const key = searchParams.get('key');
++  let key = searchParams.get('key');
++  const url = searchParams.get('url');
++  const token = searchParams.get('token');  
 +  let filter = searchParams.get('filter');
 +  // 获取客户端IP，检查请求间隔
 +  let clientIP = request.headers.get('x-forwarded-for');
@@ -411,7 +492,8 @@ index 0000000..72f5cd9
 +               'unknown';
 +  }
 +  console.log('------------------------------');
-+  console.log(`M3U8: 🌐GET Request from IP ${clientIP}`);
++  console.log(`M3U8: 🌐GET Request from IP: ${clientIP}, 🎯Referer: ${request.headers.get('referer') || 'direct'}`);
++  console.log(`M3U8: 📱User-Agent: ${request.headers.get('user-agent') || 'unknown'}`);
 +
 +  try {
 +    // 请求频率限制
@@ -431,19 +513,53 @@ index 0000000..72f5cd9
 +    }
 +
 +    // 请求参数检查
-+    if (!key || !registeredKeys.has(key)) {
++    if (key && url) {
 +      stats.errors++;
-+      return new Response('Not Found url key', { status: 404 });
++      return new Response('Too many parameters: url & key', { status: 400 });
 +    }
++    if (key) {
++        if (!registeredKeys.has(key)) {
++          stats.errors++;
++          return new Response('Not Found m3u8 key', { status: 404 });
++        }
++    } else if (url) {
++      if (!process.env.NEXT_PUBLIC_M3U8_URL_TOKEN) {
++        stats.errors++;
++        return new Response('Unsupported parameter: url', { status: 400 });
++      }
++      if (!token) {
++        stats.errors++;
++        return new Response('Missing required parameter: token', { status: 400 });
++      }
++      if (process.env.NEXT_PUBLIC_M3U8_URL_TOKEN !== token) {
++        stats.errors++;
++        return new Response('Invalid token', { status: 400 });
++      }
++      // 验证 URL
++      if (!isValidUrl(url)) {
++        stats.errors++;
++        return new Response('Invalid URL format', { status: 400 });
++      }
++      key = generateM3u8TempKey(url);
++      // 不存在则注册
++      if (!registeredKeys.has(key)) {
++        registerM3u8(key, url);
++      }
++    } else {
++      stats.errors++;
++      return new Response('Missing required parameters: url or key', { status: 400 });
++    }
++    // 获取已注册的 key
 +    const entry = registeredKeys.get(key);
 +    if (!entry) {
 +      stats.errors++;
-+      return new Response('Not Found url entry', { status: 404 });
++      return new Response('Not Found m3u8 entry', { status: 400 });
 +    }
 +    if (!entry.url) {
 +      stats.errors++;
-+      return new Response('Missing url', { status: 404 });
++      return new Response('Broken m3u8 entry', { status: 400 });
 +    }
++    // 检查过滤参数
 +    if (!filter || !(filter === 'off' || filter === 'on')) {
 +      filter = 'on';
 +    }
@@ -451,35 +567,28 @@ index 0000000..72f5cd9
 +    // 使用 entry.url 获取原始 m3u8 内容
 +    const decodedUrl = decodeURIComponent(entry.url);
 +    let responu8: responseM3u8Text | null =  null;
-+    const fetchStartTime = Date.now();
-+    let duration: number | null = null;
 +    if (entry.responseCache) {
 +      responu8 = entry.responseCache;
-+      duration = Date.now() - fetchStartTime;
-+      console.log(`M3U8: 💫Fetch cached ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
++      const ttl = Math.max(0, entry.timestamp + EXPIRATION_TIME - Date.now());
++      console.log(`M3U8: 💫Find fetched cache ${(responu8.textLength / 1024).toFixed(1)}KB for key=${key}, cache ttl=${secondsToHMS(ttl/1000)}`);
 +    } else {
-+      responu8 = await fetchM3u8Content(decodedUrl, 1);
++      responu8 = await fetchM3u8ContentWithDeduplication(key, decodedUrl, 1);
 +      // 参考 hls.js fetch-loader 的错误处理逻辑
 +      if (!responu8 || !responu8.ok) {
 +        stats.errors++;
++        const err = `HTTP Error ${responu8.status}: ${responu8.statusText}`;
++        console.error(`M3U8: ❌️${err}`);
 +        // 直接返回原始的 HTTP 错误，让 mpv 处理
 +        // 不返回JSON，因为 mpv 期望的是M3U8内容或标准 HTTP 错误
-+        return new NextResponse(
-+          `HTTP Error ${responu8.status}: ${responu8.statusText}`,
-+          {
-+            status: responu8.status,
-+            statusText: responu8.statusText,
-+            headers: {
-+              'Content-Type': 'text/plain',
-+              'Access-Control-Allow-Origin': '*',
-+            }
++        return new NextResponse(err, {
++          status: responu8.status,
++          statusText: responu8.statusText,
++          headers: {
++            'Content-Type': 'text/plain',
++            'Access-Control-Allow-Origin': '*',
 +          }
-+        );
++        });
 +      }
-+      duration = Date.now() - fetchStartTime;
-+      console.log(`M3U8: ✅Fetch ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
-+      // fetch 成功后，更新长期 cache
-+      entry.responseCache = responu8;
 +    }
 +
 +    // 更新统计信息
@@ -487,18 +596,19 @@ index 0000000..72f5cd9
 +
 +    // 过滤、重写原始 M3U8 内容
 +    const filterStartTime = Date.now();
++    let duration: number | null = null;
 +    const contentCache: string | null = modifiedContentCache.get(`${key}:filter=${filter}`)?.value || null;
 +    let modifiedContent: string | null = null;
 +    if (contentCache) {
 +        modifiedContent = contentCache;
 +        duration = Date.now() - filterStartTime;
-+        console.log(`M3U8: 💫Find filtered & modified cache for key=${key} in ${duration}ms`);
++        console.log(`M3U8: 💫Find filtered & modified cache for key=${key}`);
 +    } else {
 +      let filterLines: string[] = responu8.textLines;
 +      const originalLength = filterLines.length;
 +      const discontinuityFirstIndex = filterLines.indexOf('#EXT-X-DISCONTINUITY');
 +      if (discontinuityFirstIndex === -1) {
-+        duration = Date.now() - filterStartTime;      
++        duration = Date.now() - filterStartTime;
 +        console.log(`M3U8: ✅没有 DISCONTINUITY 标签，无需过滤清理，done in ${duration}ms`);
 +      } else {
 +        if (filter === 'on') {
@@ -521,6 +631,7 @@ index 0000000..72f5cd9
 +      duration = Date.now() - rewriteStartTime;
 +      console.log(`M3U8: ✅Modified ${filterLines.length} lines in ${duration}ms`);
 +      // 过滤、重写完成后，更新短期 cache
++      console.log(`M3U8: 💫Set filtered & modified cache for key=${key}:filter=${filter}`);
 +      setModifiedContentCache(`${key}:filter=${filter}`, modifiedContent);
 +    }
 +
@@ -538,7 +649,7 @@ index 0000000..72f5cd9
 +    return new Response(modifiedContent, { headers: resHeaders, status: 200 });
 +  } catch (error) {
 +    stats.errors++;
-+    console.error('M3U8 filter error:', error);
++    console.error('M3U8: ❌️filter error:', error);
 +    return new Response(`M3U8 filter error: ${error}`, { status: 500 });
 +  } finally {
 +    // 更新性能统计
@@ -591,6 +702,9 @@ index 0000000..72f5cd9
 +  for (let i = 0; i < discontinuityIndexes[0]; i++) {
 +    result.push(lines[i]);
 +  }
++  // 记录总时长 和 已保留切片的时长, 秒
++  let totalTime = sumGroupTime(result);
++  let keepTime = totalTime;
 +
 +  // 3. 按 #EXT-X-DISCONTINUITY 索引分组. Video、Ad 组交替出现
 +  // 重新设置 #EXT-X-KEY 的行不需处理，不删除无影响
@@ -600,7 +714,9 @@ index 0000000..72f5cd9
 +    const nextDiscIndex = j + 1 < discontinuityIndexes.length ? discontinuityIndexes[j + 1] : lines.length;
 +    // 提取当前组
 +    const currentGroup = lines.slice(discIndex, nextDiscIndex);
-+    console.log(`M3U8: 🚩检测第 ${j+1} 个 DISCONTINUITY 组`);
++    const currentGroupTime = sumGroupTime(currentGroup);
++    console.log(`M3U8: 🕗️检测第 ${j+1} 组, 时长${secondsToHMS(currentGroupTime)}, 始于${secondsToHMS(totalTime)}, 现始于${secondsToHMS(keepTime)}`);
++    totalTime += currentGroupTime;
 +    // 判断是否需要过滤
 +    if (skipDiscontinuityGroup(currentGroup, lineDirPercentage)) { // Ad 组
 +      console.log(`M3U8: 🔴过滤第 ${j+1} 组, Ad: (索引 ${discIndex}-${nextDiscIndex-1}), 共删除 ${currentGroup.length} 行`);
@@ -613,6 +729,7 @@ index 0000000..72f5cd9
 +          console.warn(`M3U8: 索引 ${i} 超出范围 0-${lines.length-1}`);
 +        }
 +      }
++      keepTime += currentGroupTime;
 +    }
 +  }
 +  // re-check 最后一行的 #EXT-X-ENDLIST
@@ -621,6 +738,21 @@ index 0000000..72f5cd9
 +  }
 +
 +  return result;
++}
++
++function sumGroupTime(group: string[]): number {
++  const sumTime = group.reduce((sum, line) => {
++    const match = line.match(/^#EXTINF:([\d.]+)/); // 时间数字（包括小数）
++    return match ? sum + parseFloat(match[1]) : sum;
++  }, 0);
++  return sumTime;
++}
++
++function secondsToHMS(seconds: number): string {
++    const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
++    const m = Math.floor(seconds % 3600 / 60).toString().padStart(2, '0');
++    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
++    return `${h}:${m}:${s}`;
 +}
 +
 +function skipDiscontinuityGroup(

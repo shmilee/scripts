@@ -104,10 +104,10 @@ index 2d55278..84493f2 100644
                <div>
 diff --git a/src/lib/m3u8.register.ts b/src/lib/m3u8.register.ts
 new file mode 100644
-index 0000000..4ec90a6
+index 0000000..c95fbfd
 --- /dev/null
 +++ b/src/lib/m3u8.register.ts
-@@ -0,0 +1,857 @@
+@@ -0,0 +1,900 @@
 +/* eslint-disable no-console */
 +/* Copyright (c) 2025 shmilee*/
 +
@@ -307,9 +307,9 @@ index 0000000..4ec90a6
 +        responu8.textLines = m3u8Content.split('\n')
 +            .map(line => line.trim())
 +            .filter(Boolean);  // 使用 Boolean 过滤空行
-+        // 检查只包含一行 #EXT-X-STREAM-INF 和一行子 /xx/XXXX.m3u8 的 m3u8
++        // 检查只包含一行 #EXT-X-STREAM-INF 和一行 /xx/XXXX.m3u8?p=1 的子 m3u8
 +        const nonCommentLines = responu8.textLines.filter(line => !line.startsWith('#'));
-+        const m3u8LineIndex = responu8.textLines.findIndex(line => !line.startsWith('#') && line.endsWith('.m3u8'));
++        const m3u8LineIndex = responu8.textLines.findIndex(line => !line.startsWith('#') && /\.m3u8(\?|$)/.test(line));
 +        if (nonCommentLines.length === 1 && m3u8LineIndex > 0
 +            &&  responu8.textLines[m3u8LineIndex - 1].startsWith('#EXT-X-STREAM-INF')) {
 +          // 使用最终的响应 URL 作为 baseUrl 和子 /xx/XXXX.m3u8 组合后重新请求
@@ -331,6 +331,26 @@ index 0000000..4ec90a6
 +    }
 +  } catch (error) {
 +    clearTimeout(timeoutId);
++    // error instanceof Error, 尝试接受自签证书
++    const code = (error as any).cause?.code;
++    if (url.startsWith('https:') && (
++        code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
++        code === 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY')
++       ) {
++      if (code === 'SELF_SIGNED_CERT_IN_CHAIN') {
++        console.warn(`M3U8: 检测到自签名证书 (${code})，尝试以不安全方式重新请求`);
++      } else if (code === 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY') {
++        console.warn(`M3U8: 检测到无效证书链 (${code})，可能缺失根证书，尝试以不安全方式重新请求`);
++      }
++      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
++      const responu88 = await fetchM3u8Content(url, depth + 1);
++      process.env.NODE_TLS_REJECT_UNAUTHORIZED = undefined;
++      if (responu88.ok) {
++        return responu88;
++      } else {
++        console.error(`M3U8: 接受无效/自签名证书的尝试失败!`);
++      }
++    }
 +    console.error('M3U8: fetch error,', error);
 +    responu8.ok = false;
 +    responu8.status = 500;
@@ -384,12 +404,16 @@ index 0000000..4ec90a6
 +    console.log(`M3U8: ⏳Waiting for existing ${existingRequest.requestCount} request(s) for key=${key}`);
 +    existingRequest.requestCount++; // 增加等待计数
 +    const responu8: responseM3u8Text = await existingRequest.promise;
++    const duration = Date.now() - fetchStartTime;
 +    if (responu8 && responu8.ok) {
-+      const duration = Date.now() - fetchStartTime;
 +      console.log(`M3U8: 💫Use fetched cache after waiting request ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
 +      return responu8;
++    // 403, 404: do not retry
++    } else if (responu8 && (responu8.status === 403 || responu8.status === 404)) {
++      console.log(`M3U8: 💫Use fetched cache '${responu8.status} ${responu8.statusText}' after waiting for key=${key} in ${duration}ms`);
++      return responu8;
 +    } else {
-+      console.log(`M3U8: ❌Waiting request failed for key=${key}`);
++      console.log(`M3U8: ❌Waiting request failed for key=${key}  in ${duration}ms`);
 +    }
 +  }
 +  // 没有正在进行的请求 或等待的请求失败
@@ -402,17 +426,26 @@ index 0000000..4ec90a6
 +  });
 +  const responu8: responseM3u8Text = await promise;
 +  const duration = Date.now() - fetchStartTime;
-+  console.log(`M3U8: ✅Fetch ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
-+  // fetch 成功后，更新长期 cache
 +  const entry = registeredKeys.get(key);
-+  if (entry) {
-+    console.log(`M3U8: 💫Set fetched cache for key=${key}`);
-+    entry.responseCache = responu8;
++  if (responu8 && responu8.ok) {
++    console.log(`M3U8: ✅Fetch ${responu8.textLength} Bytes for key=${key} in ${duration}ms`);
++    // fetch 成功后，更新长期 cache
++    if (entry) {
++      console.log(`M3U8: 💫Set fetched cache for key=${key}`);
++      entry.responseCache = responu8;
++    }
++  } else {
++    console.log(`M3U8: ❎Fetch 0 Bytes for key=${key} in ${duration}ms, ❌️ ${responu8.status} ${responu8.statusText}`);
++    // 403, 404: 同样更新长期 cache
++    if (entry && (responu8.status === 403 || responu8.status === 404)) {
++      console.log(`M3U8: 💫Set fetched cache '❌️ ${responu8.status} ${responu8.statusText}' for key=${key}`);
++      entry.responseCache = responu8;
++    }
 +  }
++  // 确保从挂起请求中移除
 +  try {
 +    return responu8;
 +  } finally {
-+    // 确保从挂起请求中移除
 +    pendingRequests.delete(key);
 +  }
 +}
@@ -570,29 +603,31 @@ index 0000000..4ec90a6
 +    if (entry.responseCache) {
 +      responu8 = entry.responseCache;
 +      const ttl = Math.max(0, entry.timestamp + EXPIRATION_TIME - Date.now());
-+      console.log(`M3U8: 💫Find fetched cache ${(responu8.textLength / 1024).toFixed(1)}KB for key=${key}, cache ttl=${secondsToHMS(ttl/1000)}`);
++      if (responu8.ok) {
++        console.log(`M3U8: 💫Find fetched cache ${(responu8.textLength / 1024).toFixed(1)}KB for key=${key}, cache ttl=${secondsToHMS(ttl/1000)}`);
++      } else { // 403, 404 cache
++        console.log(`M3U8: 💫Find fetched cache '❌️ ${responu8.status} ${responu8.statusText}' for key=${key}, cache ttl=${secondsToHMS(ttl/1000)}`);
++      }
 +    } else {
 +      responu8 = await fetchM3u8ContentWithDeduplication(key, decodedUrl, 1);
-+      // 参考 hls.js fetch-loader 的错误处理逻辑
-+      if (!responu8 || !responu8.ok) {
-+        stats.errors++;
-+        const err = `HTTP Error ${responu8.status}: ${responu8.statusText}`;
-+        console.error(`M3U8: ❌️${err}`);
-+        // 直接返回原始的 HTTP 错误，让 mpv 处理
-+        // 不返回JSON，因为 mpv 期望的是M3U8内容或标准 HTTP 错误
-+        return new NextResponse(err, {
-+          status: responu8.status,
-+          statusText: responu8.statusText,
-+          headers: {
-+            'Content-Type': 'text/plain',
-+            'Access-Control-Allow-Origin': '*',
-+          }
-+        });
-+      }
 +    }
-+
 +    // 更新统计信息
-+    stats.totalBytes += responu8.textLength;
++    stats.totalBytes += responu8?.textLength || 0;
++    // 参考 hls.js fetch-loader 的错误处理逻辑
++    if (!responu8 || !responu8.ok) {
++      stats.errors++;
++      // 直接返回原始的 HTTP 错误，让 mpv 处理
++      // 不返回JSON，因为 mpv 期望的是M3U8内容或标准 HTTP 错误
++      const err = `HTTP Error ${responu8?.status}: ${responu8?.statusText}`;
++      return new NextResponse(err, {
++        status: responu8?.status,
++        statusText: responu8?.statusText,
++        headers: {
++          'Content-Type': 'text/plain',
++          'Access-Control-Allow-Origin': '*',
++        }
++      });
++    }
 +
 +    // 过滤、重写原始 M3U8 内容
 +    const filterStartTime = Date.now();
@@ -670,9 +705,12 @@ index 0000000..4ec90a6
 +  // 1. 统计所有 #EXT-X-DISCONTINUITY 行的索引，以及 非#开头 行的目录频次
 +  const discontinuityIndexes: number[] = [];
 +  const lineDirCount = new Map<string, number>();
++  let firstExtinfIndex = 0; // 记录第一个切片的索引
 +  for (let i = 0; i < lines.length; i++) {
 +    if (lines[i] === '#EXT-X-DISCONTINUITY') {
 +      discontinuityIndexes.push(i);
++    } else if (firstExtinfIndex === 0 && lines[i].startsWith('#EXTINF:')) {
++      firstExtinfIndex = i;
 +    } else if (!lines[i].startsWith('#')) {
 +      const dir = lines[i].substring(0, lines[i].lastIndexOf('/') + 1);
 +      lineDirCount.set(dir, (lineDirCount.get(dir) || 0) + 1);
@@ -693,24 +731,29 @@ index 0000000..4ec90a6
 +    rank++;
 +  });
 +
-+  // 2. 添加开始 #EXTM3U 到 第0个 #EXT-X-DISCONTINUITY
++  // 2. 添加开头的 #EXTM3U 至 第1个切片前的内容（或 discontinuityIndexes[0] 之前的内容）
 +  // re-check 第一行的 #EXTM3U
 +  if (lines[0] !== '#EXTM3U') {
 +    result.push('#EXTM3U');
 +  }
-+  console.log(`M3U8: 🟢保留第 0 组, Head: (索引 0-${discontinuityIndexes[0]-1}, 共复制 ${discontinuityIndexes[0]} 行)`);
-+  for (let i = 0; i < discontinuityIndexes[0]; i++) {
++  const headIndex = Math.min(firstExtinfIndex, discontinuityIndexes[0])
++  console.log(`M3U8: 🟢复制 Head: (索引 0-${headIndex-1}, 共复制 ${headIndex} 行)`);
++  for (let i = 0; i < headIndex; i++) {
 +    result.push(lines[i]);
 +  }
 +  // 记录总时长 和 已保留切片的时长, 秒
-+  let totalTime = sumGroupTime(result);
-+  let keepTime = totalTime;
++  let totalTime = 0;
++  let keepTime = 0;
 +
 +  // 3. 按 #EXT-X-DISCONTINUITY 索引分组. Video、Ad 组交替出现
 +  // 重新设置 #EXT-X-KEY 的行不需处理，不删除无影响
-+  for (let j = 0; j < discontinuityIndexes.length; j++) {
-+    // 定位当前组（从当前 DISCONTINUITY 到下一个 DISCONTINUITY 或文件结束，仅包含组起始的 #EXT-X-DISCONTINUITY 标签）
-+    const discIndex = discontinuityIndexes[j];
++  // 可能需从不存在的 j=-1 开始，处理可能存在的 discontinuityIndexes[0] 之前的内容，即第 0 组
++  const jStart = firstExtinfIndex < discontinuityIndexes[0] ? -1 : 0;
++  for (let j = jStart; j < discontinuityIndexes.length; j++) {
++    // 定位当前组
++    // 从当前 DISCONTINUITY 到下一个 DISCONTINUITY 或文件结束，仅包含组起始的 #EXT-X-DISCONTINUITY 标签
++    // 或 discontinuityIndexes[0] 之前的切片内容（不含 discontinuityIndexes[0]）
++    const discIndex = j === -1 ? firstExtinfIndex : discontinuityIndexes[j];
 +    const nextDiscIndex = j + 1 < discontinuityIndexes.length ? discontinuityIndexes[j + 1] : lines.length;
 +    // 提取当前组
 +    const currentGroup = lines.slice(discIndex, nextDiscIndex);
@@ -721,8 +764,8 @@ index 0000000..4ec90a6
 +    if (skipDiscontinuityGroup(currentGroup, lineDirPercentage)) { // Ad 组
 +      console.log(`M3U8: 🔴过滤第 ${j+1} 组, Ad: (索引 ${discIndex}-${nextDiscIndex-1}), 共删除 ${currentGroup.length} 行`);
 +    } else {
-+      console.log(`M3U8: 🟢保留第 ${j+1} 组, Video: (索引 ${discIndex}-${nextDiscIndex-1}), 共复制 ${currentGroup.length}-1 行)`);
-+      for (let i = discIndex + 1; i < nextDiscIndex; i++) { //注意跳过 #EXT-X-DISCONTINUITY 标签
++      console.log(`M3U8: 🟢保留第 ${j+1} 组, Video: (索引 ${discIndex}-${nextDiscIndex-1}), 共复制 ${currentGroup.length}${j===-1?'':'-1'} 行`);
++      for (let i = (j === -1 ? discIndex : discIndex + 1); i < nextDiscIndex; i++) { // 注意 j!==-1 时，须跳过 #EXT-X-DISCONTINUITY 标签
 +        if (i < lines.length) {
 +          result.push(lines[i]);
 +        } else {

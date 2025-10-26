@@ -36,13 +36,13 @@ build_app() {
     if [ ! -d "$buildir" ]; then
         tar zxf "$tarball" -C "${WORKDIR}/build/"
         mv -v "${WORKDIR}/build/${gitrepo}-${AppCommits[$name]}" "$buildir"
-        # patch
+        # patch files in dir patches/
         local patchfiles="${AppPatches[$name]}"
         echo >"${WORKDIR}/build/${appdir}-patch.log"
         (
             for pf in ${patchfiles//:/' '};do
-                echo "[I] Applying patch file: ${WORKDIR}/$pf"
-                patch -p1 -i "${WORKDIR}/$pf" -d "$buildir" 2>&1 || exit 3
+                echo "[I] Applying patch file: ${WORKDIR}/patches/$pf"
+                patch -p1 -i "${WORKDIR}/patches/$pf" -d "$buildir" 2>&1 || exit 3
             done
 
             if [ -f "$buildir/src/lib/shortdrama.client.ts" ]; then

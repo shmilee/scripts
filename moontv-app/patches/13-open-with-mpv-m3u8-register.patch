@@ -104,10 +104,10 @@ index 2d55278..84493f2 100644
                <div>
 diff --git a/src/lib/m3u8.register.ts b/src/lib/m3u8.register.ts
 new file mode 100644
-index 0000000..c95fbfd
+index 0000000..d37e529
 --- /dev/null
 +++ b/src/lib/m3u8.register.ts
-@@ -0,0 +1,900 @@
+@@ -0,0 +1,906 @@
 +/* eslint-disable no-console */
 +/* Copyright (c) 2025 shmilee*/
 +
@@ -840,6 +840,12 @@ index 0000000..c95fbfd
 +  // 如果组中的 URL 目录总频次低于 3%，认为均是广告目录，过滤整个组
 +  if (discDirs.length > 0 && lowFreqSum < 3) {
 +    console.log(`M3U8:   → 目录频次: 判断为低频目录组, 疑似广告, 总频次=${lowFreqSum.toFixed(2)}% < 3%`);
++    return true;
++  }
++  // 仅2条目录频次记录，且本组目录总频次低于 (1-0.618)*最大值，即27.64
++  if (dirPercentage.size === 2 && lowFreqSum < 27.64) {
++    const maxFreq = Array.from(dirPercentage.values())[1];
++    console.log(`M3U8:   → 目录频次: 判断为低频目录组, 疑似广告, 总频次=${lowFreqSum.toFixed(2)}% < (1-0.618)*${maxFreq.toFixed(2)}%`);
 +    return true;
 +  }
 +

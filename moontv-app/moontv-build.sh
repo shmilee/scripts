@@ -91,6 +91,13 @@ build_app() {
                     sed -i 's|console.log(`\[DEBUG\]|//console.log(`\[DEBUG\]|' "$buildir/$tsfile"
                 fi
             fi
+            tsfile="src/middleware.ts"
+            if [ -f "$buildir/$tsfile" ]; then
+                if grep 'console.log(`\[Middleware.*;$' "$buildir/$tsfile" >/dev/null; then
+                    echo -e "\n[I] //comment log [Middleware ...] in $tsfile"
+                    sed -i "s|\(console.log.*Middleware.*requestId.*;$\)|//\1|" "$buildir/$tsfile"
+                fi
+            fi
 
             if [ -f "$buildir/.eslintrc.js" ]; then
                 echo -e "\n[I] Ignore no-console Warning ..."

@@ -1,8 +1,18 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='11.1.0.11711'
-_srcurl='https://wps-linux-personal.wpscdn.cn/wps/download/ep/Linux2019/11711'
+_pkgver='12.1.2.22571'
+_srcOrigin="https://wps-linux-personal.wpscdn.cn"
+_srcPath="/wps/download/ep/Linux2023/${_pkgver##*.}/wps-office_${_pkgver}.AK.preread.sw_480057_amd64.deb"
+_srcParams() {
+    # view-source:https://www.wps.cn/product/wpslinux#
+    # https://gitlab.com/cwittlut/wps-tsk/-/blob/main/tsk.sh
+    local secrityKey='7f8faaaa468174dc1c9cd62e5f218a5b'
+    local timestamp=$(date '+%s') # epoch
+    local md5hash=$(echo -n "${secrityKey}${_srcPath}${timestamp}" | md5sum)
+    #echo "$md5hash" && exit 1
+    echo "t=${timestamp}&k=${md5hash%% *}"
+}
 
 pkgbase=wpsforlinux
 pkgname=('wpsoffice')
@@ -14,14 +24,11 @@ license=('custom:Kingsoft')
 url='http://wps-community.org/'
 conflicts=('wps-office' 'kingsoft-office' 'wps-office-cn')
 options=(!emptydirs !strip)
-source=("${_srcurl}/${_pkgname}_${_pkgver}_amd64.deb"
-        "https://archive.org/download/archlinux_pkg_freetype2/freetype2-2.13.0-1-x86_64.pkg.tar.zst"
-        'wps-office.xml'
-        'check_data.sh')
-sha1sums=('61e0ca79b7ef506fd7470fad1d9b63f325bb5c57'
-          '5eee4a7fa1711ac221a459378d06f15a04e8d9d0'
-          '0b8f9548bb77bfa468f658e2bcb14960badc6e9e'
-          '1819bae14fa888f92c29c9fd01b59246f53e6937')
+source=("wps-office_${pkgver}_amd64.deb::${_srcOrigin}${_srcPath}?$(_srcParams)"
+        #"https://archive.org/download/archlinux_pkg_freetype2/freetype2-2.13.0-1-x86_64.pkg.tar.zst"
+        'wps-office.xml')
+sha256sums=('681d4458fd04bf95ae02ece2877c9b0f6dea6914535239444b57a66acfac5030'
+            '24b3c218d16d8da3f1de52f013cf02cf1af580548336eb0d77777a8b08630676')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
 
@@ -43,10 +50,10 @@ package_wpsoffice() {
     pkgdesc='WPS Office, including Writer, Presentation and Spreadsheets, is a powerful office productivity suite. (no fonts)'
     depends=('fontconfig' 'xorg-mkfontdir' 'libxrender'
              'desktop-file-utils' 'shared-mime-info' 'xdg-utils'
-             'glu' 'openssl-1.1' 'sdl2' 'libpulse' 'hicolor-icon-theme'
-             'libxss' 'sqlite' 'libtool' 'libxslt' 'qt5-base')
-    optdepends=('libtiff5: Provide libtiff.so.5 for wpspdf working'
-                'cups: for printing support'
+             'glu' 'sdl2' 'libpulse'
+             'hicolor-icon-theme' 'libxml2-legacy'
+             'libxss' 'sqlite' 'libtool' 'libxslt')
+    optdepends=('cups: for printing support'
                 'libjpeg-turbo: JPEG image codec support'
                 'pango: for complex (right-to-left) text support'
                 'curl: An URL retrieval utility and library'
@@ -59,11 +66,12 @@ package_wpsoffice() {
     tar xv -C "${pkgdir}" -f data.tar.xz
 
     msg2 "editing mime files: wps-office-{et,wpp,wps,pdf}.xml ..."
-    rm -f "$pkgdir"/usr/share/mime/packages/wps-office-{wps,wpp,et,pdf}.xml
+    rm -f "$pkgdir"/usr/share/mime/packages/*wps-office*.xml
+    rm -rf "$pkgdir"/opt/kingsoft/wps-office/INSTALL/
     install -Dm644 wps-office.xml "$pkgdir"/usr/share/mime/packages/wps-office.xml
 
     msg2 "editing desktop files: wps-office-{et,wpp,wps}.desktop, with shared-mime-info ..."
-    rm -rf "${pkgdir}/opt/kingsoft/wps-office/desktops/"
+    rm -rf "${pkgdir}"/opt/kingsoft/wps-office/desktops/
     #_et
     sed -i "s/^MimeType.*$/$_etMT/" "$pkgdir"/usr/share/applications/wps-office-et.desktop
     #_wpp
@@ -71,19 +79,21 @@ package_wpsoffice() {
     #_wps
     sed -i "s/^MimeType.*$/$_wpsMT/" "$pkgdir"/usr/share/applications/wps-office-wps.desktop
 
-    # fix: lost menu icon
-    cd "${pkgdir}/usr/share/icons/hicolor"
-    for _size in *; do
-        install -dm755 "${_size}/apps"
-        find "${_size}/mimetypes" -name 'wps-office2019-*main.*' -exec mv {} "${_size}/apps" \;
-    done
-
-    # fix: BOM
     cd "$pkgdir"/usr/share/applications/
-    if grep -r -I -l $'^\xEF\xBB\xBF' *.desktop 2>&1 >/dev/null; then
-        msg2 "Remove BOM (Byte-order mark) in utf-8 .desktop files ..."
-        sed -i 's/^\xEF\xBB\xBF//;' *.desktop
-    fi
+    for desktop in *.desktop; do
+        # fix: BOM
+        if grep -r -I -l $'^\xEF\xBB\xBF' "$desktop" 2>&1 >/dev/null; then
+            msg2 "Remove BOM (Byte-order mark) in utf-8 $desktop file ..."
+            sed -i 's/^\xEF\xBB\xBF//;' "$desktop"
+        fi
+        # fix: Categories=Office;...
+        local Categories=$(grep 'Categories=' "$desktop")
+        local Office=$(echo $Categories | grep Office)
+        if [ -n "$Categories" -a -z "$Office" ]; then
+            msg2 "Add Office category in $desktop file ..."
+            sed -i "s|\(Categories=\)\(.*$\)|\1Office;\2|" "$desktop"
+        fi
+    done
 
     # fix wps update log logrotate error
     # sed 's|su root|su root root|' "$pkgdir"/etc/logrotate.d/wpsupdatelog
@@ -105,42 +115,33 @@ package_wpsoffice() {
     rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libstdc++.so*
     # Use system libjpeg
     rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libjpeg.so*
-    # fix bold fonts, black cloud error, freetype2 so.6.19.0
-    install -Dm755 "${srcdir}"/usr/lib/libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6.19.0
-    ln -s libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6
-    ln -s libfreetype.so.6 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so
+    # Use system libcurl, fix libcurl.so.4.8.0: version `OPENSSL_1_1_1b' not found
+    rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libcurl.so*
 
-    clean_startpage_qing "${pkgdir}/opt/kingsoft/wps-office/office6/"
-}
+    ## fix bold fonts, black cloud error, freetype2 so.6.19.0
+    #install -vDm755 "${srcdir}"/usr/lib/libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6.19.0
+    #ln -vs libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6
+    #ln -vs libfreetype.so.6 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so
 
-# rm built-in(internal) browser, startpage etc.
-# 去除左上角主图标及设置, 云文档, 登录, 轻办公等需要浏览器插件的功能
-# 修改设置默认浏览器打开
-# sqlite3 ~/.local/share/Kingsoft/wps/addons/data/win-i386/promebrowser/Preferences \
-#   'update global_preference set useDefaultBrowser=1 where id=1;'
-clean_startpage_qing() {
-    # office6_path="$1"
-    cd "$1"
-    rm -rf libcef.so addons/cef/
-    # addons/k* qing
-    mkdir ./keep_sodir_tmp  # keep_sodir
-    for sodir in krecentfile kfpccomb kmodule knetwork konlinefileconfig; do
-        if [ -d "addons/${sodir}" ]; then
-            cp -rv "addons/${sodir}" ./keep_sodir_tmp/
-        fi
-    done
-    rm -rf addons/{k*,qing,pdfbatchcompression,wpsbox}
-    if [ -n "$(ls -A ./keep_sodir_tmp)" ]; then
-        mv -v ./keep_sodir_tmp/* addons/
-    fi
-    rmdir ./keep_sodir_tmp
-    find . -name qing.qm -exec rm {} \;
     # others
-    rm -rf wpsoffice wpsoffice-off
-    for back in transerr wpscloudsvr; do
+    cd "$pkgdir/opt/kingsoft/wps-office/office6/"
+    # libcef.so not found
+    if [ -f ./addons/cef/libcef.so -a ! -f ./libcef.so ]; then
+        ln -vs addons/cef/libcef.so ./libcef.so
+    fi
+    # libbz2.so borken link
+    if [ -L ./libbz2.so -a ! -e ./libbz2.so ]; then
+        rm -v ./libbz2.so
+    fi
+    # disable wpscloudsvr etc.
+    for back in transerr wpscloudsvr; do # wpsoffice
         if [ -f "${back}" ]; then
             chmod -x "${back}"
             mv -v "${back}" "${back}.bk"
         fi
     done
+
+    # fix 双击打开文件: WPS 全局设置中切换窗口管理模式, 改成多组件模式
+    # TODO 横版打印？竖版？test PDF etc.
+    # ref: https://aur.archlinux.org/packages/wps-office-cn?O=0
 }

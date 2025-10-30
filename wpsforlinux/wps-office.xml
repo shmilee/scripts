@@ -4,77 +4,83 @@
     <mime-type type="application/wps-office.wps">
         <comment>WPS Writer Document</comment>
         <comment xml:lang="zh_CN">WPS文字 文档</comment>
-        <alias type="application/vnd.ms-works"/>
+        <sub-class-of type="application/vnd.ms-works"/>
         <generic-icon name="wps-office-wps"/>
-        <glob pattern="*.wps" weight="60"/>
+        <glob pattern="*.wps" />
+        <glob pattern="*.wpsx" />
     </mime-type>
     <mime-type type="application/wps-office.wpt">
         <comment>WPS Writer Template</comment>
         <comment xml:lang="zh_CN">WPS文字 模板</comment>
         <generic-icon name="wps-office-wpt"/>
-        <glob pattern="*.wpt" weight="60"/>
+        <glob pattern="*.wpt" />
+        <glob pattern="*.wptx" />
     </mime-type>
     <mime-type type="application/wps-office.wpss">
         <comment>WPS Writer Security</comment>
         <comment xml:lang="zh_CN">WPS文字 安全</comment>
         <generic-icon name="wps-office-wpss"/>
-        <glob pattern="*.wpss" weight="60"/>
+        <glob pattern="*.wpss" />
     </mime-type>
     <mime-type type="application/wps-office.wpso">
         <comment>WPS Writer Outgoing Document</comment>
         <comment xml:lang="zh_CN">WPS文字 外发文档</comment>
         <generic-icon name="wps-office-wpso"/>
-        <glob pattern="*.wpso" weight="60"/>
+        <glob pattern="*.wpso" />
     </mime-type>
 
     <mime-type type="application/wps-office.dps">
         <comment>WPS Presentation File</comment>
         <comment xml:lang="zh_CN">WPS演示 演示文稿</comment>
         <generic-icon name="wps-office-dps"/>
-        <glob pattern="*.dps" weight="60"/>
+        <glob pattern="*.dps" />
+        <glob pattern="*.dpsx" />
     </mime-type>
     <mime-type type="application/wps-office.dpt">
         <comment>WPS Presentation Template</comment>
         <comment xml:lang="zh_CN">WPS演示 模板</comment>
         <generic-icon name="wps-office-dpt"/>
-        <glob pattern="*.dpt" weight="60"/>
+        <glob pattern="*.dpt" />
+        <glob pattern="*.dptx" />
     </mime-type>
     <mime-type type="application/wps-office.dpss">
         <comment>WPS Presentation Security</comment>
         <comment xml:lang="zh_CN">WPS演示 安全</comment>
         <generic-icon name="wps-office-dpss"/>
-        <glob pattern="*.dpss" weight="60"/>
+        <glob pattern="*.dpss" />
     </mime-type>
     <mime-type type="application/wps-office.dpso">
         <comment>WPS Presentation Outgoing Documen</comment>
         <comment xml:lang="zh_CN">WPS演示 外发文档</comment>
         <generic-icon name="wps-office-dpso"/>
-        <glob pattern="*.dpso" weight="60"/>
+        <glob pattern="*.dpso" />
     </mime-type>
 
     <mime-type type="application/wps-office.et">
         <comment>WPS Spreadsheets Workbook</comment>
         <comment xml:lang="zh_CN">WPS表格 工作簿</comment>
         <generic-icon name="wps-office-et"/>
-        <glob pattern="*.et" weight="60"/>
+        <glob pattern="*.et" />
+        <glob pattern="*.etx" />
     </mime-type>
     <mime-type type="application/wps-office.ett">
         <comment>WPS Spreadsheets Template</comment>
         <comment xml:lang="zh_CN">WPS表格 模板</comment>
         <generic-icon name="wps-office-ett"/>
-        <glob pattern="*.ett" weight="60"/>
+        <glob pattern="*.ett" />
+        <glob pattern="*.ettx" />
     </mime-type>
     <mime-type type="application/wps-office.ets">
         <comment>WPS Spreadsheets Security</comment>
         <comment xml:lang="zh_CN">WPS表格 安全</comment>
         <generic-icon name="wps-office-ets"/>
-        <glob pattern="*.ets" weight="60"/>
+        <glob pattern="*.ets" />
     </mime-type>
     <mime-type type="application/wps-office.eto">
         <comment>WPS Spreadsheets Outgoing Documen</comment>
         <comment xml:lang="zh_CN">WPS表格 外发文档</comment>
         <generic-icon name="wps-office-eto"/>
-        <glob pattern="*.eto" weight="60"/>
+        <glob pattern="*.eto" />
     </mime-type>
 
 </mime-info>

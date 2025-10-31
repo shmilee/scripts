@@ -1,5 +1,5 @@
 diff --git a/src/app/api/admin/config_subscription/fetch/route.ts b/src/app/api/admin/config_subscription/fetch/route.ts
-index 1480691..249ff51 100644
+index 1480691..738fc25 100644
 --- a/src/app/api/admin/config_subscription/fetch/route.ts
 +++ b/src/app/api/admin/config_subscription/fetch/route.ts
 @@ -3,6 +3,7 @@
@@ -15,22 +15,63 @@ index 1480691..249ff51 100644
  
      // 直接 fetch URL 获取配置内容
 -    const response = await fetch(url);
-+    const response = await fetch(completeCollectionPath(url));
++    const response = await fetch(completeCollectionPath(url, request));
  
      if (!response.ok) {
        return NextResponse.json(
+diff --git a/src/app/api/live/sources/route.ts b/src/app/api/live/sources/route.ts
+index 1bd17b8..ed92948 100644
+--- a/src/app/api/live/sources/route.ts
++++ b/src/app/api/live/sources/route.ts
+@@ -3,6 +3,7 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ 
+ import { getConfig } from '@/lib/config';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -16,7 +17,13 @@ export async function GET(request: NextRequest) {
+     }
+ 
+     // 过滤出所有非 disabled 的直播源
+-    const liveSources = (config.LiveConfig || []).filter(source => !source.disabled);
++    const liveSources = (config.LiveConfig || []).filter(source => !source.disabled)
++      .map(source => ({
++        ...source,
++        url: completeCollectionPath(source.url, request)
++      }));
++    //console.log('=> config.LiveConfig:', config.LiveConfig);
++    //console.log('=> liveSources:', liveSources);
+ 
+     return NextResponse.json({
+       success: true,
 diff --git a/src/lib/config.collections.ts b/src/lib/config.collections.ts
 new file mode 100644
-index 0000000..76a22fe
+index 0000000..bb7f9f8
 --- /dev/null
 +++ b/src/lib/config.collections.ts
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,28 @@
 +/* eslint-disable no-console */
-+export function completeCollectionPath(path: string): string {
++
++import { NextRequest } from 'next/server';
++
++export function completeCollectionPath(path: string, request: NextRequest | null): string {
 +    const pathPattern = /^\/config-collections\//;
 +    // const fullUrlPattern = /^(http:\/\/|https:\/\/)[^\s/$.?#].[^\s]*$/i;
 +    if (pathPattern.test(path)) {  // 用 server address 补全
-+        const baseUrl = `http://${process.env.HOSTNAME || 'localhost'}:${process.env.PORT || 3000}`;
++        let protocol = 'http';
++        let baseUrl = `http://${process.env.HOSTNAME || 'localhost'}:${process.env.PORT || 3000}`;
++        if (request) {
++            //console.log('=> request:', request);
++            if (request.url && request.url.startsWith('https://')) {
++                protocol = 'https';
++            }
++            const host = request.headers?.get('host');
++            if (host) {
++                baseUrl = `${protocol}://${host}`;
++            }
++        }
 +        const fullUrl = new URL(path, baseUrl).toString();
 +        console.log(`Get config-collection URL:`, fullUrl);
 +        return fullUrl;
@@ -40,7 +81,7 @@ index 0000000..76a22fe
 +    }
 +}
 diff --git a/src/lib/live.ts b/src/lib/live.ts
-index fa4a5e9..3eefe48 100644
+index fa4a5e9..8477d0b 100644
 --- a/src/lib/live.ts
 +++ b/src/lib/live.ts
 @@ -2,6 +2,7 @@
@@ -56,7 +97,7 @@ index fa4a5e9..3eefe48 100644
    }
    const ua = liveInfo.ua || defaultUA;
 -  const response = await fetch(liveInfo.url, {
-+  const response = await fetch(completeCollectionPath(liveInfo.url), {
++  const response = await fetch(completeCollectionPath(liveInfo.url, null), {
      headers: {
        'User-Agent': ua,
      },

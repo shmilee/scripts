@@ -1,5 +1,5 @@
 diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
-index 99886e2..5c8bc77 100644
+index 43a6fef..3f733b9 100644
 --- a/src/app/play/page.tsx
 +++ b/src/app/play/page.tsx
 @@ -42,6 +42,8 @@ interface WakeLockSentinel {
@@ -11,7 +11,7 @@ index 99886e2..5c8bc77 100644
  function PlayPageClient() {
    const router = useRouter();
    const searchParams = useSearchParams();
-@@ -1838,6 +1840,15 @@ function PlayPageClient() {
+@@ -1839,6 +1841,15 @@ function PlayPageClient() {
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}

@@ -13,7 +13,7 @@
        const timeoutId = setTimeout(() => controller.abort(), 30000);
  
 -      const response = await fetch(config.ConfigSubscribtion.URL, {
-+      const response = await fetch(completeCollectionPath(config.ConfigSubscribtion.URL), {
++      const response = await fetch(completeCollectionPath(config.ConfigSubscribtion.URL, null), {
          signal: controller.signal,
          headers: {
            'User-Agent': 'LunaTV-ConfigFetcher/1.0'

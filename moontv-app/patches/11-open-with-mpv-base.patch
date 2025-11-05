@@ -29,16 +29,16 @@ index 43a6fef..3f733b9 100644
          {/* 第二行：播放器和选集 */}
 diff --git a/src/components/MPVPlayButton.tsx b/src/components/MPVPlayButton.tsx
 new file mode 100644
-index 0000000..da6df09
+index 0000000..99fc339
 --- /dev/null
 +++ b/src/components/MPVPlayButton.tsx
 @@ -0,0 +1,334 @@
 +/* eslint-disable no-console */
-+/* Copyright (c) 2025 shmilee*/
++/* Copyright (c) 2025 shmilee */
 +
 +'use client';
 +
-+import { useCallback,useEffect, useRef, useState } from 'react';
++import { useCallback, useEffect, useRef, useState } from 'react';
 +
 +import { generateM3u8TempKey } from '@/lib/m3u8.register';
 +import { SearchResult } from '@/lib/types';

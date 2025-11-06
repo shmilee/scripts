@@ -146,7 +146,8 @@ build_app() {
     ) 2>&1 | tee "${distdir}-install.log"
     ls "$distdir/node_modules/.pnpm/" \
         | sort >"${distdir}-node_modules.txt"
-    ls -l "$distdir/node_modules/" | awk '/^lr/{print $8" -> "$10}' \
+    # awk NF 总字段数
+    ls -l "$distdir/node_modules/" | awk '/^lr/{print $(NF-2)" -> "$NF}' \
         | sort >>"${distdir}-node_modules.txt"
 
     # squashfs compress

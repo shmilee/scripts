@@ -1,0 +1,409 @@
+diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
+index 3f733b9..7a80427 100644
+--- a/src/app/play/page.tsx
++++ b/src/app/play/page.tsx
+@@ -34,6 +34,8 @@ declare global {
+   }
+ }
+ 
++import SourceRankManager from '@/components/SourceRankManager';
++
+ // Wake Lock API 类型声明
+ interface WakeLockSentinel {
+   released: boolean;
+@@ -168,6 +170,9 @@ function PlayPageClient() {
+     null
+   );
+ 
++  // 新增优选和测速工具
++  const sourceRanker = SourceRankManager();
++
+   // 优选和测速开关
+   const [optimizationEnabled] = useState<boolean>(() => {
+     if (typeof window !== 'undefined') {
+@@ -763,7 +768,8 @@ function PlayPageClient() {
+         setLoadingStage('preferring');
+         setLoadingMessage('⚡ 正在优选最佳播放源...');
+ 
+-        detailData = await preferBestSource(sourcesInfo);
++        detailData = await sourceRanker.preferBestSource(sourcesInfo);
++        setPrecomputedVideoInfo(sourceRanker.precomputedVideoInfo);
+       }
+ 
+       console.log(detailData.source, detailData.id);
+@@ -1750,10 +1756,12 @@ function PlayPageClient() {
+             </div>
+ 
+             {/* 加载消息 */}
+-            <div className='space-y-2'>
++            <div className='space-y-3'>
+               <p className='text-xl font-semibold text-gray-800 dark:text-gray-200 animate-pulse'>
+                 {loadingMessage}
+               </p>
++              {/* 测速进度显示 */}
++              {sourceRanker.speedTestProgressDisplay}
+             </div>
+           </div>
+         </div>
+diff --git a/src/components/SourceRankManager.tsx b/src/components/SourceRankManager.tsx
+new file mode 100644
+index 0000000..350aab0
+--- /dev/null
++++ b/src/components/SourceRankManager.tsx
+@@ -0,0 +1,356 @@
++/* eslint-disable no-console */
++/* Copyright (c) 2025 shmilee */
++
++/*
++实时测速进度显示，改进用户体验
++  - 在"正在优选最佳播放源..."提示下方显示实时测速进度
++  - 显示当前测试的源名称和进度 [当前/总数]
++  - 显示每个源的测速结果（质量、速度、延迟）
++  - 支持完整测速和轻量级测速
++
++Ref: https://github.com/QWiseDev/LunaTV/blob/main/src/app/play/page.tsx
++*/
++
++'use client';
++
++import { useEffect, useMemo, useRef, useState } from 'react';
++
++import { SearchResult } from '@/lib/types';
++import { getVideoResolutionFromM3u8 } from '@/lib/utils';
++
++interface SpeedTestInfo {
++  quality: string;
++  loadSpeed: string;
++  pingTime: number;
++}
++
++interface SourceTestInfo {
++  sourceInfo: SearchResult;
++  available: boolean;
++  testInfo: SpeedTestInfo;
++  testError?: string;
++  speedKBps?: number;
++  score?: number;
++}
++
++type SpeedTestType = 'full' | 'light'; // 测速类型
++const CONCURRENCY_FULL = 6;      // 完整测速并发数
++const CONCURRENCY_LIGHT = 12;    // 轻量级测速并发数
++const MAX_TEST_COUNT_FULL = 24;  // 完整测速最大测试数量
++const MAX_TEST_COUNT_LIGHT = 36; // 轻量级测速最大测试数量
++const LIGHT_TEST_TIMEOUT_MS = 5000; // 轻量级测速超时时间（毫秒）
++const HIGH_QUALITY_SPEED_MBPS = 5;  // 4K 2K 优质源速度阈值（MB/s）
++const GOOD_QUALITY_SPEED_MBPS = 3;  // 1080p 优质源速度阈值（MB/s）
++
++// 工具函数：计算播放源综合评分
++const calculateSourceScore = (
++  testResult: SourceTestInfo,
++  maxSpeed: number,
++  minPing: number,
++  maxPing: number
++): number => {
++  // 分辨率评分
++  const qualityScore = (() => {
++    switch (testResult.testInfo.quality) {
++      case '4K':
++        return 100;
++      case '2K':
++        return 85;
++      case '1080p':
++        return 75;
++      case '720p':
++        return 60;
++      case '480p':
++        return 40;
++      case 'SD':
++        return 20;
++      default:
++        return 0;
++    }
++  })();
++
++  // 下载速度评分 - 基于最大速度线性映射
++  const speedScore = (() => {
++    const speedKBps = testResult.speedKBps ?? 0;
++    // 基于最大速度线性映射，最高100分
++    const speedRatio = speedKBps / maxSpeed;
++    return Math.min(100, Math.max(0, speedRatio * 100));
++  })();
++
++  // 网络延迟评分 - 基于延迟范围线性映射
++  const pingScore = (() => {
++    const ping = testResult.testInfo.pingTime;
++    if (ping <= 0) return 0; // 无效延迟给默认分
++    // 如果所有延迟都相同，给满分
++    if (maxPing === minPing) return 100;
++    // 线性映射：最低延迟=100分，最高延迟=0分
++    const pingRatio = (maxPing - ping) / (maxPing - minPing);
++    return Math.min(100, Math.max(0, pingRatio * 100));
++  })();
++
++  // 评分权重 40% 40% 20%
++  const score = qualityScore * 0.4 + speedScore * 0.4 + pingScore * 0.2;
++  console.log(
++    `${testResult.sourceInfo.source_name} - 评分结果: ${score.toFixed(2)
++    } = ${qualityScore}*0.4 + ${speedScore}*0.4 + ${pingScore}*0.2`);
++  return Math.round(score * 100) / 100; // 保留两位小数
++};
++
++// 工具函数：优选成功的结果并排序
++const validSortedSources = (testResults: SourceTestInfo[], testType: SpeedTestType): SourceTestInfo[] => {
++  const successfulResults = testResults.filter(r => r.available);
++  if (successfulResults.length === 0) return [];
++  if (testType === 'full') { // 完整测速
++    // 找出所有有效速度的最大值，用于线性映射
++    successfulResults.forEach((result) => {
++        const speedStr = result.testInfo.loadSpeed;
++        if (speedStr === '未知' || speedStr === '测量中...') {
++          result.speedKBps = 0;
++          return;
++        }
++        // 解析速度值
++        const match = speedStr.match(/^([\d.]+)\s*(KB\/s|MB\/s)$/);
++        if (!match) {
++          result.speedKBps = 0;
++        } else {
++          const value = parseFloat(match[1]);
++          const unit = match[2];
++          // 统一转换为 KB/s
++          result.speedKBps = unit === 'MB/s' ? value * 1024 : value;
++        }
++    });
++    const validSpeeds = successfulResults
++      .map((result) => result.speedKBps ?? 0)
++      .filter((speed) => speed > 0);
++    const maxSpeed = validSpeeds.length > 0 ? Math.max(...validSpeeds) : 1024; // 默认1MB/s作为基准
++    // 找出所有有效延迟的最小值和最大值，用于线性映射
++    const validPings = successfulResults
++      .map((result) => result.testInfo.pingTime)
++      .filter((ping) => ping > 0);
++    const minPing = validPings.length > 0 ? Math.min(...validPings) : 50;
++    const maxPing = validPings.length > 0 ? Math.max(...validPings) : 1000;
++    // 计算每个结果的评分
++    successfulResults.forEach((result) => {
++      result.score = calculateSourceScore(result, maxSpeed, minPing, maxPing);
++    });
++    // 按综合评分排序，选择最佳播放源
++    successfulResults.sort((a, b) => (b.score??0) - (a.score??0));
++    console.log('播放源评分排序结果:');
++    successfulResults.forEach((result, index) => {
++      console.log(
++        `${index + 1}. ${result.sourceInfo.source_name
++        } - 评分: ${(result.score??0).toFixed(1)} (${result.testInfo.quality
++        }, ${result.testInfo.loadSpeed}, ${result.testInfo.pingTime}ms)`
++      );
++    });
++  } else { // 轻量级 仅响应时间
++    successfulResults.sort((a, b) => a.testInfo.pingTime - b.testInfo.pingTime);
++    console.log('播放源轻量级排序结果:');
++    successfulResults.forEach((result, index) => {
++      console.log(
++        `${index + 1}. ${result.sourceInfo.source_name
++        }: ${result.testInfo.pingTime}ms)`
++      );
++    });
++  }
++  return successfulResults;
++}
++
++export default function SourceRankManager() {
++  const isMobileRef = useRef(false);
++  // 检测是否为移动设备
++  useEffect(() => {
++    if (typeof navigator === 'undefined') {
++      isMobileRef.current = false;
++    } else {
++      isMobileRef.current = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
++    }
++  }, []);
++
++  // 测速进度状态
++  const [speedTestProgress, setSpeedTestProgress] = useState<{
++    current: number;
++    total: number;
++    currentSource: string;
++    text?: string;
++  } | null>(null);
++  // 保存优选时的测速结果，避免 EpisodeSelector 重复测速
++  const [precomputedVideoInfo, setPrecomputedVideoInfo] = useState<
++    Map<string, SpeedTestInfo>
++  >(new Map());
++
++  // 播放源优选函数
++  const preferBestSource = async (
++    sources: SearchResult[]
++  ): Promise<SearchResult> => {
++    if (sources.length === 1) return sources[0];
++
++    if (isMobileRef.current) {
++      console.log('移动设备使用轻量级优选，仅测试连通性和响应时间');
++    }
++    const testType: SpeedTestType = isMobileRef.current ? 'light' : 'full';
++
++    // full 使用小批量并发，避免创建过多实例
++    const concurrency = testType === 'full'
++        ? CONCURRENCY_FULL
++        : CONCURRENCY_LIGHT;
++    // 限制最大测试数量
++    const MAX_TEST_COUNT_LIMIT = testType === 'full'
++        ? MAX_TEST_COUNT_FULL
++        : MAX_TEST_COUNT_LIGHT;
++    if (sources.length > MAX_TEST_COUNT_LIMIT) {
++        console.log(`限制最大测试数量: 原有${sources.length}个播放源，仅测试前${MAX_TEST_COUNT_LIMIT}个`);
++        // 重新赋值（引用），不会影响外部传入
++        sources = sources.slice(0, MAX_TEST_COUNT_LIMIT);
++    }
++
++    // 批量测试
++    const allResults: Array<SourceTestInfo> = [];
++    let shouldStop = false; // 停止测试标志
++    let testedCount = 0; // 已测试数量
++    let lastProgressUpdateTime = 0; // 防抖计时
++    for (let i = 0; i < sources.length && !shouldStop; i += concurrency) {
++      const batch = sources.slice(i, i + concurrency);
++      console.log(`测速批次 ${Math.floor(i/concurrency) + 1}/${Math.ceil(sources.length/concurrency)}: ${batch.length} 个源`);
++
++      const batchResults = await Promise.all(
++        batch.map(async (sourceInfo) => {
++          const result: SourceTestInfo = {
++            sourceInfo, available: false,
++            testInfo: { quality: '错误', loadSpeed: '未知', pingTime: -9999 },
++          };
++
++          let testext = '';
++          try {
++            if (!sourceInfo.episodes || sourceInfo.episodes.length === 0) {
++              result.testError = 'no episodes';
++              testext = '无剧集地址';
++            } else {
++              const episodeUrl = sourceInfo.episodes.length > 1
++                ? sourceInfo.episodes[1]
++                : sourceInfo.episodes[0];
++
++              if (testType === 'full') {
++                // 完整测速（如桌面设备）
++                const info = await getVideoResolutionFromM3u8(episodeUrl);
++                result.testInfo = info;
++                result.available = true;
++                testext = `${info.quality} | ${info.loadSpeed} | ${info.pingTime}ms`;
++              } else {
++                // 轻量级测速，仅ping，不创建HLS（如移动设备）
++                const startTime = performance.now();
++                await fetch(episodeUrl, {
++                  method: 'HEAD', mode: 'no-cors',
++                  signal: AbortSignal.timeout(LIGHT_TEST_TIMEOUT_MS) // 超时
++                });
++                const pingTime = performance.now() - startTime;
++                result.testInfo.pingTime = Math.round(pingTime);
++                result.available = true;
++                testext = `${result.testInfo.pingTime}ms`;
++              }
++            }
++          } catch (error) {
++            console.warn(`测速失败: ${sourceInfo.source_name}`, error);
++            const msg = error instanceof Error ? error.message : String(error);
++            result.testError = msg;
++            testext = msg.length > 36 ? `${msg.substring(0,36)}...` : msg;
++          }
++
++          // 更新进度：显示部分测试结果
++          testedCount += 1;
++          const now = Date.now();
++          if (now - lastProgressUpdateTime > 99) { // 99ms 防抖
++            setSpeedTestProgress({
++              current: testedCount, total: sources.length,
++              currentSource: sourceInfo.source_name, text: testext,
++            });
++            lastProgressUpdateTime = now;
++          }
++          return result;
++        })
++      );
++      allResults.push(...batchResults);
++
++      // 完整测速，遇到优质源（4K或2K + 速  度>5MB/s，或1080p + 速度>3MB/s）后停止测试
++      if (testType === 'full') {
++        for (const result of batchResults) {
++          if (!result.available) continue;
++
++          const { quality, loadSpeed } = result.testInfo;
++          const speedMatch = loadSpeed.match(/^([\d.]+)\s*MB\/s$/);
++          const speedMBps = speedMatch ? parseFloat(speedMatch[1]) : 0;
++          // 优质源判断条件
++          const isHighQuality = (quality === '4K' || quality === '2K') && speedMBps >= HIGH_QUALITY_SPEED_MBPS;
++          const isGoodQuality = quality === '1080p' && speedMBps >= GOOD_QUALITY_SPEED_MBPS;
++          if (!isHighQuality && !isGoodQuality) continue;
++
++          console.log(`✓ 找到优质源: ${result.sourceInfo.source_name} (${quality}, ${loadSpeed})，停止测速`);
++          shouldStop = true;
++          break;
++        }
++      }
++
++      // 完整测速批次间延迟，让资源有时间清理
++      if (testType === 'full' && i + concurrency < sources.length && !shouldStop) {
++        await new Promise(resolve => setTimeout(resolve, 300));
++      }
++    }
++
++    // 短暂显示最终进度
++    setSpeedTestProgress({
++      current: testedCount, total: sources.length,
++      currentSource: '播放源测速完成',
++    });
++    await new Promise(resolve => setTimeout(resolve, 300));
++    // 清除测速进度状态
++    setSpeedTestProgress(null);
++
++    // 排序可用 sources
++    const sortedResults = validSortedSources(allResults, testType);
++    if (sortedResults.length === 0) {
++      console.warn('所有播放源测速都失败，使用第一个播放源');
++      return sources[0];
++    }
++
++    // 完整测速, 保存可用测速结果到 precomputedVideoInfo
++    if (testType === 'full') {
++      const newVideoInfoMap = new Map<string, SpeedTestInfo>();
++      sortedResults.forEach((result) => {
++        const skey = `${result.sourceInfo.source}-${result.sourceInfo.id}`;
++        newVideoInfoMap.set(skey, result.testInfo);
++      });
++      setPrecomputedVideoInfo(newVideoInfoMap);
++    }
++
++    return sortedResults[0].sourceInfo;
++  }; // end 优选函数
++
++  // 渲染测速进度，使用 useMemo 缓存
++  const speedTestProgressDisplay = useMemo(() => (
++    speedTestProgress ? (
++      <div className='mt-4 space-y-2'>
++        <div className='flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400'>
++          <span className='font-medium'>
++            [{speedTestProgress.current}/{speedTestProgress.total}]
++          </span>
++          <span className='text-green-600 dark:text-green-400'>
++            {speedTestProgress.currentSource}
++          </span>
++        </div>
++        {speedTestProgress.text && (
++          <div className='text-xs text-gray-500 dark:text-gray-500 font-mono'>
++            {speedTestProgress.text}
++          </div>
++        )}
++      </div>
++    ) : null
++  ), [speedTestProgress]);
++
++  // Manager
++  return {
++    preferBestSource,
++    precomputedVideoInfo,
++    speedTestProgressDisplay,
++  };
++};
++

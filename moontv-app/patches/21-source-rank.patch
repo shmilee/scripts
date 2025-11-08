@@ -47,10 +47,10 @@ index 3f733b9..7a80427 100644
          </div>
 diff --git a/src/components/SourceRankManager.tsx b/src/components/SourceRankManager.tsx
 new file mode 100644
-index 0000000..350aab0
+index 0000000..fc1edb8
 --- /dev/null
 +++ b/src/components/SourceRankManager.tsx
-@@ -0,0 +1,356 @@
+@@ -0,0 +1,701 @@
 +/* eslint-disable no-console */
 +/* Copyright (c) 2025 shmilee */
 +
@@ -66,15 +66,15 @@ index 0000000..350aab0
 +
 +'use client';
 +
++import Hls from 'hls.js';
 +import { useEffect, useMemo, useRef, useState } from 'react';
 +
 +import { SearchResult } from '@/lib/types';
-+import { getVideoResolutionFromM3u8 } from '@/lib/utils';
 +
 +interface SpeedTestInfo {
-+  quality: string;
-+  loadSpeed: string;
-+  pingTime: number;
++  quality: string;   // 分辨率，如720p、1080p等
++  loadSpeed: string; // 速率，自动转换为KB/s或MB/s
++  pingTime: number;  // 网络延迟（毫秒）
 +}
 +
 +interface SourceTestInfo {
@@ -86,14 +86,348 @@ index 0000000..350aab0
 +  score?: number;
 +}
 +
-+type SpeedTestType = 'full' | 'light'; // 测速类型
-+const CONCURRENCY_FULL = 6;      // 完整测速并发数
-+const CONCURRENCY_LIGHT = 12;    // 轻量级测速并发数
-+const MAX_TEST_COUNT_FULL = 24;  // 完整测速最大测试数量
-+const MAX_TEST_COUNT_LIGHT = 36; // 轻量级测速最大测试数量
-+const LIGHT_TEST_TIMEOUT_MS = 5000; // 轻量级测速超时时间（毫秒）
-+const HIGH_QUALITY_SPEED_MBPS = 5;  // 4K 2K 优质源速度阈值（MB/s）
-+const GOOD_QUALITY_SPEED_MBPS = 3;  // 1080p 优质源速度阈值（MB/s）
++// 测速类型定义； NOT-TODO：full/deep，综合已有测速记录（数据库）
++type SpeedTestType = 'Basic' | 'Light' | 'Ping';
++// 测速配置接口
++interface SpeedTestConfig {
++  concurrency: number;  // 并发数
++  maxTestCount: number; // 最大测试数量
++  timeout: number;      // 超时时间（毫秒）
++  description: string;
++  capabilities: string[];
++}
++// 测速配置映射表
++const SPEED_TEST_CONFIGS = new Map<SpeedTestType, SpeedTestConfig>([
++  ['Basic', {
++    concurrency: 12,
++    maxTestCount: 36,
++    timeout: 6500,
++    description: '标准测速 - 解析m3u8元数据',
++    capabilities: ['quality', 'loadSpeed', 'pingTime']
++  }],
++  ['Light', {
++    concurrency: 10,
++    maxTestCount: 30,
++    timeout: 6000,
++    description: '轻量测速 - 解析m3u8元数据，优化 hls.js 性能占用',
++    capabilities: ['quality', 'loadSpeed', 'pingTime']
++  }],
++  ['Ping', {
++    concurrency: 10,
++    maxTestCount: 30,
++    timeout: 4000,
++    description: '连通测速 - 仅获取响应时间',
++    capabilities: ['pingTime']
++  }]
++]);
++const getSpeedTestConfig = (testType: SpeedTestType): SpeedTestConfig => {
++  return SPEED_TEST_CONFIGS.get(testType) || {
++    concurrency: 12,
++    maxTestCount: 36,
++    timeout: 6500,
++    description: '标准测速 - 解析m3u8元数据',
++    capabilities: ['quality', 'loadSpeed', 'pingTime']
++  };
++};
++
++// 基于常见视频码率的优质源速度阈值（MB/s）
++const QUALITY_SPEED_MBPS = new Map([
++  ['4K', 4.0],    // 32 Mbps (4K高码率 + 缓冲余量)
++  ['2K', 2.5],    // 20 Mbps (2K高码率 + 缓冲余量)
++  ['1080p', 2.0], // 16 Mbps (1080p高码率 + 缓冲余量)
++  ['720p', 1.0],  // 8 Mbps (720p高码率 + 缓冲余量)
++  ['480p', 0.75], // 6 Mbps (480p高码率 + 缓冲余量)
++  ['SD', 0.5]     // 4 Mbps (标清 + 缓冲余量)
++]);
++const getQualitySpeedThreshold = (quality: string): number => {
++  return QUALITY_SPEED_MBPS.get(quality) || 1.0; // 默认 1.0
++};
++
++type DeviceType = 'iPad' | 'Tablet' | 'Mobile' | 'Desktop';
++type DevicePerformanceType = 'Low' | 'Medium' | 'High';
++// 工具函数：检测设备性能
++const getDevicePerformance = (): {
++  device: DeviceType;
++  devicePerformance: DevicePerformanceType;
++} => {
++  if (typeof navigator === 'undefined') {
++    return { device: 'Desktop', devicePerformance: 'Medium' }; // 默认值
++  }
++
++  const { userAgent, platform, maxTouchPoints } = navigator;
++  const cores = navigator.hardwareConcurrency || 4;
++
++  // iPad 专门检测 (包括新的 iPad Pro)
++  const hasMSStream = 'MSStream' in window;
++  const isIPad = /iPad/i.test(userAgent) || (
++    (userAgent.includes('Macintosh') || /Mac/i.test(platform)) &&
++    !hasMSStream && maxTouchPoints > 2
++  );
++  // 安卓平板设备
++  const isTablet = /Android/i.test(userAgent) && (
++    /Tablet|Pad/.test(userAgent) ||
++    (!/Mobile/i.test(userAgent) && screen.width >= 768)
++  );
++  // 移动设备
++  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
++
++  const device = isIPad ? 'iPad' : isTablet ? 'Tablet' : (
++    isMobile ? 'Mobile' : 'Desktop'
++  );
++
++  // 性能等级估算
++  if (isIPad || isTablet || isMobile) {
++    return { device, devicePerformance: cores >= 6 ? 'Medium' : 'Low' };
++  } else {
++    return {
++      device,
++      devicePerformance: cores >= 8 ? 'High' : cores >= 4 ? 'Medium' : 'Low'
++    };
++  }
++}
++
++// 'hls.js' 版本
++const isHlsVersionGreaterEqual_1_6_13 = ((current, target) => {
++  const curParts = current.split('.').map(Number);
++  const tarParts = target.split('.').map(Number);
++  for (let i = 0; i < Math.max(curParts.length, tarParts.length); i++) {
++    const cur = curParts[i] || 0;
++    const tar = tarParts[i] || 0;
++    if (cur !== tar) return cur > tar; // Greater
++  }
++  return true; // Equal
++})(Hls.version, '1.6.13');
++
++
++// 工具函数：从m3u8地址获取视频质量信息
++// 修改、替换 { getVideoResolutionFromM3u8 } from '@/lib/utils';
++const getVideoInfoFromM3u8 = async (
++  m3u8Url: string,
++  testType: SpeedTestType
++): Promise<SpeedTestInfo> => {
++  // 1. 最简单的Ping测试，不创建任何video或HLS实例
++  if (testType === 'Ping') {
++    try {
++      const startTime = performance.now();
++      await fetch(m3u8Url, {
++        method: 'HEAD', mode: 'no-cors',
++        signal: AbortSignal.timeout(getSpeedTestConfig(testType).timeout)
++      });
++      const pingTime = Math.round(performance.now() - startTime);
++      return { quality: '未知', loadSpeed: '未知', pingTime };
++    } catch (error) {
++      throw new Error(
++        `Ping: ${error instanceof Error ? error.message : String(error)}`
++      );
++    }
++  }
++  // 2. 标准测速 Basic; 或 3. 轻量测速 Light
++  // 创建视频实例
++  const createVideo = (): HTMLVideoElement => {
++    const video = document.createElement('video');
++    video.muted = true;
++    video.preload = 'metadata';
++    if (testType === 'Light') { // 使用更小的视频元素减少内存占用
++      video.width = 32;
++      video.height = 18;
++      video.style.display = 'none';
++      video.style.position = 'absolute';
++      video.style.left = '-9999px';
++    }
++    return video;
++  };
++  // HLS实例配置选项，默认值参考@1.6.10: hls.js/src/config.ts
++  // https://github.com/video-dev/hls.js/blob/master/docs/API.md#fine-tuning
++  const hlsConfig = {
++    debug: false, // 默认 false
++    // 1. 减少最大缓冲长度，避免缓冲过多数据，默认 30 秒
++    maxBufferLength: testType === 'Light' ? 10 : 20,
++    // 2. 减小最大缓冲区大小，减少内存占用，默认 60 MB
++    maxBufferSize: (testType === 'Light' ? 8 : 16) * 1000 * 1000,
++    // 3. 限制后向缓冲区，节省内存，默认 Infinity
++    backBufferLength: testType === 'Light' ? 10 : 30,
++    // 4. 限制前端缓冲区刷新阈值，默认 Infinity
++    frontBufferFlushThreshold: testType === 'Light' ? 15 : 30,
++    // 5. 较小的最大缓冲空洞容忍度，默认 0.1
++    maxBufferHole: testType === 'Light' ? 0.05 : 0.1,
++    // 6. 较小的最大重试次数，默认 3
++    appendErrorMaxRetry: testType === 'Light' ? 2 : 4,
++    // 7. Web Worker，减少线程开销，默认 true
++    enableWorker: testType === 'Basic',
++    // 8. 带宽测试，避免额外的网络请求，默认 true
++    testBandwidth: false,
++    // 9. 低延迟模式，默认 true
++    lowLatencyMode: testType === 'Basic',
++    // 10. 禁用各种元数据解析（可减少CPU使用），默认 true
++    enableDateRangeMetadataCues: false,
++    enableEmsgMetadataCues: false,
++    enableID3MetadataCues: false,
++    // 11. 优化片段解析错误处理，默认 Retry: 6; Delay: 1000
++    fragLoadingMaxRetry: testType === 'Light' ? 3 : 6,
++    fragLoadingRetryDelay: testType === 'Light' ? 500 : 800,
++  };
++  // 根据视频宽度判断质量等级，使用经典分辨率的宽度作为分割点
++  const getQualityFromWidth = (width: number): string => {
++    return width >= 3840 ? '4K'  // 4K: 3840x2160
++      : width >= 2560 ? '2K'     // 2K: 2560x1440
++      : width >= 1920 ? '1080p'  // 1080p: 1920x1080
++      : width >= 1280 ? '720p'   // 720p: 1280x720
++      : width >= 854 ? '480p'    // 480p: 854x480
++      : 'SD';
++  };
++  // 计算分片下载速度
++  // eslint-disable-next-line @typescript-eslint/no-explicit-any
++  const calculateFragmentSpeed = (fragmentStartTime: number, data: any): string | null => {
++    if (fragmentStartTime <= 0 || !data || !data.payload) return null;
++    const loadTime = performance.now() - fragmentStartTime;
++    const size = data.payload.byteLength || 0;
++    if (loadTime > 0 && size > 0) {
++      const speedKBps = size / 1024 / (loadTime / 1000);
++      return speedKBps >= 1024 ? `${(speedKBps / 1024).toFixed(2)} MB/s`
++        : `${speedKBps.toFixed(2)} KB/s`;
++    }
++    return null;
++  };
++  // 清理资源
++  const cleanupResources = (hls: Hls, video: HTMLVideoElement, timeoutId?: NodeJS.Timeout): void => {
++    if (timeoutId) clearTimeout(timeoutId);
++    try {
++      if (hls) {
++        // 移除所有事件监听
++        hls.off(Hls.Events.FRAG_LOADING);
++        hls.off(Hls.Events.FRAG_LOADED);
++        hls.off(Hls.Events.ERROR);
++        // 销毁
++        hls.stopLoad();
++        hls.detachMedia();
++        hls.destroy();
++      }
++    } catch (e) {
++      console.warn('HLS cleanup error:', e);
++    }
++    try {
++      if (video) {
++        // 移除所有事件监听
++        video.onloadedmetadata = null;
++        video.onerror = null;
++        video.pause(); // 暂停
++        // 无论是否在DOM中，都尝试移除
++        if (video.parentNode) {
++          video.parentNode.removeChild(video);
++        } else {
++          video.remove();
++        }
++      }
++    } catch (e) {
++      console.warn('Video cleanup error:', e);
++    }
++  };
++
++  // 开始测速
++  return new Promise((resolve, reject) => {
++    // 测量ping时间
++    const pingStart = performance.now();
++    let pingTime = 0;
++    const pingPromise = fetch(m3u8Url, { method: 'HEAD', mode: 'no-cors' })
++      .then(() => { pingTime = performance.now() - pingStart; })
++      .catch(() => { pingTime = performance.now() - pingStart; });
++
++    const video = createVideo();
++    const hls = new Hls(hlsConfig);
++
++    // 设置超时处理
++    const timeoutId = setTimeout(() => {
++      cleanupResources(hls, video);
++      reject(new Error('Timeout loading video metadata'));
++    }, getSpeedTestConfig(testType).timeout);
++
++    let actualLoadSpeed = '未知';
++    let hasSpeedCalculated = false;
++    let hasMetadataLoaded = false;
++    let fragmentStartTime = 0;
++    // 检查是否可以返回结果
++    const checkAndResolve = async () => {
++      if (hasMetadataLoaded && (hasSpeedCalculated || actualLoadSpeed !== '未知')) {
++        const width = video.videoWidth;
++        const quality = width && width > 0
++          ? getQualityFromWidth(width)
++          : '未知'; // webkit 无法获取尺寸，直接返回
++        cleanupResources(hls, video, timeoutId);
++        await pingPromise; // 等待ping测试完成
++        resolve({
++          quality,
++          loadSpeed: actualLoadSpeed,
++          pingTime: Math.round(pingTime),
++        });
++      }
++    };
++
++    // HLS事件处理
++    // 监听片段加载开始
++    hls.on(Hls.Events.FRAG_LOADING, () => {
++      if (!hasSpeedCalculated) {
++        fragmentStartTime = performance.now();
++      }
++    });
++    // 监听片段加载完成，只需首个分片即可计算速度
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    hls.on(Hls.Events.FRAG_LOADED, (event: any, data: any) => {
++      if (!hasSpeedCalculated) {
++        const speed = calculateFragmentSpeed(fragmentStartTime, data);
++        if (speed) {
++          actualLoadSpeed = speed;
++          hasSpeedCalculated = true;
++          checkAndResolve(); // 尝试返回结果
++        }
++      }
++    });
++    // 监听HLS错误
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    hls.on(Hls.Events.ERROR, (event: any, data: any) => {
++      console.error('HLS测速错误:', data);
++      if (isHlsVersionGreaterEqual_1_6_13) {
++        // v1.6.13 特殊处理：片段解析错误不应该导致测速失败
++        if (data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR) {
++          console.log('测速中遇到片段解析错误，v1.6.13已修复，继续测速');
++          return;
++        }
++        // v1.6.13 特殊处理：时间戳错误也不应该导致测速失败
++        if (data.details === Hls.ErrorDetails.BUFFER_APPEND_ERROR &&
++            data.err && data.err.message &&
++            data.err.message.includes('timestamp')) {
++          console.log('测速中遇到时间戳错误，v1.6.13已修复，继续测速');
++          return;
++        }
++      }
++      if (data.fatal) {
++        cleanupResources(hls, video, timeoutId);
++        reject(new Error(`HLS ${data.type}`));
++      }
++    });
++
++    // 视频事件处理
++    // 监听视频元数据加载完成
++    video.onloadedmetadata = () => {
++      hasMetadataLoaded = true;
++      checkAndResolve(); // 尝试返回结果
++    };
++    // 监听视频错误
++    video.onerror = () => {
++      cleanupResources(hls, video, timeoutId);
++      reject(new Error('Failed to load video metadata'));
++    };
++
++    // 加载视频源
++    try {
++      hls.loadSource(m3u8Url);
++      hls.attachMedia(video);
++    } catch (error) {
++      cleanupResources(hls, video, timeoutId);
++      reject(error);
++    }
++  });
++}
++
 +
 +// 工具函数：计算播放源综合评分
 +const calculateSourceScore = (
@@ -145,7 +479,7 @@ index 0000000..350aab0
 +  const score = qualityScore * 0.4 + speedScore * 0.4 + pingScore * 0.2;
 +  console.log(
 +    `${testResult.sourceInfo.source_name} - 评分结果: ${score.toFixed(2)
-+    } = ${qualityScore}*0.4 + ${speedScore}*0.4 + ${pingScore}*0.2`);
++    } = ${qualityScore}*0.4 + ${speedScore.toFixed(2)}*0.4 + ${pingScore.toFixed(2)}*0.2`);
 +  return Math.round(score * 100) / 100; // 保留两位小数
 +};
 +
@@ -153,7 +487,7 @@ index 0000000..350aab0
 +const validSortedSources = (testResults: SourceTestInfo[], testType: SpeedTestType): SourceTestInfo[] => {
 +  const successfulResults = testResults.filter(r => r.available);
 +  if (successfulResults.length === 0) return [];
-+  if (testType === 'full') { // 完整测速
++  if (testType === 'Basic' || testType === 'Light') { // 标准、轻量的完整测速
 +    // 找出所有有效速度的最大值，用于线性映射
 +    successfulResults.forEach((result) => {
 +        const speedStr = result.testInfo.loadSpeed;
@@ -196,13 +530,13 @@ index 0000000..350aab0
 +        }, ${result.testInfo.loadSpeed}, ${result.testInfo.pingTime}ms)`
 +      );
 +    });
-+  } else { // 轻量级 仅响应时间
++  } else { // 连通测速 仅响应时间
 +    successfulResults.sort((a, b) => a.testInfo.pingTime - b.testInfo.pingTime);
-+    console.log('播放源轻量级排序结果:');
++    console.log('播放源响应时间排序结果:');
 +    successfulResults.forEach((result, index) => {
 +      console.log(
 +        `${index + 1}. ${result.sourceInfo.source_name
-+        }: ${result.testInfo.pingTime}ms)`
++        }: ${result.testInfo.pingTime}ms`
 +      );
 +    });
 +  }
@@ -210,14 +544,13 @@ index 0000000..350aab0
 +}
 +
 +export default function SourceRankManager() {
-+  const isMobileRef = useRef(false);
-+  // 检测是否为移动设备
++  const deviceRef = useRef<DeviceType>('Desktop');
++  const devicePerformanceRef = useRef<DevicePerformanceType>('Medium');
++  // 检测设备和性能
 +  useEffect(() => {
-+    if (typeof navigator === 'undefined') {
-+      isMobileRef.current = false;
-+    } else {
-+      isMobileRef.current = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-+    }
++    const { device, devicePerformance } = getDevicePerformance();
++    deviceRef.current = device;
++    devicePerformanceRef.current = devicePerformance;
 +  }, []);
 +
 +  // 测速进度状态
@@ -238,23 +571,47 @@ index 0000000..350aab0
 +  ): Promise<SearchResult> => {
 +    if (sources.length === 1) return sources[0];
 +
-+    if (isMobileRef.current) {
-+      console.log('移动设备使用轻量级优选，仅测试连通性和响应时间');
++    // 确定测速类型
++    let testType: SpeedTestType = 'Light';
++    const device = deviceRef.current;
++    const devicePerformance = devicePerformanceRef.current;
++    if (device === 'iPad') {
++      testType = 'Ping';
++    } else if ((device === 'Tablet' || device === 'Mobile') && devicePerformance === 'Low') {
++      testType = 'Ping';
++    } else if (device === 'Desktop' && (devicePerformance === 'Medium' || devicePerformance === 'High')) {
++      testType = 'Basic';
 +    }
-+    const testType: SpeedTestType = isMobileRef.current ? 'light' : 'full';
++    const testTypeDesc = getSpeedTestConfig(testType).description;
++    console.log(`${device} 设备（性能 ${devicePerformance}）优选使用 ${testTypeDesc}`);
++    console.log(`HLS版本 ${Hls.version} >= 1.6.13 ? ${isHlsVersionGreaterEqual_1_6_13}`);
 +
-+    // full 使用小批量并发，避免创建过多实例
-+    const concurrency = testType === 'full'
-+        ? CONCURRENCY_FULL
-+        : CONCURRENCY_LIGHT;
++    // 添加内存检查（如果可用）
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const memory = typeof performance !== 'undefined' ? (performance as any).memory : null;
++    if (memory) {
++      const usedMB = memory.usedJSHeapSize;
++      const limitMB = memory.jsHeapSizeLimit;
++      console.log(`内存使用：usedJSHeapSize=${usedMB}, jsHeapSizeLimit=${limitMB}`);
++      const ratio = usedMB / limitMB;
++      if ( ratio > 0.618) {
++        const newTestType = ratio > 0.88 ? 'Ping' : 'Light';
++        if (newTestType !== testType) {
++          testType = newTestType;
++          const testTypeDesc = getSpeedTestConfig(testType).description;
++          console.warn(`内存使用率过高（${(ratio*100).toFixed(1)}%），优选切换到 ${testTypeDesc}`);
++        }
++      }
++    }
++
++    // 使用小批量并发，避免创建过多实例
++    const concurrency = getSpeedTestConfig(testType).concurrency;
 +    // 限制最大测试数量
-+    const MAX_TEST_COUNT_LIMIT = testType === 'full'
-+        ? MAX_TEST_COUNT_FULL
-+        : MAX_TEST_COUNT_LIGHT;
-+    if (sources.length > MAX_TEST_COUNT_LIMIT) {
-+        console.log(`限制最大测试数量: 原有${sources.length}个播放源，仅测试前${MAX_TEST_COUNT_LIMIT}个`);
++    const maxTestCount = getSpeedTestConfig(testType).maxTestCount;
++    if (sources.length > maxTestCount) {
++        console.log(`限制最大测试数量: 原有${sources.length}个播放源，仅测试前${maxTestCount}个`);
 +        // 重新赋值（引用），不会影响外部传入
-+        sources = sources.slice(0, MAX_TEST_COUNT_LIMIT);
++        sources = sources.slice(0, maxTestCount);
 +    }
 +
 +    // 批量测试
@@ -270,7 +627,7 @@ index 0000000..350aab0
 +        batch.map(async (sourceInfo) => {
 +          const result: SourceTestInfo = {
 +            sourceInfo, available: false,
-+            testInfo: { quality: '错误', loadSpeed: '未知', pingTime: -9999 },
++            testInfo: { quality: '未知', loadSpeed: '未知', pingTime: -9999 },
 +          };
 +
 +          let testext = '';
@@ -282,23 +639,12 @@ index 0000000..350aab0
 +              const episodeUrl = sourceInfo.episodes.length > 1
 +                ? sourceInfo.episodes[1]
 +                : sourceInfo.episodes[0];
-+
-+              if (testType === 'full') {
-+                // 完整测速（如桌面设备）
-+                const info = await getVideoResolutionFromM3u8(episodeUrl);
-+                result.testInfo = info;
-+                result.available = true;
++              const info = await getVideoInfoFromM3u8(episodeUrl, testType);
++              result.testInfo = info;
++              result.available = true;
++              if (testType !== 'Ping') { // 完整
 +                testext = `${info.quality} | ${info.loadSpeed} | ${info.pingTime}ms`;
 +              } else {
-+                // 轻量级测速，仅ping，不创建HLS（如移动设备）
-+                const startTime = performance.now();
-+                await fetch(episodeUrl, {
-+                  method: 'HEAD', mode: 'no-cors',
-+                  signal: AbortSignal.timeout(LIGHT_TEST_TIMEOUT_MS) // 超时
-+                });
-+                const pingTime = performance.now() - startTime;
-+                result.testInfo.pingTime = Math.round(pingTime);
-+                result.available = true;
 +                testext = `${result.testInfo.pingTime}ms`;
 +              }
 +            }
@@ -324,8 +670,9 @@ index 0000000..350aab0
 +      );
 +      allResults.push(...batchResults);
 +
-+      // 完整测速，遇到优质源（4K或2K + 速  度>5MB/s，或1080p + 速度>3MB/s）后停止测试
-+      if (testType === 'full') {
++      // HLS完整测速
++      if (testType !== 'Ping') {
++        // 遇到优质源（4K或2K + 速  度>5MB/s，或1080p + 速度>3MB/s）后停止测试
 +        for (const result of batchResults) {
 +          if (!result.available) continue;
 +
@@ -333,19 +680,17 @@ index 0000000..350aab0
 +          const speedMatch = loadSpeed.match(/^([\d.]+)\s*MB\/s$/);
 +          const speedMBps = speedMatch ? parseFloat(speedMatch[1]) : 0;
 +          // 优质源判断条件
-+          const isHighQuality = (quality === '4K' || quality === '2K') && speedMBps >= HIGH_QUALITY_SPEED_MBPS;
-+          const isGoodQuality = quality === '1080p' && speedMBps >= GOOD_QUALITY_SPEED_MBPS;
-+          if (!isHighQuality && !isGoodQuality) continue;
++          const isGoodQuality = (quality === '4K' || quality === '2K' || quality === '1080p') && speedMBps >= getQualitySpeedThreshold(quality);
++          if (!isGoodQuality) continue;
 +
 +          console.log(`✓ 找到优质源: ${result.sourceInfo.source_name} (${quality}, ${loadSpeed})，停止测速`);
 +          shouldStop = true;
 +          break;
 +        }
-+      }
-+
-+      // 完整测速批次间延迟，让资源有时间清理
-+      if (testType === 'full' && i + concurrency < sources.length && !shouldStop) {
-+        await new Promise(resolve => setTimeout(resolve, 300));
++        // 测速批次间延迟，让资源有时间清理
++        if (i + concurrency < sources.length && !shouldStop) {
++          await new Promise(resolve => setTimeout(resolve, 300));
++        }
 +      }
 +    }
 +
@@ -366,7 +711,7 @@ index 0000000..350aab0
 +    }
 +
 +    // 完整测速, 保存可用测速结果到 precomputedVideoInfo
-+    if (testType === 'full') {
++    if (testType !== 'Ping') {
 +      const newVideoInfoMap = new Map<string, SpeedTestInfo>();
 +      sortedResults.forEach((result) => {
 +        const skey = `${result.sourceInfo.source}-${result.sourceInfo.id}`;

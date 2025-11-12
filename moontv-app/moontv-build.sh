@@ -11,7 +11,7 @@ build_app() {
     local gituser="$(get_gituser $name)"
     local gitrepo="$(get_gitrepo $name)"
     local appdir="$(get_appdir $name)"
-    local buildir="${WORKDIR}/build/${gituser}-${gitrepo}-${AppCommits[$name]}"
+    local buildir="${WORKDIR}/build/$appdir"
     local distdir="${WORKDIR}/dist/$appdir"
 
     if [ -d "$distdir" ]; then
@@ -20,7 +20,7 @@ build_app() {
     fi
 
     local downurl="${AppUrls[$name]}/archive/${AppCommits[$name]}.tar.gz"
-    local tarball="${WORKDIR}/download/${appdir}.tar.gz"
+    local tarball="${WORKDIR}/download/$(get_tarball $name)"
     if [ ! -f "$tarball" ]; then
         echo "=> download: $tarball"
         $CURLCMD -o "$tarball" "$downurl" || return

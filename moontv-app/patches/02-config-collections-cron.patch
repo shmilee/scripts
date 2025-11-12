@@ -1,5 +1,5 @@
 diff --git a/src/app/api/cron/route.ts b/src/app/api/cron/route.ts
-index 93db66a..f4ec4c8 100644
+index 93db66a..d36122a 100644
 --- a/src/app/api/cron/route.ts
 +++ b/src/app/api/cron/route.ts
 @@ -8,6 +8,7 @@ import { db } from '@/lib/db';
@@ -19,3 +19,12 @@ index 93db66a..f4ec4c8 100644
  
        if (!response.ok) {
          throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+@@ -137,7 +138,7 @@ async function refreshRecordAndFavorites() {
+             return detail;
+           })
+           .catch((err) => {
+-            console.error(`获取视频详情失败 (${source}+${id}):`, err);
++            console.error(`获取视频详情失败 ${fallbackTitle} (${source}+${id}):`, err);
+             return null;
+           });
+       }

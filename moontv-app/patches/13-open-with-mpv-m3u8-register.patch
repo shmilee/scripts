@@ -104,10 +104,10 @@ index 2d55278..84493f2 100644
                <div>
 diff --git a/src/lib/m3u8.register.ts b/src/lib/m3u8.register.ts
 new file mode 100644
-index 0000000..b9b9975
+index 0000000..cdf8cea
 --- /dev/null
 +++ b/src/lib/m3u8.register.ts
-@@ -0,0 +1,906 @@
+@@ -0,0 +1,907 @@
 +/* eslint-disable no-console */
 +/* Copyright (c) 2025 shmilee */
 +
@@ -332,6 +332,7 @@ index 0000000..b9b9975
 +  } catch (error) {
 +    clearTimeout(timeoutId);
 +    // error instanceof Error, 尝试接受自签证书
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 +    const code = (error as any).cause?.code;
 +    if (url.startsWith('https:') && (
 +        code === 'SELF_SIGNED_CERT_IN_CHAIN' ||

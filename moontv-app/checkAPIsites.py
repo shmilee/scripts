@@ -121,30 +121,17 @@ class SpeedTest(object):
         self.timeout = timeout
         self.UA = UA or 'Mozilla/5.0 (Windows NT 10.0; Win64) Firefox/142.0'
 
-    def fetch(self, url, desc):
-        '''return status, {speed KB/s, Epoch-seconds, data-size}, data'''
-        print("(%s) fetching %s ..." % (desc, url))
-        status, data = 1000, b''
-        try:
-            parsed_url = urlparse(url)
-            host = parsed_url.netloc  # .hostname
-            kwargs = dict(
-                timeout=self.timeout,
-                headers={'User-Agent': self.UA, 'Host': host}
-            )
-            start = time.monotonic()
-            with closing(requests.get(url, **kwargs)) as rp:
-                status = rp.status_code
-                if status == 200:
-                    data = rp.content
-                else:
-                    print('===%d===' % rp.status_code, url)
-                    print(rp.headers)
-            now = time.monotonic()
-            data_size = len(data)
-            speed = round(data_size/(now-start)/1024, 3)
-        except Exception as error:
-            errno = getattr(error, 'errno', None)
+    def _get_kwargs(self, url):
+        parsed_url = urlparse(url)
+        host = parsed_url.netloc  # .hostname
+        return dict(
+            timeout=self.timeout, allow_redirects=True,
+            headers={'User-Agent': self.UA, 'Host': host}
+        )
+
+    def _get_errno(self, error):
+        errno = getattr(error, 'errno', None)
+        if errno == None:
             err = error
             while isinstance(err, Exception):
                 if len(err.args) > 0:
@@ -160,6 +147,42 @@ class SpeedTest(object):
                             break
                 else:
                     break
+        return errno
+
+    def connect(self, url, desc):
+        '''return True/False'''
+        print("(%s) connecting %s ..." % (desc, url))
+        try:
+            with closing(requests.get(url, **self._get_kwargs(url))) as rp:
+                if 200 <= rp.status_code < 400:
+                    print('(%s) \033[32m[connected]\033[0m, %s' % (desc, url))
+                    return True
+                else:
+                    print('(%s) \033[32m[status %d]\033[0m, %s'
+                          % (desc, rp.status_code, url))
+        except Exception as error:
+            errno = self._get_errno(error)
+            print('(%s) \033[32m[error %s]\033[0m, %s' % (desc, errno, url))
+        return False
+
+    def fetch(self, url, desc):
+        '''return status, {speed KB/s, Epoch-seconds, data-size}, data'''
+        print("(%s) fetching %s ..." % (desc, url))
+        status, data = 1000, b''
+        try:
+            start = time.monotonic()
+            with closing(requests.get(url, **self._get_kwargs(url))) as rp:
+                status = rp.status_code
+                if status == 200:
+                    data = rp.content
+                else:
+                    print('===%d===' % rp.status_code, url)
+                    print(rp.headers)
+            now = time.monotonic()
+            data_size = len(data)
+            speed = round(data_size/(now-start)/1024, 3)
+        except Exception as error:
+            errno = self._get_errno(error)
             if errno:
                 status = 1000 + errno
             print('(%s) \033[31m[Error %d]\033[0m, %s'
@@ -248,15 +271,16 @@ class APISites(object):
         '''
         add (new) api, only with its (new) alias, name, detail,
         and othe-info
+        Return number of added/updated api_sites
         '''
         if not os.path.isfile(file):
             print("Error: json config %s not found!" % file)
-            return
+            return 0
         with open(file, 'rb') as fp:
             fsha256sum = sha256(fp.read()).digest().hex()
         if fsha256sum in self.sources:
             print("json config %s has been added!" % file)
-            return
+            return 0
         else:
             print("adding json config %s ..." % file)
         try:
@@ -269,10 +293,10 @@ class APISites(object):
                 config = json.loads(raw)
             except Exception as err:
                 print('Error: invalid moontv config!', err)
-                return
+                return 0
         if 'api_site' not in config or 'cache_time' not in config:
             print("Error: invalid moontv config!")
-            return
+            return 0
         count = 0
         for alias, info in config['api_site'].items():
             api = info.get('api', None)
@@ -280,8 +304,8 @@ class APISites(object):
                 api = api[:-1]
             name = info.get('name', None)
             detail = info.get('detail', None)
-            count += 1
             if api and name:
+                count += 1
                 if api in self.sites:
                     print(" > %d) Update api: %s, %s" % (count, name, api))
                     self.sites[api]['alias'].append(alias)
@@ -302,7 +326,7 @@ class APISites(object):
                         summary={},
                     )
             else:
-                print(" > %d) Skip invalid api: %s, %s" % (count, name, api))
+                print(" > X) Skip invalid api: %s, %s" % (name, api))
                 continue
             # other-info
             site = self.sites[api]
@@ -314,9 +338,11 @@ class APISites(object):
                             site[key].append(info[key])
                     else:
                         site[key] = [info[key]]
+        print('==> %d api_sites added or updated!' % count)
         self.count = len(self.sites)
         self.sources.append(fsha256sum)
         self.update_common()
+        return count
 
     def update_common(self):
         '''update most common name, alias, detail'''
@@ -326,22 +352,49 @@ class APISites(object):
             info['common_detail'] = self.get_common_detail(api, info)
 
     def get_common_name(self, api, info):
-        N = len(info['name'])  # >=1
-        if N == 1:
-            return info['name'][0]
-        count = [(n.count('TV'), n.count('-')) for n in info['name']]
-        index = sorted(range(N), key=count.__getitem__)[-1]
-        return info['name'][index]
+        # 去除结尾的-数字
+        names = [re.sub(r'[-0-9\s]+$', '', n) for n in info['name']]
+        # 去除开头的特殊字符（保留中文、英文、数字）
+        names = [re.sub(r'^[^\u4e00-\u9fa5a-zA-Z0-9]+', '', n) for n in names]
+        # 去除原有 TV- Av-
+        names = [re.sub(r'^(?:TV-|AV-)', '', n) for n in names]
+        # assert len(names) >= 1
+        # get name
+        if len(names) == 1:
+            name = names[0]
+        else:
+            name = Counter(names).most_common(1)[0][0]
+        # count TV- AV- >= 0
+        TVnames = [n for n in info['name'] if re.match(r'^(?:TV-|🎬)', n)]
+        AVnames = [n for n in info['name'] if re.match(r'^(?:AV-|🔞)', n)]
+        # get nameprefix
+        if len(TVnames) > len(AVnames):
+            nameprefix = 'TV-'
+        elif len(TVnames) < len(AVnames):
+            nameprefix = 'AV-'
+        else:
+            nameprefix = ''
+        return nameprefix + name
+
+    API_Proxies = {
+        'hafrey': 'https://jjpz.hafrey.dpdns.org/?url=',
+        '168188': 'https://pz.168188.dpdns.org/?url=',
+    }
 
     def get_common_alias(self, api, info):
         # ignore info['alias']
+        use_proxy, proxy = '', ''
+        for key in self.API_Proxies.keys():
+            if api.startswith(self.API_Proxies[key]):
+                use_proxy, proxy = key, self.API_Proxies[key]
+        apiurl = api.replace(proxy, '', 1) if use_proxy else api
         # use 一级域名 + 顶级[:2] OR 一级域名 + 二级[:1] + 顶级[:1]
-        host = urlparse(api).netloc
+        host = urlparse(apiurl).netloc
         domain_parts = host.split('.')
         domain_parts.reverse()  # len: 2 or 3
         suffix = (domain_parts[0][:2] if len(domain_parts) == 2
                   else domain_parts[2][:1] + domain_parts[0][:1])
-        return domain_parts[1] + suffix
+        return domain_parts[1] + suffix + use_proxy
 
     def get_common_detail(self, api, info):
         N = len(info['detail'])  # >=0
@@ -352,9 +405,66 @@ class APISites(object):
         most_details = Counter(info['detail']).most_common(2)
         return most_details[0][0]
 
-    def test_connection(self, timeout=30, pool_size=8):
-        tester = SpeedTest(timeout=timeout)
-        testpool = Pool(pool_size)
+    def check_http_to_https(self, timeout=30, pool_size=8):
+        tester, testpool = SpeedTest(timeout=timeout), Pool(pool_size)
+        result = []
+        for i, api in enumerate(self.sites.keys(), 1):
+            urls_todo = []
+            # 1. api
+            if api.startswith('http://'):
+                urls_todo.append(('api-url', api))
+            # 2. detail
+            added_detail = []
+            for index, detail in enumerate(self.sites[api]['detail']):
+                if (detail.startswith('http://')
+                        and detail not in added_detail):
+                    added_detail.append(detail)
+                    urls_todo.append(('detail-%d' % index, detail))
+            # 3. common_detail
+            common_detail = self.sites[api]['common_detail']
+            if common_detail and common_detail.startswith('http://'):
+                urls_todo.append(('common_detail', common_detail))
+            for what, url in urls_todo:
+                desc = '%2d/%2d %s' % (i, self.count, what)
+                newurl = url.replace('http', 'https', 1)
+                result.append((
+                    api, what, url, newurl,
+                    testpool.apply_async(tester.connect, args=(newurl, desc))
+                ))
+        testpool.close()
+        testpool.join()
+        result = [
+            (api, what, url, newurl)
+            for api, what, url, newurl, res in result
+            if res.get()  # http -> https connected
+        ]
+        count = 0
+        # 1. replace detail & common_detail first
+        for api, what, url, newurl in result:
+            if what.startswith('detail-'):
+                index = int(what[7:])
+                if (index < len(self.sites[api]['detail'])  # recheck
+                        and self.sites[api]['detail'][index] == url):
+                    print('[D] Replacing %s => %s' % (url, newurl))
+                    count += 1
+                    self.sites[api]['detail'][index] = newurl
+            elif what == 'common_detail':
+                if self.sites[api]['common_detail'] == url:  # recheck
+                    print('[C] Replacing %s => %s' % (url, newurl))
+                    count += 1
+                    self.sites[api]['common_detail'] = newurl
+        # 2. then replace api (the key)
+        for api, what, url, newurl in result:
+            if what == 'api-url':
+                if api == url and url[5:] == newurl[6:]:  # recheck
+                    print('[K] Replacing %s => %s' % (url, newurl))
+                    count += 1
+                    info = self.sites.pop(api)
+                    self.sites[newurl] = info
+        print('==> 共替换 \033[32m%d\033[0m 个 http 网址为 https!' % count)
+
+    def test_speed(self, timeout=30, pool_size=8):
+        tester, testpool = SpeedTest(timeout=timeout), Pool(pool_size)
         result = []
         apis = self.sites.keys()
         for i, api in enumerate(apis, 1):
@@ -431,7 +541,7 @@ class APISites(object):
                 key='rate+speed', reverse=True, **kwargs):
         '''
         Summarize and print info of sorted api_sites, then save to output.
-        Call after :meth:`test_connection`.
+        Call after :meth:`test_speed`.
 
         Parameters
         ----------
@@ -520,7 +630,7 @@ class APISites(object):
                       % (count, action, common_name, name, api))
         else:
             for api in ordered:
-                count +=1
+                count += 1
                 common_name = SA[api]['common_name']
                 print("[S%2d] %s %s\033[0m, %s"
                       % (count, 'Add', common_name, api))
@@ -567,9 +677,15 @@ if __name__ == '__main__':
         './api-configs/moontv-hafrey1-config.txt',
         './api-configs/moontv-senshinya-gistfile.txt',
     ]
+    count = 0
     for conf in collection_confs:
-        sites.add_json_config(conf)
-    sites.test_connection()
+        count += sites.add_json_config(conf)
+    if count > 0:
+        sites.update_common()
+        sites.check_http_to_https()
+
+    # test speed
+    sites.test_speed()
 
     # backup
     sites.reorder_apis()

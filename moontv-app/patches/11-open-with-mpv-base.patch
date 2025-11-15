@@ -1,17 +1,31 @@
 diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
-index 43a6fef..3f733b9 100644
+index 43a6fef..07b558c 100644
 --- a/src/app/play/page.tsx
 +++ b/src/app/play/page.tsx
 @@ -42,6 +42,8 @@ interface WakeLockSentinel {
    removeEventListener(type: 'release', listener: () => void): void;
  }
  
-+import MPVPlayButton from '@/components/MPVPlayButton';
++import MPVPlayButton, { M3U8DiscontinuityAdsTool } from '@/components/MPVPlayButton';
 +
  function PlayPageClient() {
    const router = useRouter();
    const searchParams = useSearchParams();
-@@ -1839,6 +1841,15 @@ function PlayPageClient() {
+@@ -493,9 +495,13 @@ function PlayPageClient() {
+     }
+   };
+ 
++  const m3u8AdsTool = M3U8DiscontinuityAdsTool();
+   // 去广告相关函数
+   function filterAdsFromM3U8(m3u8Content: string): string {
+     if (!m3u8Content) return '';
++    if (m3u8AdsTool.statusRef.current == 'on') {
++      return m3u8AdsTool.filterAds(m3u8Content);
++    }
+ 
+     // 按行分割M3U8内容
+     const lines = m3u8Content.split('\n');
+@@ -1839,6 +1845,15 @@ function PlayPageClient() {
                  {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
                </span>
              )}
@@ -29,10 +43,10 @@ index 43a6fef..3f733b9 100644
          {/* 第二行：播放器和选集 */}
 diff --git a/src/components/MPVPlayButton.tsx b/src/components/MPVPlayButton.tsx
 new file mode 100644
-index 0000000..99fc339
+index 0000000..65af205
 --- /dev/null
 +++ b/src/components/MPVPlayButton.tsx
-@@ -0,0 +1,334 @@
+@@ -0,0 +1,365 @@
 +/* eslint-disable no-console */
 +/* Copyright (c) 2025 shmilee */
 +
@@ -40,7 +54,7 @@ index 0000000..99fc339
 +
 +import { useCallback, useEffect, useRef, useState } from 'react';
 +
-+import { generateM3u8TempKey } from '@/lib/m3u8.register';
++import { filterDiscontinuityAdJump, generateM3u8TempKey } from '@/lib/m3u8.register';
 +import { SearchResult } from '@/lib/types';
 +
 +interface ArtPlayerInstance {
@@ -69,6 +83,37 @@ index 0000000..99fc339
 +const isMobileDevice = (): boolean => {
 +  if (typeof navigator === 'undefined') return false;
 +  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
++};
++
++// 工具函数：去广告
++export const M3U8DiscontinuityAdsTool = () => {
++  const statusRef = useRef<'on'|'off'>('on');
++  useEffect(() => {
++    if (typeof window !== 'undefined') {
++      // 读取 m3u8Filter: 'true', 'false', null
++      const savedM3u8Filter = localStorage.getItem('m3u8Filter');
++      if (savedM3u8Filter && !JSON.parse(savedM3u8Filter)) {
++        statusRef.current = 'off';
++      }
++    }
++  }, []); // 空依赖数组表示只在挂载时执行
++
++  const filterAds = (m3u8Content: string): string => {
++    const discontinuity1stIdx = m3u8Content.indexOf('#EXT-X-DISCONTINUITY');
++    if (discontinuity1stIdx === -1) {
++      console.log('M3U8: 💫No #EXT-X-DISCONTINUITY tag.');
++      return m3u8Content;
++    }
++    const lines = m3u8Content.split('\n').map(line => line.trim()).filter(Boolean);  // 过滤空行
++    console.log('M3U8: 🚀Aggressive filter (DISCONTINUITY + ads)');
++    const filterStartTime = Date.now();
++    const filteredLines = filterDiscontinuityAdJump(lines);
++    const duration = Date.now() - filterStartTime;
++    console.log(`M3U8: ✅Filtered ${lines.length - filteredLines.length}/${lines.length} lines in ${duration}ms`);
++    return filteredLines.join('\n');
++  };
++
++  return { statusRef, filterAds };
 +};
 +
 +// 弹幕 URL 地址 API 响应类型
@@ -114,10 +159,10 @@ index 0000000..99fc339
 +    setIsMobile(isMobileDevice());
 +  }, []);
 +
-+  // 在组件挂载时从 localStorage 读取 mpvM3u8Filter: 'true', 'false', null
++  // 在组件挂载时从 localStorage 读取 m3u8Filter: 'true', 'false', null
 +  useEffect(() => {
-+    const savedMpvM3u8Filter = localStorage.getItem('mpvM3u8Filter');
-+    if (savedMpvM3u8Filter && !JSON.parse(savedMpvM3u8Filter)) {
++    const savedM3u8Filter = localStorage.getItem('m3u8Filter');
++    if (savedM3u8Filter && !JSON.parse(savedM3u8Filter)) {
 +      setM3u8Filter('off');
 +    }
 +  }, []); // 空依赖数组表示只在挂载时执行

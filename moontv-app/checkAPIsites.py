@@ -115,6 +115,111 @@ class Base58(object):
             return func(f.read(), autofix=autofix)
 
 
+class NetIspDetector(object):
+
+    APIS_ISP = [
+        # (url, isp_field),
+        ('https://ipapi.co/json/', 'org'),
+        ('https://ipinfo.io/json/', 'org'),
+        ('http://ip-api.com/json/', 'isp'),
+    ]
+    default_requests_kwargs = dict(timeout=10, headers={
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64) Firefox/142.0',
+    })
+
+    def __init__(self, qqKey=None, baiduAK=None):
+        if qqKey or baiduAK:
+            self.qqKey = qqKey
+            self.baiduAK = baiduAK
+        else:
+            raise ValueError('Need QQ API Key or Baidu API AK!')
+        # 位置，国内API比较准确
+        info = self._api_baidumap()
+        addr = info['addr'] or self._api_qqmap() or '未知'
+        addr = addr.replace(' ', '_').replace('省', '').replace('市', '')
+        # ISP
+        isp = '未知'
+        for url, field in self.APIS_ISP:
+            response = self._fetch_api_data(url, url, timeout=5)
+            if response and response.get(field, None):
+                isp = self._standardize_isp(response[field])
+                break
+        self.addr = addr
+        self.isp = isp
+        print(f"本机网络运营商(ISP)为: {self.netisp}")
+
+    @property
+    def netisp(self):
+        return f'{self.addr}+{self.isp}'
+
+    def _fetch_api_data(self, name, url, **kwargs):
+        requests_kwargs = self.default_requests_kwargs.copy()
+        requests_kwargs.update(kwargs)
+        print(f"尝试API {name}...")
+        try:
+            response = requests.get(url, **requests_kwargs)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"请求失败: {response}")
+        except Exception as e:
+            print(f"请求失败: {e}")
+        return None
+
+    def _api_baidumap(self):
+        '''Return {addr:'xx', isp:'xx'}'''
+        if not self.baiduAK:
+            return dict(addr=None, isp=None)
+        name = '百度IP定位'
+        url = 'https://api.map.baidu.com/location/ip?ak=%s' % self.baiduAK
+        response = self._fetch_api_data(name, url, timeout=5)
+        try:
+            if response and response['status'] == 0:
+                if 'content' in response:
+                    content = response['content']
+                    return dict(addr=content['address'], isp=None)
+                elif 'result' in response:  # old?
+                    result = response['result']
+                    return dict(addr=result['location'], isp=result['isp'])
+            print(f"{name} 响应错误: {response.get('message', '')}")
+        except Exception as e:
+            print(f"{name} 响应解析错误: {e}")
+        return dict(addr=None, isp=None)
+
+    def _api_qqmap(self):
+        '''Return addr only'''
+        if not self.qqKey:
+            return
+        name = '腾讯IP定位'
+        url = 'https://apis.map.qq.com/ws/location/v1/ip?key=%s' % self.qqKey
+        response = self._fetch_api_data(name, url, timeout=5)
+        try:
+            if response and response['status'] == 0:
+                info = iresponse['result']['ad_info']
+                return info['province'] + info['city'] + info['district']
+            print(f"{name} 响应错误: {response.get('message', '')}")
+        except Exception as e:
+            print(f"{name} 响应解析错误: {e}")
+        return
+
+    def _standardize_isp(self, isp_raw):
+        """标准化运营商名称"""
+        isp_lower = isp_raw.lower()
+        if any(keyword in isp_lower for keyword in [
+                '电信', 'chinatelecom', 'china telecom', 'chinanet']):
+            return '电信'
+        elif any(keyword in isp_lower for keyword in [
+                '移动', 'chinamobile', 'china mobile', 'cmcc']):
+            return '移动'
+        elif any(keyword in isp_lower for keyword in [
+                '联通', 'chinaunicom', 'china unicom']):
+            return '联通'
+        elif any(keyword in isp_lower for keyword in ['教育网', 'cernet']):
+            return '教育网'
+        else:
+            return isp_raw.replace(' ', '.')
+
+
 class SpeedTest(object):
 
     def __init__(self, timeout=10, UA=None):
@@ -217,45 +322,62 @@ class APISites(object):
             "alias": [],
             "name": [],
             "detail": [],
-            'common_alias': 'str',
-            'common_name': 'str',
-            'common_detail': 'str' | None,
-            "status": [200, 403, ..., or 1000+Errno, ...],
-            "speed_info": [{speed, Epoch, size}, ...],
+            "proxy": [],  # fmt: 'https://api-proxy-domain/?url='
+            "common_alias": 'str',
+            "common_name": 'str',
+            "common_detail": None or 'str',
+            "speed_log": [
+                {
+                    netisp, # addr+isp
+                    status, # 200, 403, ..., or 1000+Errno
+                    speed, Epoch, size,
+                },
+                ...,
+            ],
             "summary": {
                 ok=int, fail=int, rate=float, speed=float,
             },
             "other-info-keys": [other_info],
         }
     '''
+    Proxy_Pattern = re.compile(r'''
+        ^(?P<proxy>https?://[\w\.]+/\?url=)  # prefix proxy url
+        (?P<api>https?://[\w\./]+)$  # real api url
+    ''', re.VERBOSE)
+    API_Proxies = {
+        'hafrey': 'https://pz.v88.qzz.io/?url=',
+        '168188': 'https://pz.168188.dpdns.org/?url=',
+    }
 
-    def __init__(self, backup: Union[str, None] = None):
+    def __init__(self, netisp: str = '未知+未知',
+                 backup: Union[str, None] = None):
         self.sites = {}
         self.count = 0
-        self.sources = []
+        self.config_sources = []
         if backup:
             if os.path.isfile(backup):
                 self.load_json_backup(backup)
             else:
                 print("Error: json backup %s not found!" % backup)
+        self.netisp = netisp
 
     def load_json_backup(self, file):
-        ''' {count: int, date: xx, sites: {api: {}}}, sources: [] '''
+        ''' {count: int, date: xx, sites: {api: {}}}, config_sources: [] '''
         with open(file, 'r') as fp:
             print("loading json backup %s ..." % file)
             back = json.load(fp)
         if ('count' not in back or 'date' not in back
-                or 'sites' not in back or 'sources' not in back):
+                or 'sites' not in back or 'config_sources' not in back):
             print("Error: invalid config backup!")
             return
         self.sites.update(back['sites'])
         self.count = len(self.sites)
-        newsource = [fsha256sum for fsha256sum in back['sources']
-                     if fsha256sum not in self.sources]
-        self.sources.extend(newsource)
+        newsource = [fsha256sum for fsha256sum in back['config_sources']
+                     if fsha256sum not in self.config_sources]
+        self.config_sources.extend(newsource)
 
     def save_json_backup(self, file, **json_kwargs):
-        ''' {count: int, date: xx, sites: {api: {}}}, sources: [] '''
+        ''' {count: int, date: xx, sites: {api: {}}, config_sources: []} '''
         kwargs = dict(indent=2, ensure_ascii=False)
         kwargs.update(json_kwargs)
         with open(file, 'w') as fp:
@@ -264,7 +386,101 @@ class APISites(object):
                 count=self.count,
                 date=time.asctime(),
                 sites=self.sites,
-                sources=self.sources
+                config_sources=self.config_sources
+            ), fp, **kwargs)
+
+    def update_json_backup(self, file, **json_kwargs):
+        '''
+        update back json file by version.
+
+        version and fmt:
+            0: {
+                count: int, date: xx, sites: { api: {
+                    ..., status: [], speed_info: [{speed, Epoch, size}],
+                }}, sources: [],
+            }
+            1: {
+                version: 1, count: int, date: xx, sites: { api: {
+                    ..., proxy: [], speed_log: [{
+                        netisp: str, status: int,
+                        speed, Epoch, size,
+                    }],
+                }}, config_sources: [],
+            }
+        '''
+        kwargs = dict(indent=2, ensure_ascii=False)
+        kwargs.update(json_kwargs)
+        with open(file, 'r') as fp:
+            print("loading json backup %s ..." % file)
+            back = json.load(fp)
+        if ('count' not in back or 'date' not in back or 'sites' not in back):
+            print("Error: invalid config backup!")
+            return
+        sites = back['sites']
+
+        if 'version' not in back:  # 0
+            newsites, count = {}, 0
+            # copy 基本信息
+            for api, info in sites.items():
+                # test match 'https://api-proxy-domain/?url=api'
+                m, info['proxy'] = self.Proxy_Pattern.match(api), []
+                if m:
+                    api = m.groupdict()['api']
+                    info['proxy'] = [m.groupdict()['proxy']]
+                count, name = count + 1, info['common_name']
+                logproxy = f' with {info['proxy'][0]}' if info['proxy'] else ''
+                if api in newsites:
+                    print(f"{count}) Update api: {name}, {api}{logproxy}")
+                    for key, value in info.items():
+                        if key in newsites[api]:
+                            if isinstance(newsites[api][key], list):
+                                print(f"  > list: extend {key}")
+                                newsites[api][key].extend(value)
+                            elif isinstance(newsites[api][key], dict):
+                                print(f"  > dict: update {key}")
+                                newsites[api][key].update(value)
+                            else:
+                                clas = type(newsites[api][key])
+                                print(f"  > {clas.__name__}: overwrite {key}")
+                                newsites[api][key] = value
+                        else:
+                            print(f"  > {type(value).__name__}: copy {key}")
+                            newsites[api][key] = value
+                else:
+                    print(f"{count}) Copy api: {name}, {api}{logproxy}")
+                    newsites[api] = info
+            sites = newsites
+            # 更新 common_xx 和测速
+            for api, info in sites.items():
+                # common_
+                info['common_name'] = self.get_common_name(api, info)
+                info['common_alias'] = self.get_common_alias(api, info)
+                info['common_detail'] = self.get_common_detail(api, info)
+                # status, speed test info, summary
+                status = info.pop('status')
+                speed_info = info.pop('speed_info')
+                speed_log = []
+                for stat, speed in zip(status, speed_info):
+                    speed['status'] = stat
+                    speed['netisp'] = '未知+未知'
+                    speed_log.append(speed)
+                info['speed_log'] = speed_log
+                summary = self.get_speed_summary(api, info, netisp='ALL')
+                info['summary'] = summary
+
+        if 'version' not in back:  # 0
+            config_sources = back.get('sources', [])
+        else:  # 1
+            config_sources = back.get('config_sources', [])
+
+        with open(file, 'w') as fp:
+            print("saving json backup %s ..." % file)
+            json.dump(dict(
+                version=1,
+                count=len(sites),
+                date=time.asctime(),
+                sites=sites,
+                config_sources=config_sources
             ), fp, **kwargs)
 
     def add_json_config(self, file):
@@ -278,7 +494,7 @@ class APISites(object):
             return 0
         with open(file, 'rb') as fp:
             fsha256sum = sha256(fp.read()).digest().hex()
-        if fsha256sum in self.sources:
+        if fsha256sum in self.config_sources:
             print("json config %s has been added!" % file)
             return 0
         else:
@@ -300,39 +516,48 @@ class APISites(object):
         count = 0
         for alias, info in config['api_site'].items():
             api = info.get('api', None)
+            # rm last /
             if api[-1] == '/' and api[:-1] in self.sites:
                 api = api[:-1]
+            # test match 'https://api-proxy-domain/?url=api'
+            m, proxy = self.Proxy_Pattern.match(api), None
+            if m:
+                api = m.groupdict()['api']
+                proxy = m.groupdict()['proxy']
             name = info.get('name', None)
             detail = info.get('detail', None)
             if api and name:
                 count += 1
+                logproxy = f' with {proxy}' if proxy else ''
                 if api in self.sites:
-                    print(" > %d) Update api: %s, %s" % (count, name, api))
+                    print(f" > {count}) Update api: {name}, {api}{logproxy}")
                     self.sites[api]['alias'].append(alias)
                     self.sites[api]['name'].append(name)
                     if detail:
                         self.sites[api]['detail'].append(detail)
+                    if proxy:
+                        self.sites[api]['proxy'].append(proxy)
                 else:
-                    print(" > %d) New api: %s, %s" % (count, name, api))
+                    print(f" > {count}) New api: {name}, {api}{logproxy}")
                     self.sites[api] = dict(
                         alias=[alias],
                         name=[name],
                         detail=[detail] if detail else [],
+                        proxy=[proxy] if proxy else [],
                         common_alias=None,  # update in the end
                         common_name=None,
                         common_detail=None,
-                        status=[],
-                        speed_info=[],
+                        speed_log=[],
                         summary={},
                     )
             else:
-                print(" > X) Skip invalid api: %s, %s" % (name, api))
+                print(f" > X) Skip invalid api: {name}, {api}{logproxy}")
                 continue
             # other-info
             site = self.sites[api]
             for key in info:
-                if key not in ('api', 'name', 'detail',
-                               'status', 'speed_info', 'summary'):
+                if key not in ('api', 'name', 'detail', 'proxy',
+                               'speed_log', 'summary'):
                     if key in site:
                         if info[key] not in site[key]:
                             site[key].append(info[key])
@@ -340,7 +565,7 @@ class APISites(object):
                         site[key] = [info[key]]
         print('==> %d api_sites added or updated!' % count)
         self.count = len(self.sites)
-        self.sources.append(fsha256sum)
+        self.config_sources.append(fsha256sum)
         self.update_common()
         return count
 
@@ -376,25 +601,15 @@ class APISites(object):
             nameprefix = ''
         return nameprefix + name
 
-    API_Proxies = {
-        'hafrey': 'https://jjpz.hafrey.dpdns.org/?url=',
-        '168188': 'https://pz.168188.dpdns.org/?url=',
-    }
-
     def get_common_alias(self, api, info):
         # ignore info['alias']
-        use_proxy, proxy = '', ''
-        for key in self.API_Proxies.keys():
-            if api.startswith(self.API_Proxies[key]):
-                use_proxy, proxy = key, self.API_Proxies[key]
-        apiurl = api.replace(proxy, '', 1) if use_proxy else api
         # use 一级域名 + 顶级[:2] OR 一级域名 + 二级[:1] + 顶级[:1]
-        host = urlparse(apiurl).netloc
+        host = urlparse(api).netloc
         domain_parts = host.split('.')
         domain_parts.reverse()  # len: 2 or 3
         suffix = (domain_parts[0][:2] if len(domain_parts) == 2
                   else domain_parts[2][:1] + domain_parts[0][:1])
-        return domain_parts[1] + suffix + use_proxy
+        return domain_parts[1] + suffix
 
     def get_common_detail(self, api, info):
         N = len(info['detail'])  # >=0
@@ -405,7 +620,7 @@ class APISites(object):
         most_details = Counter(info['detail']).most_common(2)
         return most_details[0][0]
 
-    def check_http_to_https(self, timeout=30, pool_size=8):
+    def check_http_to_https(self, timeout=30, pool_size=12):
         tester, testpool = SpeedTest(timeout=timeout), Pool(pool_size)
         result = []
         for i, api in enumerate(self.sites.keys(), 1):
@@ -463,7 +678,7 @@ class APISites(object):
                     self.sites[newurl] = info
         print('==> 共替换 \033[32m%d\033[0m 个 http 网址为 https!' % count)
 
-    def test_speed(self, timeout=30, pool_size=8):
+    def test_speed(self, timeout=30, pool_size=12):
         tester, testpool = SpeedTest(timeout=timeout), Pool(pool_size)
         result = []
         apis = self.sites.keys()
@@ -476,26 +691,37 @@ class APISites(object):
         testpool.join()
         for api, res in result:
             status, speed_info, data = res.get()
-            if 'status' in self.sites[api]:
-                self.sites[api]['status'].append(status)
+            speed_log = dict(netisp=self.netisp, status=status, **speed_info)
+            if 'speed_log' in self.sites[api]:
+                self.sites[api]['speed_log'].append(speed_log)
             else:
-                self.sites[api]['status'] = [status]
-            if 'speed_info' in self.sites[api]:
-                self.sites[api]['speed_info'].append(speed_info)
-            else:
-                self.sites[api]['speed_info'] = [speed_info]
+                self.sites[api]['speed_log'] = [speed_log]
         # update summary: 可用率 rate, 平均 speed etc.
         for api, info in self.sites.items():
-            N = len(info['status'])
-            ok = len([i for i in info['status'] if i == 200])
-            fail = N - ok
-            rate = round(ok/N, 4)
-            # let fail speed = 0
-            all_speed = [si.get('speed', 0) for si in info['speed_info']]
-            speed = sum(all_speed)/len(info['speed_info'])
-            info['summary'].update(ok=ok, fail=fail, rate=rate, speed=speed)
+            info['summary'] = self.get_speed_summary(api, info, netisp='ALL')
 
-    def sort(self, apis, key='rate+speed', reverse=True, **kwargs):
+    def get_speed_summary(self, api, info, netisp=None):
+        # ok, fail, 可用率 rate, 平均 speed etc.
+        filter_netisp = netisp or self.netisp
+        if filter_netisp == 'ALL':
+            speed_log = info['speed_log']
+        else:
+            speed_log = [
+                sl for sl in info['speed_log']
+                if sl['netisp'] == filter_netisp
+            ]
+        N = len(speed_log)
+        if N == 0:
+            print('==> Warn: %s \033[33m无测速数据\033[0m!' % api)
+            return dict(ok=0, fail=0, rate=0, speed=0)
+        ok = len([sl for sl in speed_log if sl['status'] == 200])
+        fail = N - ok
+        rate = round(ok/N, 4)
+        all_speed = [sl.get('speed', 0) for sl in speed_log]
+        speed = sum(all_speed)/N
+        return dict(ok=ok, fail=fail, rate=rate, speed=speed)
+
+    def sort(self, apis, key='rate+speed', netisp=None, reverse=True, **kwargs):
         ''' sort by 'rate+speed' or 'api' or callable `key(api)` '''
         if callable(key):
             pass
@@ -503,8 +729,9 @@ class APISites(object):
             key = 'rate+speed' if key not in ('rate+speed', 'api') else key
             if key == 'rate+speed':
                 def key(api):
-                    return (self.sites[api]['summary']['rate'],
-                            self.sites[api]['summary']['speed'])
+                    info = self.sites[api]
+                    summary = self.get_speed_summary(api, info, netisp=netisp)
+                    return (summary['rate'], summary['speed'])
             elif key == 'api':
                 def key(api):
                     return self.sites[api]['common_alias'], urlparse(api).path
@@ -518,7 +745,7 @@ class APISites(object):
         '''
         def key(api):
             return (
-                self.sites[api]['status'][-1],
+                self.sites[api]['speed_log'][-1]['status'],
                 -self.sites[api]['summary']['rate'],
                 self.sites[api]['common_name'],
                 self.sites[api]['common_alias'],
@@ -531,13 +758,13 @@ class APISites(object):
         self.sites = ordered_sites
 
     def get_last_testime(self):
-        last_times = [max(si['time'] for si in self.sites[api]['speed_info'])
+        last_times = [max(sl['time'] for sl in self.sites[api]['speed_log'])
                       for api in self.sites]
         # 平均 各 API 最近更新时间
         last_seconds = sum(last_times)/len(last_times)
         return time.ctime(last_seconds)
 
-    def summary(self, shownum=10, output=None,
+    def summary(self, shownum=10, output=None, netisp=None,
                 key='rate+speed', reverse=True, **kwargs):
         '''
         Summarize and print info of sorted api_sites, then save to output.
@@ -547,11 +774,15 @@ class APISites(object):
         ----------
         shownum: if <=0, show all.
         output: file path to save info
-        key, reverse, kwargs: passed for :meth:`sort_apis`.
+        netisp: str
+            filter speed_log by netisp when sorting api_sites
+            default is :attr:`netisp`, 'ALL' for sorting by all speed_logs
+        key, reverse, kwargs:
+            passed for :meth:`sort_apis`.
         '''
         log = []
         success = [api for api in self.sites
-                   if self.sites[api]['status'][-1] == 200]
+                   if self.sites[api]['speed_log'][-1]['status'] == 200]
         fail = [api for api in self.sites if api not in success]
         Nok = len(success)
         Nfail = len(fail)
@@ -561,15 +792,23 @@ class APISites(object):
         log.append(" -> 最近成功数：\033[32m%2d\033[0m" % Nok)
         log.append(" -> 最近失败数：\033[31m%2d\033[0m" % Nfail)
         ordered = self.sort(
-            self.sites.keys(), key=key, reverse=reverse, **kwargs)
+            self.sites.keys(),
+            key=key, netisp=netisp,
+            reverse=reverse, **kwargs)
         # show first `shownum`
         shownum = shownum if shownum > 0 else self.count
         if key == 'rate+speed' and reverse == True:
-            log.append("==> (可用率 rate, 平均速度 speed) 排序靠前的 API：")
+            headprefix = "(可用率 rate, 平均速度 speed) "
         else:
-            log.append("==> 排序靠前的 API：")
+            headprefix = ''
+        log.append("==> 网络 ISP: %s" % (netisp or self.netisp))
+        log.append("==> %s排序靠前的 API：" % headprefix)
         for idx, api in enumerate(ordered[:shownum], 1):
-            summary = self.sites[api]['summary']
+            if netisp == 'ALL':
+                summary = self.sites[api]['summary']
+            else:
+                info = self.sites[api]
+                summary = self.get_speed_summary(api, info, netisp=netisp)
             log.append(" -> [%2d] %5.1f%%, %4.1f KB/s, %4s, %s"
                        % (idx, summary['rate']*100, summary['speed'],
                           self.sites[api]['common_name'], api))
@@ -581,11 +820,15 @@ class APISites(object):
                 out.write(log)
                 print("saving summary info in '%s'" % output)
 
-    def select_apis(self, rate_limit=0.8, nameprefix=None, unique=True,
+    def select_apis(self, rate_limit=0.8, netisp=None,
+                    nameprefix=None, unique=True,
                     filter_out=None):
         '''
         rate_limit: float
             info['summary']['rate'] > limit
+        netisp: str
+            filter speed_log by netisp when calculating info['summary']
+            default is :attr:`netisp`, 'ALL' for sorting by all speed_logs
         nameprefix: str, like 'TV-'
             info['common_name'] starts with **nameprefix**
             and also used for **unique**
@@ -594,17 +837,24 @@ class APISites(object):
         filter_out: function condition(api, info)
             remove api that satisfies condition.
         '''
-        print("\nSelecting API, rate_limit=%s, nameprefix=%s, unique=%s ..."
-              % (rate_limit, nameprefix, unique))
+        print("\nSelecting API, rate_limit=%s, netisp=%s, nameprefix=%s, unique=%s ..."
+              % (rate_limit, netisp, nameprefix, unique))
         SA = self.sites
-        select = [api for api in SA.keys()
-                  if SA[api]['summary']['rate'] > rate_limit]
+        select = []
+        for api in SA.keys():
+            if netisp == 'ALL':
+                summary = SA[api]['summary']
+            else:
+                summary = self.get_speed_summary(api, SA[api], netisp=netisp)
+            if summary['rate'] > rate_limit:
+                select.append(api)
         if nameprefix:
             select = [api for api in select
                       if SA[api]['common_name'].startswith(nameprefix)]
         if callable(filter_out):
             select = [api for api in select if not filter_out(api, SA[api])]
-        ordered = self.sort(select, key='rate+speed', reverse=True)
+        ordered = self.sort(
+            select, key='rate+speed', netisp=netisp, reverse=True)
         count = 0
         if unique:
             result, uniq_names = [], []
@@ -669,8 +919,14 @@ class APISites(object):
 
 
 if __name__ == '__main__':
+    # ISP
+    netisp = NetIspDetector(
+        qqKey='your-Key',
+        baiduAK='your-AK'
+    ).netisp
+
     api_bakcup = './api-configs/api-sites-backup.json'
-    sites = APISites(api_bakcup)
+    sites = APISites(netisp=netisp, backup=api_bakcup)
 
     # update
     collection_confs = [

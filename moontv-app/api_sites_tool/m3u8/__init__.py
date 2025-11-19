@@ -1,0 +1,106 @@
+# Copyright 2014 Globo.com Player authors. All rights reserved.
+# Use of this source code is governed by a MIT License
+# license that can be found in the LICENSE file.
+
+import os
+from urllib.parse import urljoin, urlsplit
+
+from .model import (
+    M3U8,
+    DefaultHTTPClient,
+    ContentSteering,
+    DateRange,
+    DateRangeList,
+    IFramePlaylist,
+    ImagePlaylist,
+    Key,
+    Media,
+    MediaList,
+    PartialSegment,
+    PartialSegmentList,
+    PartInformation,
+    Playlist,
+    PlaylistList,
+    PreloadHint,
+    RenditionReport,
+    RenditionReportList,
+    Segment,
+    SegmentList,
+    ServerControl,
+    Skip,
+    Start,
+    Tiles,
+)
+from .parser import ParseError, parse
+
+__all__ = (
+    "M3U8",
+    "Segment",
+    "SegmentList",
+    "PartialSegment",
+    "PartialSegmentList",
+    "Key",
+    "Playlist",
+    "IFramePlaylist",
+    "Media",
+    "MediaList",
+    "PlaylistList",
+    "Start",
+    "RenditionReport",
+    "RenditionReportList",
+    "ServerControl",
+    "Skip",
+    "PartInformation",
+    "PreloadHint",
+    "DateRange",
+    "DateRangeList",
+    "ContentSteering",
+    "ImagePlaylist",
+    "Tiles",
+    "loads",
+    "load",
+    "parse",
+    "ParseError",
+)
+
+__author__ = "Globo.com"
+__version__ = "6.0.0"
+__license__ = "MIT"
+__url__ = "https://github.com/globocom/m3u8"
+__description__ = "Python m3u8 parser"
+
+
+def loads(content, uri=None, custom_tags_parser=None):
+    """
+    Given a string with a m3u8 content, returns a M3U8 object.
+    Optionally parses a uri to set a correct base_uri on the M3U8 object.
+    Raises ValueError if invalid content
+    """
+
+    if uri is None:
+        return M3U8(content, custom_tags_parser=custom_tags_parser)
+    else:
+        base_uri = urljoin(uri, ".")
+        return M3U8(content, base_uri=base_uri, custom_tags_parser=custom_tags_parser)
+
+
+def load(
+    uri,
+    timeout=None,
+    headers={},
+    custom_tags_parser=None,
+    http_client=DefaultHTTPClient(),
+    verify_ssl=True,
+):
+    """
+    Retrieves the content from a given URI and returns a M3U8 object.
+    Raises ValueError if invalid content or IOError if request fails.
+    """
+    base_uri_parts = urlsplit(uri)
+    if base_uri_parts.scheme and base_uri_parts.netloc:
+        content, base_uri = http_client.download(uri, timeout, headers, verify_ssl)
+    else:
+        with open(uri, encoding="utf8") as fileobj:
+            content = fileobj.read().strip()
+        base_uri = os.path.dirname(uri)
+    return M3U8(content, base_uri=base_uri, custom_tags_parser=custom_tags_parser)

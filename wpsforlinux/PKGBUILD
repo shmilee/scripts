@@ -17,7 +17,7 @@ _srcParams() {
 pkgbase=wpsforlinux
 pkgname=('wpsoffice')
 pkgver=${_pkgver/\~/_}
-pkgrel=1
+pkgrel=2
 arch=('x86_64')
 groups=('wpsforlinux')
 license=('custom:Kingsoft')
@@ -25,7 +25,6 @@ url='http://wps-community.org/'
 conflicts=('wps-office' 'kingsoft-office' 'wps-office-cn')
 options=(!emptydirs !strip)
 source=("wps-office_${pkgver}_amd64.deb::${_srcOrigin}${_srcPath}?$(_srcParams)"
-        #"https://archive.org/download/archlinux_pkg_freetype2/freetype2-2.13.0-1-x86_64.pkg.tar.zst"
         'wps-office.xml')
 sha256sums=('20c9259c7eab08f6451c494b145e80b7941d0e0ed4b7f941645c3ea0fc106167'
             '24b3c218d16d8da3f1de52f013cf02cf1af580548336eb0d77777a8b08630676')
@@ -97,9 +96,6 @@ package_wpsoffice() {
         fi
     done
 
-    # fix wps update log logrotate error
-    # sed 's|su root|su root root|' "$pkgdir"/etc/logrotate.d/wpsupdatelog
-    # or rm wps update
     cd "$pkgdir"/etc/
     rm -rf cron.d/ logrotate.d/ xdg/autostart/
 
@@ -117,33 +113,25 @@ package_wpsoffice() {
     rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libstdc++.so*
     # Use system libjpeg
     rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libjpeg.so*
-    # Use system libcurl, fix libcurl.so.4.8.0: version `OPENSSL_1_1_1b' not found
-    #rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libcurl.so*
-
-    ## fix bold fonts, black cloud error, freetype2 so.6.19.0
-    #install -vDm755 "${srcdir}"/usr/lib/libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6.19.0
-    #ln -vs libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6
-    #ln -vs libfreetype.so.6 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so
 
     # others
     cd "$pkgdir/opt/kingsoft/wps-office/office6/"
-    # libcef.so not found
-    if [ -f ./addons/cef/libcef.so -a ! -f ./libcef.so ]; then
-        ln -vs addons/cef/libcef.so ./libcef.so
-    fi
     # libbz2.so borken link
     if [ -L ./libbz2.so -a ! -e ./libbz2.so ]; then
         rm -v ./libbz2.so
     fi
     # disable wpscloudsvr etc.
-    for back in transerr wpscloudsvr; do # wpsoffice
+    for back in transerr wpscloudsvr; do
         if [ -f "${back}" ]; then
             chmod -x "${back}"
             mv -v "${back}" "${back}.bk"
         fi
     done
 
+    # wpsoffice 不能 .bk, 全局设置需要
+
     # fix 双击打开文件: WPS 全局设置中切换窗口管理模式, 改成多组件模式
+    # ref: https://aur.archlinux.org/packages/wps-office-cn#comment-1040495
     # TODO 横版打印？竖版？test PDF etc.
     # ref: https://aur.archlinux.org/packages/wps-office-cn?O=0
 }

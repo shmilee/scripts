@@ -1,9 +1,9 @@
 # Maintainer: shmilee <echo c2htaWxlZS56anVAZ21haWwuY29tCg==|base64 -d>
 
 _pkgname=wps-office
-_pkgver='12.1.2.22571'
+_pkgver='12.1.2.23578'
 _srcOrigin="https://wps-linux-personal.wpscdn.cn"
-_srcPath="/wps/download/ep/Linux2023/${_pkgver##*.}/wps-office_${_pkgver}.AK.preread.sw_480057_amd64.deb"
+_srcPath="/wps/download/ep/Linux2023/${_pkgver##*.}/wps-office_${_pkgver}.AK.preread.sw_542488_amd64.deb"
 _srcParams() {
     # view-source:https://www.wps.cn/product/wpslinux#
     # https://gitlab.com/cwittlut/wps-tsk/-/blob/main/tsk.sh
@@ -27,7 +27,7 @@ options=(!emptydirs !strip)
 source=("wps-office_${pkgver}_amd64.deb::${_srcOrigin}${_srcPath}?$(_srcParams)"
         #"https://archive.org/download/archlinux_pkg_freetype2/freetype2-2.13.0-1-x86_64.pkg.tar.zst"
         'wps-office.xml')
-sha256sums=('681d4458fd04bf95ae02ece2877c9b0f6dea6914535239444b57a66acfac5030'
+sha256sums=('20c9259c7eab08f6451c494b145e80b7941d0e0ed4b7f941645c3ea0fc106167'
             '24b3c218d16d8da3f1de52f013cf02cf1af580548336eb0d77777a8b08630676')
 
 #PKGEXT='.pkg.tar' ##reduce the time of compression
@@ -72,6 +72,8 @@ package_wpsoffice() {
 
     msg2 "editing desktop files: wps-office-{et,wpp,wps}.desktop, with shared-mime-info ..."
     rm -rf "${pkgdir}"/opt/kingsoft/wps-office/desktops/
+    rm -rf "${pkgdir}"/usr/share/desktop-directories/
+    rm -rf "${pkgdir}"/usr/share/templates/
     #_et
     sed -i "s/^MimeType.*$/$_etMT/" "$pkgdir"/usr/share/applications/wps-office-et.desktop
     #_wpp
@@ -116,7 +118,7 @@ package_wpsoffice() {
     # Use system libjpeg
     rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libjpeg.so*
     # Use system libcurl, fix libcurl.so.4.8.0: version `OPENSSL_1_1_1b' not found
-    rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libcurl.so*
+    #rm -vf "${pkgdir}"/opt/kingsoft/wps-office/office6/libcurl.so*
 
     ## fix bold fonts, black cloud error, freetype2 so.6.19.0
     #install -vDm755 "${srcdir}"/usr/lib/libfreetype.so.6.19.0 "${pkgdir}"/opt/kingsoft/wps-office/office6/libfreetype.so.6.19.0

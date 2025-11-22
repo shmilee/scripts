@@ -70,7 +70,7 @@ class APIConfig(object):
         with open(file, 'r') as fp:
             print("Info: loading json backup in %s ..." % file)
             back = json.load(fp)
-        if (not isinstance(back, dict) or back.get('version', None)
+        if (not isinstance(back, dict) or 'version' not in back
                 or back.get('__moon_sign__', None) != self.__moon_sign__
                 or 'apisites' not in back or 'config_sources' not in back):
             print("Error: invalid config backup!")
@@ -93,7 +93,7 @@ class APIConfig(object):
         with open(file, 'w') as fp:
             fp.write(data)
 
-    def save_json_backup(self, file=None, indent_limit=None, **json_kwargs):
+    def save_json_backup(self, file=None, indent_limit=6, **json_kwargs):
         file = file or self.backup
         obj = dict(
             __moon_sign__=self.__moon_sign__, version=1,

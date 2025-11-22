@@ -180,7 +180,7 @@ class SpeedTest(object):
                     print('(%s) \033[31m[Error %d]\033[0m, %s'
                           % (segdesc, status, url), error)
                 else:
-                    if status == 200:
+                    if status in [200, 206]:
                         print('(%s) \033[32m[ok, %.2f KB/s]\033[0m, %s'
                               % (segdesc, speed, url))
                     else:

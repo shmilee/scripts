@@ -24,8 +24,7 @@ class SpeedTest(object):
         kws['headers'] = self.default_headers.copy()
         kws['headers'].update({
             'User-Agent': self.UA,
-            'Host': host,
-            'Referer': url,
+            'Host': host,  # 'Referer': url,
         })
         return kws
 
@@ -82,19 +81,18 @@ class SpeedTest(object):
                 if status == 200:
                     data = rp.content
                 else:
-                    print('===%d=== %s\n' % (status, url), rp.headers)
+                    print('(%s) =%d= %s\n' % (desc, status, url), rp.headers)
             now = time.monotonic()
             size = len(data)
             speed = round(size/(now-start)/1024, 3)
         except Exception as error:
             errno = self._get_errno(error)
             if errno:
-                status = 1000 + errno
+                info['status'] = 1000 + errno
             print('(%s) \033[31m[Error %d]\033[0m, %s'
-                  % (desc, status, url), error)
-            info.update(status=status)
+                  % (desc, info['status'], url), error)
         else:
-            info.update(status=status)
+            info['status'] = status
             if status == 200:
                 print('(%s) \033[32m[ok, %.2f KB/s]\033[0m, %s'
                       % (desc, speed, url))
@@ -106,7 +104,7 @@ class SpeedTest(object):
 
     def fetch_m3u8_playlist(self, m3u8_url, desc, max_depth=3):
         '''
-        Return 1. m3u8.model.M3U8 instance or None, and 2. test info: {
+        Return 1. (url, m3u8.model.M3U8 instance) or None, and 2. test info: {
           time:Epoch-seconds, status:int, size:data-size, speed:KB/s,
         }
         '''
@@ -115,23 +113,24 @@ class SpeedTest(object):
             for depth in range(max_depth):
                 playlist = m3u8.loads(data.decode(), uri=m3u8_url)
                 if playlist.is_endlist and playlist.segments:
-                    return playlist, info
-                elif (depth < max_depth - 1 and len(playlist.playlists) > 0
-                      and playlist.playlists[0].uri.endswith('.m3u8')):
+                    return (m3u8_url, playlist), info
+                if depth >= max_depth or len(playlist.playlists) == 0:
+                    break
+                if playlist.playlists[0].uri.split('?')[0].endswith('.m3u8'):
                     uri = playlist.playlists[0].uri  # Handle relative URI
                     # set sub playlist m3u8_url to test
                     m3u8_url = requests.compat.urljoin(m3u8_url, uri)
                     data, info = self.fetch(m3u8_url, desc)
-            print('Cannot get M3U8 playlist!')
+            print('(%s) Cannot get M3U8 playlist!' % desc)
         except Exception as e:
-            print(f"Error loading M3U8 playlist: {e}")
+            print(f"(%s) Error loading M3U8 playlist: {e}" % desc)
         return None, info
 
     def fetch_m3u8_segments(
             self, m3u8_playlist, desc,
             time_limit=60, count_limit=10, size_limit=15*1024*1024):
         '''
-        Return 1. list of segments bytes and 2. test info: {
+        Return 1. list of segments (uri, bytes) and 2. test info: {
             time:Epoch-seconds, status:[int,...],
             size:[data-size,...], speed:[KB/s,...],
         }
@@ -139,29 +138,41 @@ class SpeedTest(object):
         segments_data = []
         info = dict(time=int(time.time()), status=[], size=[], speed=[])
         if not isinstance(m3u8_playlist, m3u8.M3U8):
-            print('Invalid m3u8 playlist!')
+            print('(%s) Invalid m3u8 playlist!' % desc)
             return [], info
+        #  beginning ts, or NOT-TODO: random ts
         segments = m3u8_playlist.segments[:count_limit]
+        base_timeout = self.timeout
         rqkwargs = self._get_rqkwargs(m3u8_playlist.base_uri)
+        head1 = rqkwargs.pop('headers', {})
+        head0 = {'User-Agent': self.UA}
         with requests.Session() as session:
-            session.headers.update(rqkwargs.pop('headers', {}))
+            session.headers.update()
             ts_time, ts_size = 0, 0
             for idx, seg in enumerate(segments, 1):
                 segdesc = f'{desc},seg-{idx}/{count_limit}'
                 url = seg.absolute_uri
+                delta_time = min(seg.duration or 0, 5)
+                if isinstance(base_timeout, (tuple, list)):
+                    timeout = (base_timeout[0], base_timeout[1] + delta_time)
+                else:
+                    timeout = base_timeout + delta_time
                 print("(%s) fetching %s ..." % (segdesc, url))
                 start = time.monotonic()
                 data, status, size, speed = b'', 1000, 0, 0
                 try:
-                    rp = session.get(url, timeout=self.timeout)
+                    rp = session.get(url, timeout=timeout, headers=head1)
+                    if rp.status_code != 200:
+                        # fix: malformed Host header
+                        rp = session.get(url, timeout=timeout, headers=head0)
                     status = rp.status_code
-                    if status == 200:
+                    if status in [200, 206]:  # ok, Partial Content
                         data = rp.content
                     else:
                         print('===%d=== %s\n' % (status, url), rp.headers)
                     now = time.monotonic()
                     size = len(data)
-                    speed = size/(now-start)/1024
+                    speed = round(size/(now-start)/1024, 3)
                 except Exception as error:
                     errno = self._get_errno(error)
                     if errno:
@@ -176,10 +187,24 @@ class SpeedTest(object):
                         print('(%s) \033[31m[Error %d]\033[0m, %s'
                               % (segdesc, status, url))
                 # update data, info
-                segments_data.append(data)
+                segments_data.append((seg.uri, data))
                 info['status'].append(status)
                 info['size'].append(size)
-                info['speed'].append(round(speed, 4))
+                info['speed'].append(speed)
+                # check info['status']
+                not20Xs = [s for s in info['status'] if s not in [200, 206]]
+                N, not20XN = len(info['status']), len(not20Xs)
+                if not20XN/N >= 0.7 and not20XN >= 3:
+                    print("(%s) stop download, so many !=20X status_code, %s"
+                          % (segdesc, not20Xs))
+                    break
+                # check speed < 10 KB/s
+                slow_speed = [s for s in info['speed'] if s < 10]
+                N, slowN = len(info['speed']), len(slow_speed)
+                if slowN/N >= 0.6 and slowN >= 4:
+                    print("(%s) slow download, so many speed < 10 KB/s, %s"
+                          % (segdesc, slow_speed))
+                    break
                 # check limit
                 ts_time += seg.duration
                 ts_size += size

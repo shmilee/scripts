@@ -13,23 +13,25 @@ class VodAPI(object):
 
     M3U8_PATTERN = '(https?:\/\/[^\"\'\s]+?\.m3u8)'
 
-    def __init__(self, api, name, detail=None, timeout=10, UA=None):
+    def __init__(self, api, desc, detail=None, timeout=10, UA=None):
         self.api = api
-        self.name = name
+        self.desc = desc
         self.detail = detail
         self.tester = SpeedTest(timeout=timeout, UA=UA, default_headers={
             'Accept': 'application/json,text/html',
             'Accept-Encoding': 'gzip, deflate, zstd',
         })
-        data, info = self.tester.fetch(api, name)
+        data, info = self.tester.fetch(api, desc)
+        self.api_speed = info
+        self.api_json = {}
         if data:
             data = json.loads(data)
             if data.get('list', None) and len(data['list']) > 0:
                 self.api_json = data
             else:
-                raise ValueError(f'Invalid {name} response: {data}')
+                print(f'({desc}) Invalid response: {data}')
         else:
-            raise ValueError(f'Invalid {name} api: {api}')
+            print(f'({desc}) Invalid api: {api}')
 
     def random_vod_id(self):
         vods = self.api_json.get('list', [])
@@ -50,13 +52,13 @@ class VodAPI(object):
 
     def getDetailFromApi(self, vod_id):
         url = f'{self.api}?ac=videolist&ids={vod_id}'
-        data, _ = self.tester.fetch(url, self.name)
+        data, _ = self.tester.fetch(url, self.desc)
         if data:
             data = json.loads(data)
             if data.get('list', None) and len(data['list']) > 0:
                 video_detail = data['list'][0]
                 return self.__parse_video_detail(vod_id, video_detail)
-        print(f'Invalid {self.name} detail response: {data}')
+        print(f'({self.desc}) Invalid detail response: {data}')
         return
 
     def __parse_video_detail(self, vod_id, video_detail):
@@ -109,10 +111,10 @@ class VodAPI(object):
 
     def getDetailFromPage(self, vod_id):
         if not self.detail:
-            print('Need detail URL!')
+            print(f'({self.desc}) Need detail URL!')
             return
         url = f'{self.detail}/index.php/vod/detail/id/{vod_id}.html'
-        data, _ = self.tester.fetch(url, self.name)
+        data, _ = self.tester.fetch(url, self.desc)
         if not data:
             return
         html = data.decode()

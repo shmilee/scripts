@@ -57,6 +57,10 @@ class APIConfig(object):
         self.backup = backup
         if backup and os.path.isfile(backup):
             self.load_json_backup(backup)
+        self.proxy_apis = [
+            api for api, info in self.sites.items()
+            if info.get('proxy', [])
+        ]
 
     def load_json_backup(self, file=None):
         '''
@@ -296,7 +300,7 @@ class APIConfig(object):
                     self.sites[newurl] = info
         print('==> 共替换 \033[32m%d\033[0m 个 http 网址为 https!' % count)
 
-    def reorder(self, key=None, reverse=False):
+    def reorder_sites(self, key=None, reverse=False):
         '''
         Reorder the :attr:`sites` to be an OrderedDict.
         The default order of the APIs is based on the key:
@@ -321,73 +325,24 @@ class APIConfig(object):
                 return (info['common_name'], info['common_alias'], urlpath)
         return sorted(apis, key=key, reverse=reverse)
 
-    def select_apis(self, apis, nameprefix=None, filterout=None, unique=True):
-        '''
-        nameprefix: str, like 'TV-'
-            info['common_name'] starts with **nameprefix**
-            and also used for **unique**
-        filterout: function condition(api, info)
-            remove api that satisfies condition.
-        unique: bool, default True
-            unique API with name 'XXXXX', common_name="nameprefix(XXXXX)%d*"
-        '''
-        SA = self.sites
-        print(f"Selecting API, nameprefix={nameprefix}, unique={unique} ...")
-        if nameprefix:
-            select = [api for api in apis
-                      if SA[api]['common_name'].startswith(nameprefix)]
-        else:
-            select = apis
-        if callable(filterout):
-            select = [api for api in select if not filterout(api, SA[api])]
-        count = 0
-        if unique:
-            result, uniq_names = [], []
-            for api in select:
-                common_name = SA[api]['common_name']
-                if nameprefix:
-                    pat = r'%s(.*[^0-9])\d*' % nameprefix
-                else:
-                    pat = r'(.*[^0-9])\d*'
-                m = re.match(pat, common_name)
-                if m:
-                    name = m.groups()[0]
-                else:
-                    name = common_name.replace(nameprefix, '', count=1)
-                if name not in uniq_names:
-                    result.append(api)
-                    uniq_names.append(name)
-                    action = '+Add'
-                    count += 1
-                else:
-                    action = '\033[33mSkip'
-                print("[S%2d] %s %s\033[0m (%s), %s"
-                      % (count, action, common_name, name, api))
-        else:
-            for api in select:
-                count += 1
-                common_name = SA[api]['common_name']
-                print("[S%2d] %s %s\033[0m, %s"
-                      % (count, 'Add', common_name, api))
-            result = select
-        print("==> \033[32m%d\033[0m APIs selected." % len(result))
-        return result
+    def _get_last_updated_time(self):
+        return time.asctime()
 
-    def dump_moon_config(self, apis, output,
-                         proxy_apis=None, prefer_proxy=None,
-                         **json_kwargs):
+    def dump_moon_config(self, apis, output, prefer_proxy='default'):
         '''
         apis: list of url str
         output: fiel path str
-        proxy_apis: list of url str of api which need proxy
-        prefer_proxy: str, which proxy to use for *proxy_apis*
+        prefer_proxy: str, which proxy to use for :attr`proxy_apis`
         '''
-        config = dict(cache_time=7200, last_updated=self.get_last_testime(),
+        config = dict(cache_time=7200,
+                      last_updated=self._get_last_updated_time(),
                       api_count=0, api_site=OrderedDict())
         print("\n==> config 选用 API 数：%d" % len(apis))
-        proxy_apis = proxy_apis or []
-        proxy = prefer_proxy if prefer_proxy in Prefer_Proxies else 'default'
-        proxy = Prefer_Proxies[proxy]
+        if prefer_proxy in self.Prefer_Proxies:
+            proxy = prefer_proxy
+        else:
+            proxy = 'default'
+        proxy = self.Prefer_Proxies[proxy]
         for api in apis:
             alias = self.sites[api]['common_alias']
             if alias in config['api_site']:
@@ -395,7 +350,7 @@ class APIConfig(object):
                       % (alias, api))
             else:
                 name = self.sites[api]['common_name']
-                if api in proxy_apis:
+                if api in self.proxy_apis:
                     real_api = proxy + api
                     print(" -> [Warn] proxy %s: %s" % (name, real_api))
                 else:
@@ -408,7 +363,6 @@ class APIConfig(object):
         config['api_count'] = len(config['api_site'])
         print("==> config 保存 API 数：%d" % config['api_count'])
         kwargs = dict(indent=2, ensure_ascii=False)
-        kwargs.update(json_kwargs)
         with open(output, 'w') as fp:
             json.dump(config, fp, **kwargs)
         # base58

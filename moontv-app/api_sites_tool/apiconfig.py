@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from multiprocessing import Pool
 from collections import Counter, OrderedDict
 from .base58 import Base58
+from .vod import VodAPI
 from .speedtest import SpeedTest
 
 
@@ -241,9 +242,22 @@ class APIConfig(object):
         most_details = Counter(info['detail']).most_common(2)
         return most_details[0][0]
 
-    def check_http_to_https(self, timeout=30, pool_size=12):
-        tester, testpool = SpeedTest(timeout=timeout), Pool(pool_size)
-        result = []
+    def _check_https_worker(self, what, url, desc, timeout, fallback_proxy):
+        if what == 'api-url':
+            vod = VodAPI(url, desc, timeout=timeout)
+            if not vod.api_json:
+                proxy = self.Prefer_Proxies.get(fallback_proxy)
+                vod = VodAPI(proxy+url, desc, timeout=timeout)
+            return True if vod.api_json else False
+        else:
+            tester = SpeedTest(timeout=timeout)
+            return tester.test_connection(url, desc)
+
+    def check_http_to_https(self, fallback_proxy='default',
+                            timeout=30, pool_size=12):
+        if fallback_proxy not in self.Prefer_Proxies:
+            fallback_proxy = 'default'
+        testpool, result = Pool(pool_size), []
         for i, api in enumerate(self.sites.keys(), 1):
             urls_todo = []
             # 1. api
@@ -263,11 +277,13 @@ class APIConfig(object):
             for what, url in urls_todo:
                 desc = '%2d/%2d %s' % (i, self.count, what)
                 newurl = url.replace('http', 'https', 1)
-                result.append((api, what, url, newurl,
-                               testpool.apply_async(
-                                   tester.test_connection,
-                                   args=(newurl, desc)
-                               )))
+                result.append(
+                    (api, what, url, newurl,
+                     testpool.apply_async(
+                         self._check_https_worker,
+                         args=(what, newurl, desc, timeout, fallback_proxy))
+                     )
+                )
         testpool.close()
         testpool.join()
         result = [
@@ -345,14 +361,14 @@ class APIConfig(object):
         proxy = self.Prefer_Proxies[proxy]
         for api in apis:
             alias = self.sites[api]['common_alias']
+            name = self.sites[api]['common_name']
             if alias in config['api_site']:
-                print('\033[33m[Error] %s\033[0m has been dumped! Ignore %s!'
-                      % (alias, api))
+                print(' -> [W] \033[33mIgnore dumped %s %s!\033[0m %s'
+                      % (alias, name, api))
             else:
-                name = self.sites[api]['common_name']
                 if api in self.proxy_apis:
                     real_api = proxy + api
-                    print(" -> [Warn] proxy %s: %s" % (name, real_api))
+                    print(" -> [I] proxy %s: %s" % (name, real_api))
                 else:
                     real_api = api
                 config['api_site'][alias] = dict(api=real_api, name=name)

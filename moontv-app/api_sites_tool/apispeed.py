@@ -131,11 +131,11 @@ class APISpeed(APIConfig):
         '''Return vod_api_log, m3u8_log, m3u8_ts_log'''
         # 1. get vod_api_log & m3u8_url
         vod_api_log = dict(proxy=None)
-        vod = VodAPI(api, desc, detail, timeout=api_timeout)
+        vod = VodAPI(api, desc, detail=detail, timeout=api_timeout)
         vod_api_log.update(vod.api_speed)
         if not vod.api_json:
             proxy = self.Prefer_Proxies.get(fallback_proxy)
-            vod = VodAPI(proxy+api, desc, detail, timeout=api_timeout)
+            vod = VodAPI(proxy+api, desc, detail=detail, timeout=api_timeout)
             vod_api_log['proxy'] = proxy
             vod_api_log.update(vod.api_speed)
         m3u8_url, title, eptitle = None, '', ''

@@ -57,11 +57,11 @@ class SpeedTest(object):
                     print('(%s) \033[32m[connected]\033[0m, %s' % (desc, url))
                     return True
                 else:
-                    print('(%s) \033[32m[status %d]\033[0m, %s'
+                    print('(%s) \033[31m[status %d]\033[0m, %s'
                           % (desc, rp.status_code, url))
         except Exception as error:
             errno = self._get_errno(error)
-            print('(%s) \033[32m[error %s]\033[0m, %s' % (desc, errno, url))
+            print('(%s) \033[31m[error %s]\033[0m, %s' % (desc, errno, url))
         return False
 
     def fetch(self, url, desc):

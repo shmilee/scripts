@@ -100,6 +100,7 @@ class SpeedTest(object):
             else:
                 print('(%s) \033[31m[Error %d]\033[0m, %s'
                       % (desc, status, url))
+        info['time'] = int(time.time())
         return data, info
 
     def fetch_m3u8_playlist(self, m3u8_url, desc, max_depth=3):
@@ -216,4 +217,5 @@ class SpeedTest(object):
                     print("(%s) download ts size: %.3f > %.3f ..."
                           % (segdesc, ts_size, size_limit))
                     break
+        info['time'] = int(time.time())
         return segments_data, info

@@ -25,10 +25,13 @@ class VodAPI(object):
         self.api_speed = info
         self.api_json = {}
         if data:
-            data = json.loads(data)
-            if data.get('list', None) and len(data['list']) > 0:
-                self.api_json = data
-            else:
+            try:
+                data = json.loads(data)
+                if data.get('list', None) and len(data['list']) > 0:
+                    self.api_json = data
+                else:
+                    print(f'({desc}) Invalid response: {data}')
+            except Exception:
                 print(f'({desc}) Invalid response: {data}')
         else:
             print(f'({desc}) Invalid api: {api}')
@@ -54,10 +57,13 @@ class VodAPI(object):
         url = f'{self.api}?ac=videolist&ids={vod_id}'
         data, _ = self.tester.fetch(url, self.desc)
         if data:
-            data = json.loads(data)
-            if data.get('list', None) and len(data['list']) > 0:
-                video_detail = data['list'][0]
-                return self.__parse_video_detail(vod_id, video_detail)
+            try:
+                data = json.loads(data)
+                if data.get('list', None) and len(data['list']) > 0:
+                    video_detail = data['list'][0]
+                    return self.__parse_video_detail(vod_id, video_detail)
+            except Exception:
+                pass
         print(f'({self.desc}) Invalid detail response: {data}')
         return
 
@@ -117,7 +123,11 @@ class VodAPI(object):
         data, _ = self.tester.fetch(url, self.desc)
         if not data:
             return
-        html = data.decode()
+        try:
+            html = data.decode()
+        except Exception:
+            print(f'({self.desc}) Invalid detail html data: {data}')
+            return
         ffzy_pat = r'\$(https?://[^"\'\s]+?/\d{8}/\d+_[a-f0-9]+/index\.m3u8)'
         matches = re.findall(ffzy_pat, html) or []
         if not matches:

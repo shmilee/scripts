@@ -245,7 +245,7 @@ class APISpeed(APIConfig):
             self.logs[key] = summary
         # update proxy_apis
         self.proxy_apis = self._get_proxy_apis()
-        print('==> 共测试 \033[32m%d\033[0m 个 API!' % len(result))
+        print('==> 已测试 \033[32m%d\033[0m 个 API!' % len(result))
 
     def _speed_summary(self, api, speed_logs, addrisp=None):
         filter_addrisp = addrisp or self.addrisp
@@ -318,14 +318,26 @@ class APISpeed(APIConfig):
         return sorted(apis, key=key, reverse=reverse)
 
     def _get_last_updated_time(self):
-        last_times = list(filter(None, [  # 过滤有效时间
+        last_start_seconds = list(filter(None, [  # 过滤最近更新的有效时间
             self.logs[api][-1].get('vod_api', {}).get('time', 0)
             for api in self.sites
             if len(self.logs.get(api, [])) > 0
         ]))
-        # 平均各 API 最近更新时间
-        last_seconds = sum(last_times)/len(last_times)
-        return time.ctime(last_seconds)
+        last_end_seconds = list(filter(None, [
+            self.logs[api][-1].get('m3u8_ts', {}).get('time', 0)
+            for api in self.sites
+            if len(self.logs.get(api, [])) > 0
+        ]))
+        # 提取最小的开始时间和最大的结束时间
+        start = min(last_start_seconds)
+        end = max(last_start_seconds + last_end_seconds)
+        # 处理 'Sun Nov 23 15:31:06 2025'
+        # s, e = time.ctime(start), time.ctime(end)
+        # hms = r'(.*\s)(\d{2}:\d{2}:\d{2})(\s.*)'
+        # return re.sub(hms, r'\1(\2)-(%s)\3' % re.match(hms, e).group(2), s)
+        hms0 = time.strftime(r'%H:%M:%S', time.localtime(start))
+        hms1 = time.strftime(r'%H:%M:%S', time.localtime(end))
+        return time.ctime(start).replace(hms0, f'({hms0})-({hms1})')
 
     def summary_speedlogs(self, shownum=10, output=None, addrisp=None):
         '''

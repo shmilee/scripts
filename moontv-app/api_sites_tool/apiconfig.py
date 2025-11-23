@@ -142,7 +142,7 @@ class APIConfig(object):
         for alias, info in config['api_site'].items():
             api = info.get('api', None)
             # rm last /
-            if api[-1] == '/' and api[:-1] in self.sites:
+            if api[-1] == '/':
                 api = api[:-1]
             # test match 'https://api-proxy-domain/?url=api'
             m, proxy = self.Proxy_Pattern.match(api), None

@@ -259,6 +259,9 @@ class APISpeed(APIConfig):
             if N == 0:
                 print('==> Warn: %s \033[33m无测速数据\033[0m!' % api)
                 return dict(ok=0, fail=0, rate=0, speed=0)
+        if len(speed_logs) > 100:  # 仅用最近 100 次测试
+            speed_logs = speed_logs[-100:]
+            N = 100
         success = [sl for sl in speed_logs if sl['status'] == "ok"]
         ok = len(success)
         fail = N - ok

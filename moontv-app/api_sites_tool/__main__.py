@@ -17,7 +17,7 @@ def main():
     # update
     collection_confs = [
         './api-configs/moon-config-collections/senshinya-gistfile.txt',
-        './api-configs/moon-config-collections/hafrey1-LunaTV-config.txt',
+        './api-configs/moon-config-collections/hafrey1-LunaTV-config.json',
     ]
     count = 0
     for conf in collection_confs:

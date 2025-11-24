@@ -38,6 +38,7 @@ class APIConfig(object):
             "common_alias": 'str',
             "common_name": 'str',
             "common_detail": None or 'str',
+            "sources": [int,...],  # config_sources indexs
             "other-info-keys": [other_info],
         }
     '''
@@ -68,7 +69,8 @@ class APIConfig(object):
         {
             version: 1, __moon_sign__: :attr:`__moon_sign__`,
             count: int, date: "xx 20xx",
-            apisites: {api: {...}, ...}, config_sources: [],
+            apisites: {api: {...}, ...},
+            config_sources: [{index,filename,sha256sum}, ...],
         }
         '''
         file = file or self.backup
@@ -82,9 +84,11 @@ class APIConfig(object):
             return
         self.sites.update(back['apisites'])
         self.count = len(self.sites)
-        newsource = [fsha256sum for fsha256sum in back['config_sources']
-                     if fsha256sum not in self.config_sources]
+        sha256sums = [cs['sha256sum'] for cs in self.config_sources]
+        newsource = [cs for cs in back['config_sources']
+                     if cs['sha256sum'] not in sha256sums]
         self.config_sources.extend(newsource)
+        self.config_sources.sort(key=lambda cs: (cs['index'], cs['filename']))
 
     def _format_json_dump(self, obj, file, indent_limit, **json_kwargs):
         kwargs = dict(indent=2, ensure_ascii=False)
@@ -117,9 +121,11 @@ class APIConfig(object):
         if not os.path.isfile(file):
             print("Error: moon config %s not found!" % file)
             return 0
+        sha256sums = [cs['sha256sum'] for cs in self.config_sources]
+        source_index = len(self.config_sources)
         with open(file, 'rb') as fp:
-            fsha256sum = sha256(fp.read()).digest().hex()
-        if fsha256sum in self.config_sources:
+            source_sha256sum = sha256(fp.read()).digest().hex()
+        if source_sha256sum in sha256sums:
             print("moon config %s has been added!" % file)
             return 0
         else:
@@ -141,16 +147,27 @@ class APIConfig(object):
         count = 0
         for alias, info in config['api_site'].items():
             api = info.get('api', None)
-            # rm last /
-            if api[-1] == '/':
-                api = api[:-1]
             # test match 'https://api-proxy-domain/?url=api'
             m, proxy = self.Proxy_Pattern.match(api), None
             if m:
                 api = m.groupdict()['api']
                 proxy = m.groupdict()['proxy']
+            # rm last /
+            if api[-1] == '/':
+                api = api[:-1]
+            # tested api https
+            if api.startswith('http://'):
+                newurl = api.replace('http:', 'https:', 1)
+                if newurl in self.sites:
+                    api = newurl
             name = info.get('name', None)
             detail = info.get('detail', None)
+            # tested detail https
+            if detail and detail.startswith('http://'):
+                newurl = detail.replace('http:', 'https:', 1)
+                if newurl in self.sites.get(api, {}).get('detail', []):
+                    detail = newurl
+            # start
             if api and name:
                 count += 1
                 logproxy = f' with {proxy}' if proxy else ''
@@ -162,6 +179,9 @@ class APIConfig(object):
                         self.sites[api]['detail'].append(detail)
                     if proxy:
                         self.sites[api]['proxy'].append(proxy)
+                    self.sites[api]['sources'].append(source_index)
+                    # DO NOT sort: same order with alias, name
+                    # self.sites[api]['sources'].sort()
                 else:
                     print(f" > {count}) New api: {name}, {api}{logproxy}")
                     self.sites[api] = dict(
@@ -172,6 +192,7 @@ class APIConfig(object):
                         common_alias=None,  # update in the end
                         common_name=None,
                         common_detail=None,
+                        sources=[source_index],
                     )
             else:
                 print(f" > X) Skip invalid api: {name}, {api}{logproxy}")
@@ -187,7 +208,11 @@ class APIConfig(object):
                         site[key] = [info[key]]
         print('==> %d api_sites added or updated!' % count)
         self.count = len(self.sites)
-        self.config_sources.append(fsha256sum)
+        self.config_sources.append(dict(
+            index=source_index,
+            filename=os.path.basename(file),
+            sha256sum=source_sha256sum,
+        ))
         self._update_common()
         return count
 
@@ -203,8 +228,11 @@ class APIConfig(object):
         names = [re.sub(r'[-0-9\s]+$', '', n) for n in info['name']]
         # 去除开头的特殊字符（保留中文、英文、数字）
         names = [re.sub(r'^[^\u4e00-\u9fa5a-zA-Z0-9]+', '', n) for n in names]
-        # 去除原有 TV- Av-
+        # 去除原有 TV- AV-
         names = [re.sub(r'^(?:TV-|AV-)', '', n) for n in names]
+        # 替换结尾的“点播” etc.
+        names = [re.sub(r'点播$', '资源', n) for n in names]
+        names = [re.sub(r'非凡影视$', '非凡资源', n) for n in names]
         # assert len(names) >= 1
         # get name
         if len(names) == 1:
@@ -257,33 +285,30 @@ class APIConfig(object):
                             timeout=30, pool_size=12):
         if fallback_proxy not in self.Prefer_Proxies:
             fallback_proxy = 'default'
-        testpool, result = Pool(pool_size), []
-        for i, api in enumerate(self.sites.keys(), 1):
-            urls_todo = []
+        urls_todo = []
+        for api in self.sites.keys():
             # 1. api
             if api.startswith('http://'):
-                urls_todo.append(('api-url', api))
+                urls_todo.append((api, 'api-url', api))
             # 2. detail
             added_detail = []
-            for index, detail in enumerate(self.sites[api]['detail']):
+            for detail in self.sites[api]['detail']:
                 if (detail.startswith('http://')
                         and detail not in added_detail):
                     added_detail.append(detail)
-                    urls_todo.append(('detail-%d' % index, detail))
-            # 3. common_detail
-            common_detail = self.sites[api]['common_detail']
-            if common_detail and common_detail.startswith('http://'):
-                urls_todo.append(('common_detail', common_detail))
-            for what, url in urls_todo:
-                desc = '%2d/%2d %s' % (i, self.count, what)
-                newurl = url.replace('http', 'https', 1)
-                result.append(
-                    (api, what, url, newurl,
-                     testpool.apply_async(
-                         self._check_https_worker,
-                         args=(what, newurl, desc, timeout, fallback_proxy))
-                     )
-                )
+                    urls_todo.append((api, 'detail-url', detail))
+        testpool, result, N = Pool(pool_size), [], len(urls_todo)
+        print('==> 需测试替换 \033[32m%d\033[0m 个 http 网址!' % N)
+        for i, (api, what, url) in enumerate(urls_todo, 1):
+            desc = '%d/%d %s' % (i, N, what)
+            newurl = url.replace('http', 'https', 1)
+            result.append(
+                (api, what, url, newurl,
+                 testpool.apply_async(
+                     self._check_https_worker,
+                     args=(what, newurl, desc, timeout, fallback_proxy))
+                 )
+            )
         testpool.close()
         testpool.join()
         result = [
@@ -294,23 +319,21 @@ class APIConfig(object):
         count = 0
         # 1. replace detail & common_detail first
         for api, what, url, newurl in result:
-            if what.startswith('detail-'):
-                index = int(what[7:])
-                if (index < len(self.sites[api]['detail'])  # recheck
-                        and self.sites[api]['detail'][index] == url):
-                    print('[D] Replacing %s => %s' % (url, newurl))
-                    count += 1
-                    self.sites[api]['detail'][index] = newurl
-            elif what == 'common_detail':
-                if self.sites[api]['common_detail'] == url:  # recheck
-                    print('[C] Replacing %s => %s' % (url, newurl))
+            if what == 'detail-url':
+                for idx in range(len(self.sites[api]['detail'])):
+                    if self.sites[api]['detail'][idx] == url:
+                        print('[D-%d] Replacing %s => https' % (idx, url))
+                        count += 1
+                        self.sites[api]['detail'][idx] = newurl
+                if self.sites[api]['common_detail'] == url:
+                    print('[D-C] Replacing %s => https' % url)
                     count += 1
                     self.sites[api]['common_detail'] = newurl
         # 2. then replace api (the key)
         for api, what, url, newurl in result:
             if what == 'api-url':
                 if api == url and url[5:] == newurl[6:]:  # recheck
-                    print('[K] Replacing %s => %s' % (url, newurl))
+                    print('[API] Replacing %s => https' % url)
                     count += 1
                     info = self.sites.pop(api)
                     self.sites[newurl] = info
@@ -346,7 +369,7 @@ class APIConfig(object):
 
     def dump_moon_config(self, apis, output, prefer_proxy='default'):
         '''
-        apis: list of url str
+        apis: list of url str(or group tuple)
         output: fiel path str
         prefer_proxy: str, which proxy to use for :attr`proxy_apis`
         '''
@@ -359,28 +382,43 @@ class APIConfig(object):
         else:
             proxy = 'default'
         proxy = self.Prefer_Proxies[proxy]
-        for api in apis:
+        for g_api in apis:
+            if isinstance(g_api, str):
+                api = g_api
+            elif isinstance(g_api, tuple):
+                api = g_api[0]
+            else:
+                print(' -> [W] \033[33mIgnore invalid %s!\033[0m' % api)
+                continue
             alias = self.sites[api]['common_alias']
             name = self.sites[api]['common_name']
             if alias in config['api_site']:
                 print(' -> [W] \033[33mIgnore dumped %s %s!\033[0m %s'
                       % (alias, name, api))
+                continue
+            # add this api
+            if api in self.proxy_apis:
+                real_api = proxy + api
+                print(" -> [I] proxy %s: %s" % (name, real_api))
             else:
-                if api in self.proxy_apis:
-                    real_api = proxy + api
-                    print(" -> [I] proxy %s: %s" % (name, real_api))
-                else:
-                    real_api = api
-                config['api_site'][alias] = dict(api=real_api, name=name)
-                detail = self.sites[api].get('common_detail')
-                if detail:
-                    config['api_site'][alias]['detail'] = detail
+                real_api = api
+            config['api_site'][alias] = dict(api=real_api, name=name)
+            detail = self.sites[api].get('common_detail')
+            if detail:
+                config['api_site'][alias]['detail'] = detail
+            # also output alternative apis
+            if isinstance(g_api, tuple) and len(g_api) > 1:
+                alt = []
+                for _api in g_api[1:]:
+                    if _api in self.proxy_apis:
+                        alt.append(proxy + _api)
+                    else:
+                        alt.append(_api)
+                config['api_site'][alias]['alternative'] = alt
         # dump
         config['api_count'] = len(config['api_site'])
         print("==> config 保存 API 数：%d" % config['api_count'])
-        kwargs = dict(indent=2, ensure_ascii=False)
-        with open(output, 'w') as fp:
-            json.dump(config, fp, **kwargs)
+        self._format_json_dump(config, output, 8)
         # base58
         b58 = Base58().encode_file(output)
         b58file = os.path.splitext(output)[0] + '.txt'

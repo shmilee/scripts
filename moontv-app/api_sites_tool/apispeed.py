@@ -376,8 +376,8 @@ class APISpeed(APIConfig):
         for idx, api in enumerate(ordered[:shownum], 1):
             summary = self.get_speed_summary(api, addrisp=addrisp)
             useproxy = '🧱' if api in self.proxy_apis else '🌐'
-            outext.append(" -> [%2d] %s %5.1f%%, %4.1f KB/s, %4s, %s"
-                          % (idx, useproxy,
+            outext.append(" ->%s[%2d] %s %5.1f%%, %4.1f KB/s, %4s, %s"
+                          % ('' if idx > 99 else ' ', idx, useproxy,
                              summary['rate']*100, summary['speed'],
                              self.sites[api]['common_name'], api))
         outext = '\n'.join(outext)
@@ -389,9 +389,11 @@ class APISpeed(APIConfig):
                 print("saving summary speed info in '%s'" % output)
 
     def select_apis(self, rate_limit=0.8, addrisp=None,
-                    nameprefix=None, filterout=None, unique=True):
+                    nameprefix=None, filterout=None):
         '''
-        Select apis, then return apis sorted by rate, speed.
+        Select APIs, then return APIs list sorted by rate, speed.
+        APIs with the same name 'XXX' or common_name of "nameprefix(XXX)"
+        will be grouped into a single tuple.
 
         rate_limit: float
             summary speed rate > limit
@@ -400,14 +402,11 @@ class APISpeed(APIConfig):
             Default is :attr:`addrisp`, 'ALL' for sorting by all speed_logs
         nameprefix: str, like 'TV-'
             info['common_name'] starts with **nameprefix**
-            and also used for **unique**
         filterout: function condition(api, info)
             remove api that satisfies condition.
-        unique: bool, default True
-            unique API with name 'XXXXX', common_name="nameprefix(XXXXX)%d*"
         '''
-        print("\nSelecting API, rate_limit=%s, addrisp=%s, nameprefix=%s, unique=%s ..."
-              % (rate_limit, addrisp or self.addrisp, nameprefix, unique))
+        print("\nSelecting API, rate_limit=%s, addrisp=%s, nameprefix=%s ..."
+              % (rate_limit, addrisp or self.addrisp, nameprefix))
         SA = self.sites
         select = [
             api for api in SA.keys()
@@ -420,35 +419,25 @@ class APISpeed(APIConfig):
             select = [api for api in select if not filterout(api, SA[api])]
         select = self.sorted_by_rate_speed(
             select, addrisp=addrisp, reverse=True)
-        count = 0
-        if unique:
-            result, uniq_names = [], []
-            for api in select:
-                common_name = SA[api]['common_name']
-                if nameprefix:
-                    pat = r'%s(.*[^0-9])\d*' % nameprefix
-                else:
-                    pat = r'(.*[^0-9])\d*'
-                m = re.match(pat, common_name)
-                if m:
-                    name = m.groups()[0]
-                else:
-                    name = common_name.replace(nameprefix, '', count=1)
-                if name not in uniq_names:
-                    result.append(api)
-                    uniq_names.append(name)
-                    action = '+Add'
-                    count += 1
-                else:
-                    action = '\033[33mSkip'
-                print("[S%2d] %s %s\033[0m (%s), %s"
-                      % (count, action, common_name, name, api))
-        else:
-            for api in select:
-                count += 1
-                common_name = SA[api]['common_name']
-                print("[S%2d] %s %s\033[0m, %s"
-                      % (count, 'Add', common_name, api))
-            result = select
-        print("==> \033[32m%d\033[0m APIs selected." % len(result))
+        result, uniq_names = [], []
+        for i, api in enumerate(select, 1):
+            useproxy = '🧱' if api in self.proxy_apis else '🌐'
+            common_name = SA[api]['common_name']
+            if nameprefix:
+                name = common_name.replace(nameprefix, '', count=1)
+            else:
+                name = common_name
+            if name not in uniq_names:
+                result.append([api])
+                uniq_names.append(name)
+                log = "[%3s,%3s] +Add+" % (f'S{i}', f'G{len(result)}')
+            else:
+                action = '\033[33mGroup'
+                idx = uniq_names.index(name)
+                result[idx].append(api)
+                log = "[%3s,%3s] \033[33mGroup" % (f'S{i}', f'G{idx+1}')
+            print("%s %s %s\033[0m, %s" % (log, useproxy, common_name, api))
+        result = [(tuple(res) if len(res) > 1 else res[0]) for res in result]
+        print("==> Select \033[32m%d\033[0m APIs in \033[32m%d\033[0m groups."
+              % (len(select), len(result)))
         return result

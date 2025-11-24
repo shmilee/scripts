@@ -11,7 +11,7 @@ from .speedtest import SpeedTest
 
 class VodAPI(object):
 
-    M3U8_PATTERN = '(https?:\/\/[^\"\'\s]+?\.m3u8)'
+    M3U8_PATTERN = r'(https?:\/\/[^\"\'\s]+?\.m3u8)'
 
     def __init__(self, api, desc, detail=None, timeout=10, UA=None):
         self.api = api

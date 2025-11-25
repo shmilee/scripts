@@ -51,7 +51,7 @@ class APISpeed(APIConfig):
                 },
                 "m3u8_ts": {
                     "count": int,
-                    "uri": [ts-uri,...],
+                    #"uri": [ts-uri,...],  # ignored
                     "time": Epoch-seconds,
                     "status": [int,...],
                     "size": [data-size,...],
@@ -176,8 +176,9 @@ class APISpeed(APIConfig):
         )
         if uri_segments:
             count = len(uri_segments)
-            uri = [us[0] for us in uri_segments]
-            m3u8_ts_log = dict(count=count, uri=uri, **ts_speed_info)
+            m3u8_ts_log = dict(
+                count=count,  # uri=[us[0] for us in uri_segments],
+                **ts_speed_info)
             return vod_api_log, m3u8_log, m3u8_ts_log
         else:
             return vod_api_log, m3u8_log, {}

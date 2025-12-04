@@ -377,7 +377,7 @@ class APISpeed(APIConfig):
         for idx, api in enumerate(ordered[:shownum], 1):
             summary = self.get_speed_summary(api, addrisp=addrisp)
             useproxy = '🧱' if api in self.proxy_apis else '🌐'
-            outext.append(" ->%s[%2d] %s %5.1f%%, %4.1f KB/s, %4s, %s"
+            outext.append(" ->%s[%02d] %s %5.1f%%, %4.1f KB/s, %4s, %s"
                           % ('' if idx > 99 else ' ', idx, useproxy,
                              summary['rate']*100, summary['speed'],
                              self.sites[api]['common_name'], api))

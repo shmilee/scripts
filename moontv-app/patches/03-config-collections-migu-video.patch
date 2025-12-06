@@ -1,6 +1,6 @@
 diff --git a/scripts/migu/androidURL.mjs b/scripts/migu/androidURL.mjs
 new file mode 100644
-index 0000000..8a37683
+index 0000000..1d0c74c
 --- /dev/null
 +++ b/scripts/migu/androidURL.mjs
 @@ -0,0 +1,101 @@
@@ -68,7 +68,7 @@ index 0000000..8a37683
 +  let respData = await response.json()
 +
 +  if (respData.rid == 'TIPS_NEED_MEMBER') {
-+    console.log(Yellow(`[migu] (${pid}) 该账号没有会员 正在降低画质`))
++    console.log(`[migu] - ${pid}: ${Yellow('该账号没有会员 正在降低画质')}`)
 +    params = "?sign=" + result.sign + "&rateType=" + (rateType - 1)
 +      + "&contId=" + pid + "&timestamp=" + timestramp + "&salt=" + result.salt
 +    response = await fetch(baseURL + params, { headers: headers })
@@ -85,7 +85,7 @@ index 0000000..8a37683
 +  // console.log(url)
 +  if (!url) {
 +    if (respData.message) {
-+      console.log(Red(`[migu] (${pid}) ${respData.message}`))
++      console.log(`[migu] - ${pid}: ${Red(respData.message)}`)
 +    }
 +    return {
 +      url: "",
@@ -260,16 +260,16 @@ index 0000000..8673361
 +}
 diff --git a/scripts/migu/generate.mjs b/scripts/migu/generate.mjs
 new file mode 100644
-index 0000000..9dc767b
+index 0000000..4238bae
 --- /dev/null
 +++ b/scripts/migu/generate.mjs
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,61 @@
 +/* eslint-disable */
 +
 +import fs from "node:fs"
 +import path from "node:path"
 +import { fileURLToPath } from "node:url"
-+import { getMiguLive } from "./live.mjs"
++import { getMiguLive, refreshMiguToken } from "./live.mjs"
 +
 +// 在 ES 模块中定义 __dirname
 +const __filename = fileURLToPath(import.meta.url)
@@ -283,7 +283,15 @@ index 0000000..9dc767b
 +const playbackUri = "/config-collections/migu-playback.xml";
 +
 +// 生成新文件
-+export async function generateMiguLive() {
++export async function generateMiguLive(hours) {
++  // 每12小时刷新token. 未考虑电脑睡眠, 未记录 Date.now()
++  if (hours % 12 === 0) {
++    refreshMiguToken();
++  }
++  // 每2小时更新播放列表
++  if (hours % 2 !== 0) {
++    return;
++  }
 +  // 从环境变量获取站点访问地址，用于epg和节目访问
 +  const host = `http://${process.env.HOSTNAME || 'localhost'}:${process.env.PORT || 3000}`
 +  const m3uHead = `#EXTM3U x-tvg-url="${host}${playbackUri}" ` +
@@ -292,7 +300,6 @@ index 0000000..9dc767b
 +      `<tv generator-info-name="Tak" generator-info-url="${host}">\n`;
 +
 +  try {
-+    console.log('[migu] Generating m3u, xml files...');
 +    // 确保 config-collections 目录存在
 +    if (!fs.existsSync(collectDir)) {
 +      fs.mkdirSync(collectDir, { recursive: true });
@@ -302,15 +309,15 @@ index 0000000..9dc767b
 +    // 写入
 +    fs.writeFileSync(m3uPath, m3uHead + m3uContent);
 +    fs.writeFileSync(playbackPath, playbackHead + playbackContent + `</tv>\n`);
-+    console.log(`[migu] ✅ Generated files in 'public/config-collections/'.`);
++    console.log(`[migu] ✅ 更新的 m3u, xml 文件位于 '/config-collections/'.`);
 +  } catch (error) {
-+    console.error('[migu] ❌ Error generating files:', error);
++    console.error('[migu] ❌ 更新 m3u 出错:', error);
 +  }
 +}
 +
 +// 作为脚本运行
 +if (path.resolve(__filename) === path.resolve(process.argv[1])) {
-+  generateMiguLive()
++  generateMiguLive(0)
 +    .then(() => {
 +      process.exit(0);
 +    })
@@ -564,10 +571,10 @@ index 0000000..2f535cd
 +}
 diff --git a/scripts/migu/live.mjs b/scripts/migu/live.mjs
 new file mode 100644
-index 0000000..a8d548e
+index 0000000..8bacb21
 --- /dev/null
 +++ b/scripts/migu/live.mjs
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,163 @@
 +/* eslint-disable no-console */
 +
 +import { getAndroidURL } from "./androidURL.mjs"
@@ -674,14 +681,7 @@ index 0000000..a8d548e
 +// 获取新的播放列表内容
 +export async function getMiguLive() {
 +  const start = Date.now();
-+  let interfacePath = ""
-+  // 刷新token
-+  if (!(userId == "" || token == "")) {
-+    const msg = await refreshToken(userId, token) ? Green("token刷新成功") : Red("token刷新失败");
-+    console.log(`[migu] ${msg}`);
-+  }
-+
-+  console.log("[migu] 开始更新频道、回放数据...");
++  console.log("[migu] 开始更新频道、节目单...");
 +  // 获取数据
 +  const datas = await fetchDataList()
 +  // 频道列表
@@ -730,12 +730,20 @@ index 0000000..a8d548e
 +  console.log(`[migu] 本次更新耗时: ${costime}秒`);
 +  return { m3uContent, playbackContent };
 +}
++
++// 刷新token
++export async function refreshMiguToken() {
++  if (!(userId == "" || token == "")) {
++    const msg = await refreshToken(userId, token) ? Green("token 刷新成功") : Red("token 刷新失败");
++    console.log(`[migu] ${msg}`);
++  }
++}
 diff --git a/scripts/migu/readme.md b/scripts/migu/readme.md
 new file mode 100644
-index 0000000..c991ae1
+index 0000000..5a11fa2
 --- /dev/null
 +++ b/scripts/migu/readme.md
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,23 @@
 +咪咕直播
 +========
 +
@@ -747,11 +755,12 @@ index 0000000..c991ae1
 +
 +配置信息如下，
 +
-+|     变量名      |  默认值  | 类型   | 介绍                                               |
-+| --------------- | -------- | ------ | -------------------------------------------------- |
-+| `MIGU_USERID`   |    ""    | string | 用户id，可在网页端登录获取                         |
-+| `MIGU_TOKEN`    |    ""    | string | 用户token，可在网页端登录获取                      |
-+| `MIGU_RATETYPE` | 登录?3:2 | number | 画质 2:标清 3:高清(需登录) 4:蓝光(需要登录且有VIP) |
++|     变量名      |  默认值   | 类型   | 介绍                                               |
++| --------------- | --------- | ------ | -------------------------------------------------- |
++| `MIGU_UPDATE`   | "disable" | string | 是否开启咪咕更新，值 enable, disable               |
++| `MIGU_USERID`   | ""        | string | 用户id，可在网页端登录获取                         |
++| `MIGU_TOKEN`    | ""        | string | 用户token，可在网页端登录获取                      |
++| `MIGU_RATETYPE` | 登录?3:2  | number | 画质 2:标清 3:高清(需登录) 4:蓝光(需要登录且有VIP) |
 +
 +> 注意事项
 +>
@@ -759,28 +768,41 @@ index 0000000..c991ae1
 +> 1. 需要国内IP才可正常访问
 +
 diff --git a/start.js b/start.js
-index 5561a53..052bb87 100644
+index 5561a53..f7ab833 100644
 --- a/start.js
 +++ b/start.js
-@@ -56,8 +56,24 @@ const intervalId = setInterval(() => {
+@@ -56,8 +56,37 @@ const intervalId = setInterval(() => {
    });
  }, 1000);
  
 -// 执行 cron 任务的函数
-+// 执行新的 cron 任务的函数: 生成 migu 文件
++// 执行新的 cron 任务的函数
++let runInitial = true;
++let runHours = 0; // 运行时长
++const miguGen = path.join(__dirname, 'scripts', 'migu', 'generate.mjs');
  function executeCronJob() {
-+  const miguGen = path.join(__dirname, 'scripts', 'migu', 'generate.mjs');
-+  import(miguGen)
-+    .then(genMod => {
-+      return genMod.generateMiguLive();
-+    })
-+    .then(() => {
-+      executeAPICronJob(); // 继续原有 cron 任务
-+    })
-+    .catch(error => {
-+      console.error('❌ Error calling scripts/migu/generate.mjs:', error);
-+      executeAPICronJob(); // 继续原有 cron 任务
-+    });
++  if (runInitial) {
++    runInitial = false;
++  } else {
++    runHours += 1;
++    console.log(`\n当前已运行 ${runHours} 小时\n`);
++  }
++  if (process.env.MIGU_UPDATE === 'enable') {
++    import(miguGen)
++      .then(genMod => {
++        // 必须有 return, 更新结束后 then 原有 cron 任务
++        return genMod.generateMiguLive(runHours); // 更新生成 migu 文件
++      })
++      .then(() => {
++        executeAPICronJob(); // 继续执行原有 cron 任务
++      })
++      .catch(error => {
++        console.error('❌ Error calling scripts/migu/generate.mjs:', error);
++        executeAPICronJob(); // 继续执行原有 cron 任务
++      });
++  } else {
++    executeAPICronJob(); // 执行原有 cron 任务
++  }
 +}
 +
 +// 执行原有 cron 任务的函数

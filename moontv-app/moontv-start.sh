@@ -7,6 +7,11 @@ set -e
 
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
+if [ -f "$WORKDIR/env.conf" ]; then
+    set -o allexport  # 或 set -a
+    source "$WORKDIR/env.conf"
+    set +o allexport  # 或 set +a
+fi
 
 export NODE_ENV=production
 export ADMIN_USERNAME=${ADMIN_USERNAME:-admin}

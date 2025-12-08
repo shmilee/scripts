@@ -96,6 +96,20 @@ build_app() {
                 if grep 'console.log(`\[Middleware.*;$' "$buildir/$tsfile" >/dev/null; then
                     echo -e "\n[I] //comment log [Middleware ...] in $tsfile"
                     sed -i "s|\(console.log.*Middleware.*requestId.*;$\)|//\1|" "$buildir/$tsfile"
+                    # 多行
+                    awk '
+                        /^\s*console\.log.*\[Middleware.*Auth info from cookie/ {
+                            in_console=1
+                        }
+                        in_console {
+                            sub(/^  /, "  //")
+                            if (/: null\);\s*$/) {
+                                in_console=0
+                            }
+                        }
+                        {print}
+                        ' "$buildir/$tsfile" >"$buildir/$tsfile.temp" \
+                    && mv "$buildir/$tsfile.temp" "$buildir/$tsfile"
                 fi
             fi
 

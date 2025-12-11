@@ -3,6 +3,7 @@
 # Copyright (c) 2025 shmilee
 
 import re
+import sys
 import json
 import random
 import html
@@ -21,7 +22,7 @@ class VodAPI(object):
             'Accept': 'application/json,text/html',
             'Accept-Encoding': 'gzip, deflate, zstd',
         })
-        data, info = self.tester.fetch(api, desc)
+        data, info = self.fetch_and_decompress(api)
         self.api_speed = info
         self.api_json = {}
         if data:
@@ -30,11 +31,36 @@ class VodAPI(object):
                 if data.get('list', None) and len(data['list']) > 0:
                     self.api_json = data
                 else:
-                    print(f'({desc}) Invalid response: {data}')
+                    print(f'({desc}) Invalid response: {data[:320]} ...')
             except Exception:
-                print(f'({desc}) Invalid response: {data}')
+                print(f'({desc}) Invalid response: {data[:320]} ...')
         else:
             print(f'({desc}) Invalid api: {api}')
+
+    def fetch_and_decompress(self, url):
+        data, info = self.tester.fetch(url, self.desc)
+        # 检查标准 Zstandard 帧, 头部前4个字节是小端序的 0xFD2FB528
+        if data and data[:4] == b'\x28\xb5\x2f\xfd':
+            try:
+                data = self._decompress_zstd(data, self.desc)
+            except Exception:
+                pass  # 放弃解压
+        # gzip requests 已自动处理
+        return data, info
+
+    @staticmethod
+    def _decompress_zstd(data, desc):
+        if sys.version_info[:3] >= (3, 14, 0):
+            # https://docs.python.org/3/library/compression.zstd.html
+            from compression import zstd
+            return zstd.decompress(data)
+        else:
+            try:
+                import zstandard as zstd
+            except ModuleNotFoundError:
+                print(f'({desc}) decompress response needs python-zstandard')
+                raise
+            return zstd.decompress(data, max_output_size=10*1024*1024)  # 10M
 
     def random_vod_id(self):
         vods = self.api_json.get('list', [])
@@ -55,7 +81,7 @@ class VodAPI(object):
 
     def getDetailFromApi(self, vod_id):
         url = f'{self.api}?ac=videolist&ids={vod_id}'
-        data, _ = self.tester.fetch(url, self.desc)
+        data, _ = self.fetch_and_decompress(url)
         if data:
             try:
                 data = json.loads(data)
@@ -120,7 +146,7 @@ class VodAPI(object):
             print(f'({self.desc}) Need detail URL!')
             return
         url = f'{self.detail}/index.php/vod/detail/id/{vod_id}.html'
-        data, _ = self.tester.fetch(url, self.desc)
+        data, _ = self.fetch_and_decompress(url)
         if not data:
             return
         try:

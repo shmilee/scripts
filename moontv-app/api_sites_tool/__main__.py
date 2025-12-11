@@ -26,8 +26,9 @@ def main():
         sites_speed.check_http_to_https()
 
     # backup config
-    sites_speed.reorder_sites()
-    sites_speed.save_json_backup()
+    if count > 0:
+        sites_speed.reorder_sites()
+        sites_speed.save_json_backup()
 
     # test speed
     sites_speed.test_speed()

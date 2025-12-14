@@ -1,12 +1,12 @@
 diff --git a/scripts/migu/androidURL.mjs b/scripts/migu/androidURL.mjs
 new file mode 100644
-index 0000000..1d0c74c
+index 0000000..05f712b
 --- /dev/null
 +++ b/scripts/migu/androidURL.mjs
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,167 @@
 +/* eslint-disable no-console */
 +
-+import { getddCalcuURL } from "./ddCalcuURL.mjs";
++import { getddCalcuURL, getddCalcuURL720p } from "./ddCalcuURL.mjs";
 +import { getStringMD5, Red, Yellow } from "./helper.mjs";
 +
 +function getSaltAndSign(md5) {
@@ -24,14 +24,15 @@ index 0000000..1d0c74c
 + * @param {string} token - 用户token
 + * @param {string} pid - 节目ID
 + * @param {number} rateType - 清晰度
++ * @param {boolean} showmsg - 空 url 时，显示响应 message
 + * @returns {} - url: 链接 rateType: 清晰度
 + */
-+export async function getAndroidURL(userId, token, pid, rateType) {
-+
++export async function getAndroidURL(userId, token, pid, rateType, showmsg) {
 +  if (rateType <= 1) {
 +    return {
 +      url: "",
-+      rateType: 0
++      rateType: 0,
++      content: null
 +    }
 +  }
 +  // 获取url
@@ -84,7 +85,7 @@ index 0000000..1d0c74c
 +  // console.log(rateType)
 +  // console.log(url)
 +  if (!url) {
-+    if (respData.message) {
++    if (showmsg && respData.message) {
 +      console.log(`[migu] - ${pid}: ${Red(respData.message)}`)
 +    }
 +    return {
@@ -105,9 +106,74 @@ index 0000000..1d0c74c
 +  }
 +
 +}
++
++/**
++ * 旧版高清画质
++ * @param {string} pid - 节目ID
++ * @param {boolean} showmsg - 空 url 时，显示响应 message
++ * @returns {object} - 
++ */
++export async function getAndroidURL720p(pid, showmsg) {
++  // 获取url
++  const timestramp = Math.round(Date.now()).toString()
++  const appVersion = "2600034600"
++  const appVersionID = appVersion + "-99000-201600010010028"
++  let headers = {
++    AppVersion: `${appVersion}`,
++    TerminalId: "android",
++    "X-UP-CLIENT-CHANNEL-ID": `${appVersionID}`
++  }
++  // console.log(headers)
++  const str = timestramp + pid + appVersion.substring(0, 8)
++  const md5 = getStringMD5(str)
++
++  const salt = String(Math.floor(Math.random() * 1000000)).padStart(6, '0') + '25'
++  const suffix = "2cac4f2c6c3346a5b34e085725ef7e33migu" + salt.substring(0, 4)
++  const sign = getStringMD5(md5 + suffix)
++
++  let rateType = 3
++  // 广东卫视有些特殊
++  if (pid == "608831231") {
++    rateType = 2
++  }
++  // 请求
++  const baseURL = "https://play.miguvideo.com/playurl/v1/play/playurl"
++  const params = "?sign=" + sign + "&rateType=" + rateType
++    + "&contId=" + pid + "&timestamp=" + timestramp + "&salt=" + salt
++  const respData = await fetch(baseURL + params, {
++    headers: headers
++  }).then(r => r.json())
++
++  // console.dir(respData, { depth: null })
++  const url = respData.body.urlInfo?.url
++  // console.log(rateType)
++  // console.log(url)
++  if (!url) {
++    if (showmsg && respData.message) {
++      console.log(`[migu] - ${pid}: ${Red(respData.message)}`)
++    }
++    return {
++      url: "",
++      rateType: 0,
++      content: respData
++    }
++  }
++
++  rateType = respData.body.urlInfo?.rateType
++
++  // 将URL加密
++  const resURL = getddCalcuURL720p(url, pid)
++
++  return {
++    url: resURL,
++    rateType: parseInt(rateType),
++    content: respData
++  }
++
++}
 diff --git a/scripts/migu/config.mjs b/scripts/migu/config.mjs
 new file mode 100644
-index 0000000..2910f14
+index 0000000..4d93009
 --- /dev/null
 +++ b/scripts/migu/config.mjs
 @@ -0,0 +1,11 @@
@@ -115,19 +181,19 @@ index 0000000..2910f14
 +export const userId = process.env.MIGU_USERID || ""
 +// 用户token 可以使用网页登录获取
 +export const token = process.env.MIGU_TOKEN || ""
-+// 画质
-+// 4 蓝光, 需登录, 且账号有VIP
-+// 3 高清 720p, 需登录
-+// 2 标清 480p
-+export const rateType = process.env.MIGU_RATETYPE || (
-+  userId != "" && token != "" ? 3 : 2
-+)
++/**
++ * 画质
++ * 4 蓝光, 需登录, 且账号有VIP
++ * 3 高清 720p
++ * 2 标清 480p
++ */
++export const rateType = process.env.MIGU_RATETYPE || 3
 diff --git a/scripts/migu/ddCalcuURL.mjs b/scripts/migu/ddCalcuURL.mjs
 new file mode 100644
-index 0000000..8673361
+index 0000000..314e375
 --- /dev/null
 +++ b/scripts/migu/ddCalcuURL.mjs
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,193 @@
 +import { userId } from "./config.mjs"
 +import { getDateString } from "./helper.mjs"
 +
@@ -258,18 +324,81 @@ index 0000000..8673361
 +
 +  return `${puDataURL}&ddCalcu=${ddCalcu}${suffix}`
 +}
++
++/**
++ * 旧版720p ddcalcu
++ * @param {string} puData - 服务器返回的那个东东
++ * @param {string} programId - 节目ID
++ * @returns {string} - ddCalcu
++ */
++function getddCalcu720p(puData, programId) {
++
++  if (puData == null || puData == undefined) {
++    return ""
++  }
++
++  if (programId == null || programId == undefined) {
++    return ""
++  }
++  const keys = "cdabyzwxkl"
++
++  let ddCalcu = []
++  for (let i = 0; i < puData.length / 2; i++) {
++
++    ddCalcu.push(puData[puData.length - i - 1])
++    ddCalcu.push(puData[i])
++    switch (i) {
++      case 1:
++        // ddCalcu.push(token=="" ?"e":keys[] )
++        ddCalcu.push("v")
++        break;
++      case 2:
++        ddCalcu.push(keys[parseInt(getDateString(new Date())[2])])
++        break;
++      case 3:
++        ddCalcu.push(keys[programId[6]])
++        break;
++      case 4:
++        ddCalcu.push("a")
++        break;
++    }
++  }
++  return ddCalcu.join("")
++}
++
++/**
++ * 旧版720p加密链接
++ * @param {string} puDataURL - 加密前链接
++ * @param {string} programId - 节目ID
++ * @returns {string} - 加密链接
++ */
++export function getddCalcuURL720p(puDataURL, programId) {
++
++  if (puDataURL == null || puDataURL == undefined) {
++    return ""
++  }
++
++  if (programId == null || programId == undefined) {
++    return ""
++  }
++
++  const puData = puDataURL.split("&puData=")[1]
++  const ddCalcu = getddCalcu720p(puData, programId)
++
++  return `${puDataURL}&ddCalcu=${ddCalcu}&sv=10004&ct=android`
++}
 diff --git a/scripts/migu/generate.mjs b/scripts/migu/generate.mjs
 new file mode 100644
-index 0000000..4238bae
+index 0000000..c8073b0
 --- /dev/null
 +++ b/scripts/migu/generate.mjs
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,66 @@
 +/* eslint-disable */
 +
 +import fs from "node:fs"
 +import path from "node:path"
 +import { fileURLToPath } from "node:url"
-+import { getMiguLive, refreshMiguToken } from "./live.mjs"
++import { getMiguLive, getMiguPE, refreshMiguToken } from "./live.mjs"
 +
 +// 在 ES 模块中定义 __dirname
 +const __filename = fileURLToPath(import.meta.url)
@@ -304,10 +433,15 @@ index 0000000..4238bae
 +    if (!fs.existsSync(collectDir)) {
 +      fs.mkdirSync(collectDir, { recursive: true });
 +    }
++    const miguUpdates = (process.env.MIGU_UPDATE || '').split('+').map(part => part.trim());
 +    // 获取新数据
-+    const { m3uContent, playbackContent } = await getMiguLive();
++    const { m3uContent, playbackContent } =  miguUpdates.includes('TV')
++      ? await getMiguLive()
++      : { m3uContent: '', playbackContent: '' };
++
++    const m3uPEContent = miguUpdates.includes('PE') ? await getMiguPE() : '';
 +    // 写入
-+    fs.writeFileSync(m3uPath, m3uHead + m3uContent);
++    fs.writeFileSync(m3uPath, m3uHead + m3uContent + m3uPEContent);
 +    fs.writeFileSync(playbackPath, playbackHead + playbackContent + `</tv>\n`);
 +    console.log(`[migu] ✅ 更新的 m3u, xml 文件位于 '/config-collections/'.`);
 +  } catch (error) {
@@ -327,10 +461,10 @@ index 0000000..4238bae
 +}
 diff --git a/scripts/migu/helper.mjs b/scripts/migu/helper.mjs
 new file mode 100644
-index 0000000..2f535cd
+index 0000000..79c52d2
 --- /dev/null
 +++ b/scripts/migu/helper.mjs
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,255 @@
 +/* eslint-disable no-console */
 +
 +import crypto from 'crypto'
@@ -373,7 +507,11 @@ index 0000000..2f535cd
 +
 +const RSA_PRIVATE_KEY_PKCS8 = "MIICdQIBADANBgkqhkiG9w0BAQEFAASCAl8wggJbAgEAAoGBAOhvWsrglBpQGpjB\r8okxLUCaaiKKOytn9EtvytB5tKDchmgkSaXpreWcDy/9imsuOiVCSdBr6hHjrTN7\rQKkA4/QYS8ptiFv1ap61PiAyRFDI1b8wp2haJ6HF1rDShG2XdfWIhLk4Hj6efVZA\rSfa3taM7C8NseWoWh05Cp26g4hXZAgMBAAECgYBzqZXghsisH1hc04ZBRrth/nT6\rIxc2jlA+ia6+9xEvSw2HHSeY7COgsnvMQbpzg1lj2QyqLkkYBdfWWmrerpa/mb7j\rm6w95YKs5Ndii8NhFWvC0eGK8Ygt02DeLohmkQu3B+Yq8JszjB7tQJRR2kdG6cPt\rKp99ZTyyPom/9uD+AQJBAPxCwajHAkCuH4+aKdZhH6n7oDAxZoMH/mihDRxHZJof\rnT+K662QCCIx0kVCl64s/wZ4YMYbP8/PWDvLMNNWC7ECQQDr4V23KRT9fAPAN8vB\rq2NqjLAmEx+tVnd4maJ16Xjy5Q4PSRiAXYLSr9uGtneSPP2fd/tja0IyawlP5UPL\rl76pAkAeXqMWAK+CvfPKxBKZXqQDQOnuI2RmDgZQ7mK3rtirvXae+ciZ4qc4Bqt7\r7yJ3s68YRlHQR+OMzzeeKz47kzZhAkAPteH1ChJw06q4Sb8TdiPX++jbkFiCxgiN\rCsaMTfGVU/Y8xGSSYCgPelEHxu1t2wwVa/tdYs505zYmkSGT1NaJAkBCS5hymXsA\rB92Fx8eGW5WpLfnpvxl8nOcP+eNXobi8Sc6q1FmoHi8snbcmBhidcDdcieKn+DbX\rGG3BQE/OCOkM\r";
 +
-+// MD5标准加密
++/**
++ * MD5 标准加密
++ * @param {string} str - 
++ * @returns {string} - 
++ */
 +export function getStringMD5(str) {
 +  // 创建 MD5 哈希对象
 +  const md5 = crypto.createHash("md5");
@@ -383,48 +521,57 @@ index 0000000..2f535cd
 +  return md5.digest("hex").toLowerCase();
 +}
 +
-+// AES 加密方法
-+// base64Key 长度: 16
-+//   AES-128: 16 字节 (128 位)
-+//   AES-256: 32 字节 (256 位)
-+function AESencrypt(str, base64Key) {
-+  // 解码 Base64 密钥
-+  const key = Buffer.from(base64Key, 'base64');
-+  // 处理 IV 和明文
-+  const iv = Buffer.from(IV, 'utf8');
-+  const plainText = Buffer.from(str, 'utf8');
-+
-+  // 创建加密器
-+  const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
-+  // 执行加密
-+  let encrypted = cipher.update(plainText);
-+  encrypted = Buffer.concat([encrypted, cipher.final()]);
-+
-+  // 返回 Base64 编码的密文
-+  return encrypted.toString('base64');
++/**
++ * AES 加密
++ * @param {string} data - 
++ * @param {string} baseKey - 
++ *   长度: 16
++ *   AES-128: 16 字节 (128 位)
++ *   AES-256: 32 字节 (256 位)
++ * @param {string} ivStr - 
++ * @returns {string} - 
++ */
++function AESencrypt(data, baseKey = KEY_AES, ivStr = IV) {
++  let key = Buffer.from(baseKey, "utf8")
++  let iv = Buffer.from(ivStr, "utf8")
++  // 填充长度
++  if (key.length < 32) {
++    const paddedKey = Buffer.alloc(32);
++    key.copy(paddedKey);
++    key = paddedKey;
++  }
++  if (iv.length < 16) {
++    const paddedIV = Buffer.alloc(16);
++    iv.copy(paddedIV);
++    iv = paddedIV;
++  }
++  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv)
++  const dest = cipher.update(data, "utf8", "base64") + cipher.final("base64")
++  return dest.toString()
 +}
 +
 +/**
-+ *RSA 加密
++ * RSA 私钥签名加密
++ * @param {string} data - 
++ * @param {string} publicKeyBase - 
++ * @returns {string} - 
 + */
-+function RSAencrypt(str) {
++function RSAencrypt(data, publicKeyBase = RSA_PRIVATE_KEY_PKCS8) {
 +  // 处理密钥：移除 \r 并解码 Base64
-+  const keyBytes = Buffer.from(RSA_PRIVATE_KEY_PKCS8.replace(/\r/g, ''), 'base64');
-+
++  const clearKey = publicKeyBase.replace(/\r/g, "")
++  const keyBytes = Buffer.from(clearKey, "base64")
 +  // 创建私钥对象
 +  const privateKey = crypto.createPrivateKey({
 +    key: keyBytes,
-+    format: 'der',
-+    type: 'pkcs8'
-+  });
-+
++    format: "der",
++    type: "pkcs8"
++  })
 +  // 使用私钥加密
-+  const encrypted = crypto.privateEncrypt(
-+    { key: privateKey, padding: crypto.constants.RSA_PKCS1_PADDING },
-+    Buffer.from(str)
-+  );
-+
-+  return encrypted.toString('base64');
++  const dest = crypto.privateEncrypt({
++    key: privateKey,
++    padding: crypto.constants.RSA_PKCS1_PADDING,
++  }, data)
++  return dest.toString("base64")
 +}
 +
 +// 4. refreshToken
@@ -437,9 +584,13 @@ index 0000000..2f535cd
 +    .replace(/%20/g, '+');
 +}
 +
-+// 刷新token
++/**
++ * 刷新 token
++ * @param {string} userId - 用户ID
++ * @param {string} token - 用户token
++ * @returns {boolean} - 是否成功
++ */
 +export async function refreshToken(userId, token) {
-+
 +  if (userId == null || userId == undefined || token == null || token == undefined) {
 +    return false
 +  }
@@ -449,8 +600,8 @@ index 0000000..2f535cd
 +  const baseData = `{"userToken":"${token}","autoDelay":true,"deviceId":"","userId":"${userId}","timestamp":"${time}"}`
 +
 +  // 请求体加密
-+  const encryData = AESencrypt(baseData, KEY_AES)
-+  const data = '{"data":"' + encryData.substring(0, encryData.length - 2) + '\\u003d\\u003d"}'
++  const encryData = AESencrypt(baseData)
++  const data = '{"data":"' + encryData + '"}'
 +
 +  // 签名
 +  const str = getStringMD5(data)
@@ -571,13 +722,13 @@ index 0000000..2f535cd
 +}
 diff --git a/scripts/migu/live.mjs b/scripts/migu/live.mjs
 new file mode 100644
-index 0000000..8bacb21
+index 0000000..c41e7c0
 --- /dev/null
 +++ b/scripts/migu/live.mjs
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,256 @@
 +/* eslint-disable no-console */
 +
-+import { getAndroidURL } from "./androidURL.mjs"
++import { getAndroidURL, getAndroidURL720p } from "./androidURL.mjs"
 +import { rateType, token, userId } from "./config.mjs"
 +import { Green, Red, Yellow } from "./helper.mjs"
 +import { fetchDataList, refreshToken } from "./helper.mjs"
@@ -678,10 +829,25 @@ index 0000000..8bacb21
 +  }
 +}
 +
++async function getURLbyPID(pid, name, showmsg) {
++  let resObj = {};
++  try {
++    // 未登录请求720p
++    if (rateType == 3 && (userId == "" || token == "")) {
++      resObj = await getAndroidURL720p(pid, showmsg);
++    } else {
++      resObj = await getAndroidURL(userId, token, pid, rateType, showmsg);
++    }
++  } catch (error) {
++    console.error(`[migu] 获取 ${name} 地址失败:`, error);
++  }
++  return resObj.url;
++}
++
 +// 获取新的播放列表内容
 +export async function getMiguLive() {
 +  const start = Date.now();
-+  console.log("[migu] 开始更新频道、节目单...");
++  console.log("[migu] 开始更新 TV 频道、节目单...");
 +  // 获取数据
 +  const datas = await fetchDataList()
 +  // 频道列表
@@ -699,14 +865,7 @@ index 0000000..8bacb21
 +      const pid = data[j].pID;
 +      const name = data[j].name;
 +      const logo = data[j].pics.highResolutionH;
-+      let resObj = {};
-+      try {
-+        resObj = await getAndroidURL(userId, token, pid, rateType);
-+      } catch (error) {
-+        console.error(`[migu] 获取 ${name} 地址失败:`, error);
-+        continue;
-+      }
-+      const playURL = resObj.url;
++      const playURL = await getURLbyPID(pid, name, true);
 +      if (playURL) {
 +        // 加入频道
 +        m3uContent += `#EXTINF:-1 tvg-id="${name}" tvg-name="${name}" tvg-logo="${logo}" ` +
@@ -723,12 +882,97 @@ index 0000000..8bacb21
 +        done.push(Red(data[j].name));
 +      }
 +    }
-+    console.log(`[migu] > 分类-${group}: ${done}`);
++    console.log(`[migu] > 分类-${group}: ${done.join(', ')}`);
 +  }
 +
 +  const costime = ((Date.now() - start)/1000).toFixed(1);
-+  console.log(`[migu] 本次更新耗时: ${costime}秒`);
++  console.log(`[migu] 本次 TV 更新耗时: ${costime}秒`);
 +  return { m3uContent, playbackContent };
++}
++
++export async function getMiguPE(hours) {
++  const start = Date.now();
++  console.log("[migu] 开始更新 PE 赛事...");
++
++  // 获取PE数据
++  const response = await fetch("http://v0-sc.miguvideo.com/vms-match/v6/staticcache/basic/match-list/normal-match-list/0/all/default/1/miguvideo");
++  if (!response.ok) {
++    console.log(`[migu] 获取 PE 数据错误: ${Red(response.status)}`)
++      return '';
++  }
++  const datas = await response.json()
++
++  let m3uPEContent = '';
++  for (let i = 1; i < 4; i++) {
++    // 日期
++    const date = datas.body?.days[i]
++    const dayDone = []
++    for (const data of datas.body?.matchList[date]) {
++      let relativeDate = "昨天"
++      const dateString = getDateString(new Date())
++      if (date == dateString) {
++        relativeDate = "今天"
++      } else if (parseInt(date.substring(6)) > parseInt(dateString.substring(6))) {
++        relativeDate = "明天"
++      }
++
++      let pkInfoTitle = data.pkInfoTitle
++      if (data.confrontTeams) {
++        pkInfoTitle = `${data.confrontTeams[0].name}VS${data.confrontTeams[1].name}`
++      }
++      try {
++        const peResult = await fetch(`https://vms-sc.miguvideo.com/vms-match/v6/staticcache/basic/basic-data/${data.mgdbId}/miguvideo`).then(r => r.json())
++        // 比赛已结束
++        if (peResult.body.endTime < Date.now()) {
++          const replayResult = await fetch(`http://app-sc.miguvideo.com/vms-match/v5/staticcache/basic/all-view-list/${data.mgdbId}/2/miguvideo`).then(r => r.json())
++          let replayList = replayResult.body?.replayList
++          if (replayList == null || replayList == undefined) {
++            replayList = peResult.body.multiPlayList.replayList
++          }
++          if (replayList == null || replayList == undefined) {
++            console.log(`[migu] ${data.mgdbId} ${pkInfoTitle} 无回放`)
++            continue
++          }
++          for (const replay of replayList) {
++            if (replay.name.match(/.*集锦|训练.*/) != null) {
++              continue
++            }
++            if (replay.name.match(/.*回放|赛.*/) != null) {
++              const playURL = await getURLbyPID(replay.pID, pkInfoTitle, false);
++              if (playURL) {
++                // 加入赛事
++                m3uPEContent += `#EXTINF:-1 tvg-id="${pkInfoTitle}" tvg-name="${pkInfoTitle}" tvg-logo="${data.competitionLogo}" group-title="体育-${relativeDate}",${data.competitionName} ${pkInfoTitle} ${replay.name} ${peResult.body.multiPlayList.preList[peResult.body.multiPlayList.preList.length - 1].startTimeStr.substring(11, 16)}\n${playURL}\n`;
++                dayDone.push(Green(pkInfoTitle));
++              } else {
++                dayDone.push(Red(pkInfoTitle));
++              }
++            }
++          }
++        } else {
++          // 比赛未结束
++          const liveList = peResult.body.multiPlayList.liveList
++          for (const live of liveList) {
++            if (live.name.match(/.*集锦.*/) != null || live.startTimeStr == undefined) {
++              continue
++            }
++            const playURL = await getURLbyPID(live.pID, pkInfoTitle, false);
++            if (playURL) {
++              // 加入赛事
++              m3uPEContent += `#EXTINF:-1 tvg-id="${pkInfoTitle}" tvg-name="${pkInfoTitle}" tvg-logo="${data.competitionLogo}" group-title="体育-${relativeDate}",${data.competitionName} ${pkInfoTitle} ${live.name} ${live.startTimeStr.substring(11, 16)}\n${playURL}\n`;
++              dayDone.push(Green(pkInfoTitle));
++            } else {
++              dayDone.push(Red(pkInfoTitle));
++            }
++          }
++        }
++      } catch (error) {
++        console.log(`[migu] ${data.mgdbId} ${pkInfoTitle} 更新失败`, error);
++      }
++    }
++    console.log(`[migu] > 日期 ${date} 更新完成: ${dayDone.join(', ')}`);
++  }
++  console.log(`[migu] 本次 PE 更新耗时: ${(Date.now() - start) / 1000}秒`);
++  return m3uPEContent;
 +}
 +
 +// 刷新token
@@ -740,7 +984,7 @@ index 0000000..8bacb21
 +}
 diff --git a/scripts/migu/readme.md b/scripts/migu/readme.md
 new file mode 100644
-index 0000000..5a11fa2
+index 0000000..47c912d
 --- /dev/null
 +++ b/scripts/migu/readme.md
 @@ -0,0 +1,23 @@
@@ -748,19 +992,19 @@ index 0000000..5a11fa2
 +========
 +
 +* 修改自 [migu video](https://github.com/develop202/migu_video)
-+* 版本：1931, 2025-12-03, c5f2e3d
-+* 更新连接：`https://github.com/develop202/migu_video/compare/c5f2e3d...${new_commit}`
++* 版本：1935, 2025-12-12, 37dde48
++* 更新连接：`https://github.com/develop202/migu_video/compare/37dde48...${new_commit}`
 +
 +## 配置
 +
 +配置信息如下，
 +
-+|     变量名      |  默认值   | 类型   | 介绍                                               |
-+| --------------- | --------- | ------ | -------------------------------------------------- |
-+| `MIGU_UPDATE`   | "disable" | string | 是否开启咪咕更新，值 enable, disable               |
-+| `MIGU_USERID`   | ""        | string | 用户id，可在网页端登录获取                         |
-+| `MIGU_TOKEN`    | ""        | string | 用户token，可在网页端登录获取                      |
-+| `MIGU_RATETYPE` | 登录?3:2  | number | 画质 2:标清 3:高清(需登录) 4:蓝光(需要登录且有VIP) |
++|     变量名      | 默认值 |  类型  |  介绍                                    |
++| --------------- | ------ | ------ | ---------------------------------------- |
++| `MIGU_UPDATE`   |   ''   | string | 更新内容，值 '', 'TV', 'PE', 'TV+PE'     |
++| `MIGU_USERID`   |   ''   | string | 用户id，可在网页端登录获取               |
++| `MIGU_TOKEN`    |   ''   | string | 用户token，可在网页端登录获取            |
++| `MIGU_RATETYPE` |    3   | number | 画质 2:标清 3:高清 4:蓝光(需登录且有VIP) |
 +
 +> 注意事项
 +>
@@ -768,7 +1012,7 @@ index 0000000..5a11fa2
 +> 1. 需要国内IP才可正常访问
 +
 diff --git a/start.js b/start.js
-index 5561a53..f7ab833 100644
+index 5561a53..4049e9c 100644
 --- a/start.js
 +++ b/start.js
 @@ -56,8 +56,37 @@ const intervalId = setInterval(() => {
@@ -787,7 +1031,7 @@ index 5561a53..f7ab833 100644
 +    runHours += 1;
 +    console.log(`\n当前已运行 ${runHours} 小时\n`);
 +  }
-+  if (process.env.MIGU_UPDATE === 'enable') {
++  if (['TV', 'PE', 'TV+PE'].includes(process.env.MIGU_UPDATE)) {
 +    import(miguGen)
 +      .then(genMod => {
 +        // 必须有 return, 更新结束后 then 原有 cron 任务

@@ -144,6 +144,9 @@ build_app() {
         cp -r "$buildir/.next/standalone/".* "$distdir/"
         echo "'$buildir/.next/static' -> '$distdir/.next/static'"
         cp -r "$buildir/.next/static" "$distdir/.next/static"
+        if [ -d "$distdir/public" ]; then
+            rm -rv "$distdir/public"
+        fi
         cp -rv "$buildir/public" "$distdir/public"
         cp -rv "$buildir/scripts" "$distdir/scripts"
         cp -v "$buildir/start.js" "$distdir/start.js"

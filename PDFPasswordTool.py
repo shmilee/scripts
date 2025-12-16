@@ -12,9 +12,25 @@ Ref:
 
 import os
 import argparse
+import time
+
+from typing import (
+    Any,
+    Optional,
+    Union,
+    cast,
+)
 from tqdm import tqdm
 from pypdf import PdfReader, PdfWriter
-# 其他库 https://github.com/pikepdf/pikepdf
+from pypdf.constants import Core as CO
+from pypdf.generic import (
+    ArrayObject,
+    DictionaryObject,
+    IndirectObject,
+    NameObject,
+    NullObject,
+    NumberObject,
+)
 
 
 def get_pdf_reader(file):
@@ -49,6 +65,161 @@ def encrypt_pdf(input_pdf, output_pdf, user_password, **kwargs):
         print(f"=> Save the encrypted PDF to {output_pdf}.")
     except Exception as err:
         print(f"发生错误：{err}")
+
+
+class MyPdfWriter(PdfWriter):
+    '''
+    custom :meth:`append` (:meth:`merge`) with progress bar
+    '''
+
+    def copy_from(
+        self,
+        reader: PdfReader,
+        pages: Optional[list[int]] = None,
+        import_outline: bool = True,
+        excluded_fields: Optional[Union[list[str], tuple[str, ...]]] = (),
+    ) -> None:
+        """
+        Copy the pages from the given PdfReader onto the end of the file.
+
+        Args:
+            reader: A PdfReader Object
+            pages: can be a list of pages index
+                to copy only the specified index of pages from the source
+                document into the output document.
+            import_outline: You may prevent the source document's
+                outline (collection of outline items, previously referred to as
+                'bookmarks') from being imported by specifying this as ``False``.
+            excluded_fields: provide the list of fields/keys to be ignored
+                if ``/Annots`` is part of the list, the annotation will be ignored
+                if ``/B`` is part of the list, the articles will be ignored
+
+        Raises:
+            TypeError: The pages attribute is not configured properly
+
+        """
+        if excluded_fields is None:
+            excluded_fields = ()
+        if not isinstance(pages, (list, range)):
+            raise TypeError('"pages" must be a list or a range')
+
+        t0 = time.time()
+        srcpages = {}
+        for page in tqdm(pages, desc="正在复制"):
+            pg = reader.pages[page]
+            assert pg.indirect_reference is not None
+            srcpages[pg.indirect_reference.idnum] = self.add_page(
+                pg, [*list(excluded_fields), 1, "/B", 1, "/Annots"]  # type: ignore
+            )
+            srcpages[pg.indirect_reference.idnum].original_page = pg
+        # cost 4s
+        #print(f'cost-time1={time.time()-t0}s')
+        t0 = time.time()  # reset
+
+        reader._named_destinations = (
+            reader.named_destinations
+        )  # need for the outline processing below
+
+        arr: Any
+
+        def _process_named_dests(dest: Any) -> None:
+            arr = dest.dest_array
+            if "/Names" in self._root_object and dest["/Title"] in cast(
+                list[Any],
+                cast(
+                    DictionaryObject,
+                    cast(DictionaryObject, self._root_object["/Names"]).get("/Dests", DictionaryObject()),
+                ).get("/Names", DictionaryObject()),
+            ):
+                # already exists: should not duplicate it
+                pass
+            elif dest["/Page"] is None or isinstance(dest["/Page"], NullObject):
+                pass
+            elif isinstance(dest["/Page"], int):
+                # the page reference is a page number normally not a PDF Reference
+                # page numbers as int are normally accepted only in external goto
+                try:
+                    p = reader.pages[dest["/Page"]]
+                except IndexError:
+                    return
+                assert p.indirect_reference is not None
+                try:
+                    arr[NumberObject(0)] = NumberObject(
+                        srcpages[p.indirect_reference.idnum].page_number
+                    )
+                    self.add_named_destination_array(dest["/Title"], arr)
+                except KeyError:
+                    pass
+            elif dest["/Page"].indirect_reference.idnum in srcpages:
+                arr[NumberObject(0)] = srcpages[
+                    dest["/Page"].indirect_reference.idnum
+                ].indirect_reference
+                self.add_named_destination_array(dest["/Title"], arr)
+
+        for dest in reader._named_destinations.values():
+            _process_named_dests(dest)
+        # cost 0.2s
+        #print(f'cost-time2={time.time()-t0}s')
+        t0 = time.time() # reset
+
+        outline_item_typ = self.get_outline_root()
+
+        _ro = reader.root_object
+        if import_outline and CO.OUTLINES in _ro:
+            outline = self._get_filtered_outline(
+                _ro.get(CO.OUTLINES, None), srcpages, reader
+            )
+            self._insert_filtered_outline(
+                outline, outline_item_typ, None
+            )  # TODO: use before parameter
+        # cost 0.08s
+        #print(f'cost-time3={time.time()-t0}s')
+        t0 = time.time() # reset
+
+        if "/Annots" not in excluded_fields:
+            for pag in srcpages.values():
+                lst = self._insert_filtered_annotations(
+                    pag.original_page.get("/Annots", []), pag, srcpages, reader
+                )
+                if len(lst) > 0:
+                    pag[NameObject("/Annots")] = lst
+                self.clean_page(pag)
+
+        if "/AcroForm" in _ro and _ro["/AcroForm"] is not None:
+            if "/AcroForm" not in self._root_object:
+                self._root_object[NameObject("/AcroForm")] = self._add_object(
+                    cast(
+                        DictionaryObject,
+                        reader.root_object["/AcroForm"],
+                    ).clone(self, False, ("/Fields",))
+                )
+                arr = ArrayObject()
+            else:
+                arr = cast(
+                    ArrayObject,
+                    cast(DictionaryObject, self._root_object["/AcroForm"])["/Fields"],
+                )
+            trslat = self._id_translated[id(reader)]
+            try:
+                for f in reader.root_object["/AcroForm"]["/Fields"]:  # type: ignore
+                    try:
+                        ind = IndirectObject(trslat[f.idnum], 0, self)
+                        if ind not in arr:
+                            arr.append(ind)
+                    except KeyError:
+                        # for trslat[] which mean the field has not be copied
+                        # through the page
+                        pass
+            except KeyError:  # for /Acroform or /Fields are not existing
+                arr = self._add_object(ArrayObject())
+            cast(DictionaryObject, self._root_object["/AcroForm"])[
+                NameObject("/Fields")
+            ] = arr
+
+        if "/B" not in excluded_fields:
+            self.add_filtered_articles("", srcpages, reader)
+        # cost 0.02s
+        #print(f'cost-time4={time.time()-t0}s')
 
 
 class PdfCracker(object):
@@ -159,24 +330,25 @@ class PdfCracker(object):
             print('=》未解密 PDF 无法编辑!')
             return
         try:
-            writer = PdfWriter()  # 空白 PDF
-            # 可选：复制原始PDF的元数据
+            writer = MyPdfWriter()  # 空白 PDF
+            # 复制原始PDF的元数据
             if self.reader.metadata:
                 writer.metadata = self.reader.metadata
+            if self.reader.xmp_metadata:
+                writer.xmp_metadata = self.reader.xmp_metadata
             N = len(self.reader.pages)
             pages = self.parse_pages_spec(pages)
             if pages:
                 pages = [i for i in pages if 0 <= i < N]
             else:
                 pages = range(N)
-            print(f'=》选取 {len(pages)} 页 PDF 保存!')
-            # 将每一页添加到PDF编写器对象
-            for page_num in tqdm(pages, desc='正在添加页'):
-                page = self.reader.pages[page_num]
-                writer.add_page(page)
-            # Save the new PDF to a file
+            print(f"=》新 PDF 共 {len(pages)} 页")
+            # 复制原始PDF的页、目录书签，import_outline (aka bookmarks)
+            # ref: https://github.com/py-pdf/pypdf/discussions/1625
+            writer.copy_from(self.reader, pages=pages, import_outline=True)
+            print(f"\r=》保存到文件 {output_pdf} ...", end=' ')
             writer.write(output_pdf)
-            print(f"=》已生成新的 PDF 文件: {output_pdf}.")
+            print('完成。')
         except Exception as err:
             print(f"发生错误：{err}")
 

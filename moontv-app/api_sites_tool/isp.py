@@ -86,7 +86,7 @@ class IspDetector(object):
         response = self._fetch_api_data(name, url)
         try:
             if response and response['status'] == 0:
-                info = iresponse['result']['ad_info']
+                info = response['result']['ad_info']
                 return info['province'] + info['city'] + info['district']
             print(f"{name} 响应错误: {response.get('message', '')}")
         except Exception as e:

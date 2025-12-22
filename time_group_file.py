@@ -19,6 +19,19 @@ class FileInfo(object):
     group: Y, M, D -> new dir
     newname: YYYY-MM-DD-original_name
     '''
+    # IMG-YYYYMMDD-HHMMSS
+    img_pattern = re.compile(r'''
+        IMG
+        [_-]{,1}
+        (?P<Y>19\d{2}|20\d{2}) #Year, 19XX, 20XX
+        (?P<M>0[1-9]|1[012]) # Month
+        (?P<D>0[1-9]|[12]\d|3[01]) # Day
+        [_-]{,1}
+        (?P<h>[01]\d|2[0-4]) # hour
+        (?P<m>[0-5]\d|60) # minute
+        (?P<s>[0-5]\d|60) # second
+        .*
+        ''', re.VERBOSE)
     # YYYY-MM-DD or YYYYMMDD
     time_pattern = re.compile(r'''
         .*
@@ -48,8 +61,10 @@ class FileInfo(object):
             str(t.tm_year),
             '%02d' % t.tm_mon,
             '%02d' % t.tm_mday)
-        m = self.time_pattern.match(self.name)
-        self.fl_ntime = m.groups() if m else None
+        m = self.img_pattern.match(self.name)
+        if not m:
+            m = self.time_pattern.match(self.name)
+        self.fl_ntime = m.groups()[:3] if m else None
         if not self.fl_ntime:
             m = self.wx_pattern.match(self.name)
             if m:

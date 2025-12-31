@@ -1,0 +1,40 @@
+diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
+--- a/src/app/play/page.tsx
++++ b/src/app/play/page.tsx
+@@ -65,6 +65,8 @@ interface WakeLockSentinel {
+   removeEventListener(type: 'release', listener: () => void): void;
+ }
+ 
++import MPVPlayButton, { M3U8DiscontinuityAdsTool } from '@/components/MPVPlayButton';
++
+ function PlayPageClient() {
+   const router = useRouter();
+   const searchParams = useSearchParams();
+@@ -1549,7 +1551,11 @@ function PlayPageClient() {
+     }
+   };
+ 
++  const m3u8AdsTool = M3U8DiscontinuityAdsTool();
+   function filterAdsFromM3U8(type: string, m3u8Content: string): string {
++    if (m3u8AdsTool.statusRef.current == 'on') {
++      return m3u8AdsTool.filterAds(m3u8Content);
++    }
+     // 尝试使用缓存的自定义去广告代码
+     if (customAdFilterCodeRef.current && customAdFilterCodeRef.current.trim()) {
+       try {
+@@ -4523,6 +4529,15 @@ function PlayPageClient() {
+                 </span>
+               );
+             })()}
++            {/* 非移动设备，同一行使用 MPVPlayButton 组件 */}
++            <MPVPlayButton
++              videoUrl={videoUrl}
++              videoTitle={videoTitle}
++              videoDoubanId={videoDoubanId}
++              detail={detail}
++              currentEpisodeIndex={currentEpisodeIndex}
++              artPlayerRef={artPlayerRef}
++            />
+           </h1>
+         </div>
+         {/* 第二行：播放器和选集 */}

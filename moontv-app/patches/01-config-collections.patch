@@ -80,27 +80,6 @@ index 0000000..bb7f9f8
 +        return path;
 +    }
 +}
-diff --git a/src/lib/live.ts b/src/lib/live.ts
-index fa4a5e9..8477d0b 100644
---- a/src/lib/live.ts
-+++ b/src/lib/live.ts
-@@ -2,6 +2,7 @@
- 
- import { getConfig } from "@/lib/config";
- import { db } from "@/lib/db";
-+import { completeCollectionPath } from '@/lib/config.collections';
- 
- const defaultUA = 'AptvPlayer/1.4.10'
- 
-@@ -62,7 +63,7 @@ export async function refreshLiveChannels(liveInfo: {
-     delete cachedLiveChannels[liveInfo.key];
-   }
-   const ua = liveInfo.ua || defaultUA;
--  const response = await fetch(liveInfo.url, {
-+  const response = await fetch(completeCollectionPath(liveInfo.url, null), {
-     headers: {
-       'User-Agent': ua,
-     },
 diff --git a/src/middleware.ts b/src/middleware.ts
 index b672d79..2227851 100644
 --- a/src/middleware.ts

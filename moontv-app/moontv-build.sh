@@ -39,85 +39,23 @@ build_app() {
         # patch files in dir patches/
         local patchfiles="${AppPatches[$name]}"
         echo >"${WORKDIR}/build/${appdir}-patch.log"
-        (
-            for pf in ${patchfiles//:/' '};do
-                echo "[I] Applying patch file: ${WORKDIR}/patches/$pf"
-                patch -p1 -i "${WORKDIR}/patches/$pf" -d "$buildir" 2>&1 || exit 3
+        {
+            for pf in ${patchfiles//:/' '}; do
+                case "$pf" in
+                    *.patch)
+                        echo -e "\n[I] Applying patch file: ${WORKDIR}/patches/$pf"
+                        patch -p1 -i "${WORKDIR}/patches/$pf" -d "$buildir" 2>&1 || exit 3
+                        ;;
+                    *.patch.sh)
+                        echo -e "\n[I] Running patch script file: ${WORKDIR}/patches/$pf"
+                        bash "${WORKDIR}/patches/$pf" "$name" "$buildir" 2>&1 || exit 3
+                        ;;
+                    *)
+                        echo "NOT a '.patch' or '.patch.sh' file!"
+                        ;;
+                esac
             done
-
-            if [ -f "$buildir/src/lib/shortdrama.client.ts" ]; then
-                con1=$(grep "User-Agent" "$buildir/src/lib/shortdrama.client.ts")
-                con2=$(grep "mode: 'cors'" "$buildir/src/lib/shortdrama.client.ts")
-                if [ -n "$con1" -a -n "$con2" ]; then
-                    echo -e "\n[I] Fix shortdrama：CORS 的 'Access-Control-Allow-Headers'，不允许使用 'user-agent'"
-                    sed -i '/User-Agent/d' "$buildir/src/lib/shortdrama.client.ts"
-                fi
-            fi
-
-            # ADMIN_USERNAME
-            echo -e "\n[I] process.env.USERNAME -> process.env.ADMIN_USERNAME"
-            for ts in $(cd "$buildir" && grep 'process.env.USERNAME' -Rl); do
-                echo " -> replacing 'process.env.USERNAME' in $ts ..."
-                sed -i "s|process.env.USERNAME|process.env.ADMIN_USERNAME|g" "$buildir/$ts"
-            done
-            for ts in $(cd "$buildir" && grep ' USERNAME' -Rl); do
-                echo " -> replacing ' USERNAME' in $ts ..."
-                sed -i "s| USERNAME| ADMIN_USERNAME|g" "$buildir/$ts"
-            done
-
-            # comment some console.log
-            tsfile="src/app/api/admin/theme/route.ts"
-            if [ -f "$buildir/$tsfile" ]; then
-                if grep "console.log('完整配置对象" "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //comment log '完整配置对象' in $tsfile"
-                    sed -i "s|\(console.log('完整配置对象\)|//\1|" "$buildir/$tsfile"
-                fi
-            fi
-            tsfile="src/app/api/user/my-stats/route.ts"
-            if [ -f "$buildir/$tsfile" ]; then
-                if grep "console.log('更新用户统计数据" "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //comment log '更新用户统计数据' in $tsfile"
-                    sed -i "s|\(console.log('更新用户统计数据\)|//\1|" "$buildir/$tsfile"
-                fi
-                if grep "console.log.*my-stats - 开始处理请求" "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //comment log 'my-stats - 开始处理请求' in $tsfile"
-                    sed -i "s|\(console.log.*my-stats - 开始处理请求\)|//\1|" "$buildir/$tsfile"
-                fi
-            fi
-            tsfile="src/lib/downstream.ts"
-            if [ -f "$buildir/$tsfile" ]; then
-                if grep 'console.log(`\[DEBUG\]' "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //comment log [DEBUG] in $tsfile"
-                    sed -i 's|console.log(`\[DEBUG\]|//console.log(`\[DEBUG\]|' "$buildir/$tsfile"
-                fi
-            fi
-            tsfile="src/middleware.ts"
-            if [ -f "$buildir/$tsfile" ]; then
-                if grep 'console.log(`\[Middleware.*;$' "$buildir/$tsfile" >/dev/null; then
-                    echo -e "\n[I] //comment log [Middleware ...] in $tsfile"
-                    sed -i "s|\(console.log.*Middleware.*requestId.*;$\)|//\1|" "$buildir/$tsfile"
-                    # 多行
-                    awk '
-                        /^\s*console\.log.*\[Middleware.*Auth info from cookie/ {
-                            in_console=1
-                        }
-                        in_console {
-                            sub(/^  /, "  //")
-                            if (/: null\);\s*$/) {
-                                in_console=0
-                            }
-                        }
-                        {print}
-                        ' "$buildir/$tsfile" >"$buildir/$tsfile.temp" \
-                    && mv "$buildir/$tsfile.temp" "$buildir/$tsfile"
-                fi
-            fi
-
-            if [ -f "$buildir/.eslintrc.js" ]; then
-                echo -e "\n[I] Ignore no-console Warning ..."
-                sed -i "s|'no-console': 'warn'|'no-console': 'off'|" "$buildir/.eslintrc.js"
-            fi
-        )  2>&1 | tee -a "${WORKDIR}/build/${appdir}-patch.log"
+        }  2>&1 | tee -a "${WORKDIR}/build/${appdir}-patch.log"
     fi
     # build, test w/ Node.js v24.7.0, Corepack 0.34.0, pnpm 10.15.1
     if [ ! -f "$buildir/.next/standalone/.next/BUILD_ID" ]; then
@@ -126,10 +64,10 @@ build_app() {
         # 确保 Next.js 在编译时即选择 Node Runtime 而不是 Edge Runtime
         find ./src -type f -name "route.ts" -print0 \
             | xargs -0 sed -i "s/export const runtime = 'edge';/export const runtime = 'nodejs';/g"
-        (
+        {
             # 修复 pnpm lint --fix
             pnpm install --frozen-lockfile && pnpm run build
-        ) 2>&1 | tee "${WORKDIR}/build/${appdir}-build.log"
+        } 2>&1 | tee "${WORKDIR}/build/${appdir}-build.log"
         cd "${WORKDIR}/"
     else
         printf "\n[I] Found builded %s in $buildir\n\n" "$name"
@@ -137,7 +75,7 @@ build_app() {
 
     # install to $WORKDIR/dist/
     mkdir -pv "$distdir"
-    (
+    {
         # copy .next/standalone, .next/static, public, scripts, and start.js
         echo "'$buildir/.next/standalone/{*,.*}' -> '$distdir'"
         cp -r "$buildir/.next/standalone/"* "$distdir/"
@@ -160,7 +98,7 @@ build_app() {
         # link config-collections/{moontv,iptv}
         ln -sv ../../config-collections "$distdir/public/config-collections"
         printf "\n[I] %s installed to ${distdir}\n\n" "$name"
-    ) 2>&1 | tee "${distdir}-install.log"
+    } 2>&1 | tee "${distdir}-install.log"
     ls "$distdir/node_modules/.pnpm/" \
         | sort >"${distdir}-node_modules.txt"
     # awk NF 总字段数

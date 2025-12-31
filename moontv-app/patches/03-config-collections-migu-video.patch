@@ -190,7 +190,7 @@ index 0000000..4d93009
 +export const rateType = process.env.MIGU_RATETYPE || 3
 diff --git a/scripts/migu/ddCalcuURL.mjs b/scripts/migu/ddCalcuURL.mjs
 new file mode 100644
-index 0000000..314e375
+index 0000000..400e8e3
 --- /dev/null
 +++ b/scripts/migu/ddCalcuURL.mjs
 @@ -0,0 +1,193 @@
@@ -276,7 +276,7 @@ index 0000000..314e375
 +    ddCalcu.push(puData[i])
 +    switch (i) {
 +      case 1:
-+        ddCalcu.push(words[i - 1])
++        ddCalcu.push(userId.length > 8 ? words[i - 1] : "v")
 +        break;
 +      case 2:
 +        ddCalcu.push(keys[parseInt(getDateString(new Date())[0])])
@@ -389,7 +389,7 @@ index 0000000..314e375
 +}
 diff --git a/scripts/migu/generate.mjs b/scripts/migu/generate.mjs
 new file mode 100644
-index 0000000..c8073b0
+index 0000000..372d08e
 --- /dev/null
 +++ b/scripts/migu/generate.mjs
 @@ -0,0 +1,66 @@
@@ -415,7 +415,7 @@ index 0000000..c8073b0
 +export async function generateMiguLive(hours) {
 +  // 每12小时刷新token. 未考虑电脑睡眠, 未记录 Date.now()
 +  if (hours % 12 === 0) {
-+    refreshMiguToken();
++    await refreshMiguToken();
 +  }
 +  // 每2小时更新播放列表
 +  if (hours % 2 !== 0) {

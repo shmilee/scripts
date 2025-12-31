@@ -1,0 +1,43 @@
+diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
+index 43a6fef..07b558c 100644
+--- a/src/app/play/page.tsx
++++ b/src/app/play/page.tsx
+@@ -42,6 +42,8 @@ interface WakeLockSentinel {
+   removeEventListener(type: 'release', listener: () => void): void;
+ }
+ 
++import MPVPlayButton, { M3U8DiscontinuityAdsTool } from '@/components/MPVPlayButton';
++
+ function PlayPageClient() {
+   const router = useRouter();
+   const searchParams = useSearchParams();
+@@ -493,9 +495,13 @@ function PlayPageClient() {
+     }
+   };
+ 
++  const m3u8AdsTool = M3U8DiscontinuityAdsTool();
+   // 去广告相关函数
+   function filterAdsFromM3U8(m3u8Content: string): string {
+     if (!m3u8Content) return '';
++    if (m3u8AdsTool.statusRef.current == 'on') {
++      return m3u8AdsTool.filterAds(m3u8Content);
++    }
+ 
+     // 按行分割M3U8内容
+     const lines = m3u8Content.split('\n');
+@@ -1839,6 +1845,15 @@ function PlayPageClient() {
+                 {` > ${detail?.episodes_titles?.[currentEpisodeIndex] || `第 ${currentEpisodeIndex + 1} 集`}`}
+               </span>
+             )}
++            {/* 非移动设备，同一行使用 MPVPlayButton 组件 */}
++            <MPVPlayButton
++              videoUrl={videoUrl}
++              videoTitle={videoTitle}
++              videoDoubanId={videoDoubanId}
++              detail={detail}
++              currentEpisodeIndex={currentEpisodeIndex}
++              artPlayerRef={artPlayerRef}
++            />
+           </h1>
+         </div>
+         {/* 第二行：播放器和选集 */}

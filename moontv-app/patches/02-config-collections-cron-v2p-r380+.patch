@@ -1,0 +1,30 @@
+diff --git a/src/app/api/cron/[password]/route.ts b/src/app/api/cron/[password]/route.ts
+index 93db66a..d36122a 100644
+--- a/src/app/api/cron/[password]/route.ts
++++ b/src/app/api/cron/[password]/route.ts
+@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
+ import { fetchVideoDetail } from '@/lib/fetchVideoDetail';
+ import { refreshLiveChannels } from '@/lib/live';
+ import { SearchResult } from '@/lib/types';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -71,7 +72,7 @@ async function refreshConfig() {
+   let config = await getConfig();
+   if (config && config.ConfigSubscribtion && config.ConfigSubscribtion.URL && config.ConfigSubscribtion.AutoUpdate) {
+     try {
+-      const response = await fetch(config.ConfigSubscribtion.URL);
++      const response = await fetch(completeCollectionPath(config.ConfigSubscribtion.URL, null));
+ 
+       if (!response.ok) {
+         throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+@@ -137,7 +138,7 @@ async function refreshRecordAndFavorites() {
+             return detail;
+           })
+           .catch((err) => {
+-            console.error(`获取视频详情失败 (${source}+${id}):`, err);
++            console.error(`获取视频详情失败 ${fallbackTitle} (${source}+${id}):`, err);
+             return null;
+           });
+       }

@@ -1,0 +1,47 @@
+diff --git a/src/app/play/page.tsx b/src/app/play/page.tsx
+index 07b558c..5d1e1d7 100644
+--- a/src/app/play/page.tsx
++++ b/src/app/play/page.tsx
+@@ -69,6 +69,8 @@ declare global {
+   }
+ }
+ 
++import SourceRankManager from '@/components/SourceRankManager';
++
+ // Wake Lock API 类型声明
+ interface WakeLockSentinel {
+   released: boolean;
+@@ -1034,6 +1036,9 @@ function PlayPageClient() {
+   );
+   const [backgroundSourcesLoading, setBackgroundSourcesLoading] = useState(false);
+ 
++  // 新增优选和测速工具
++  const sourceRanker = SourceRankManager();
++
+   // 优选和测速开关
+   const [optimizationEnabled] = useState<boolean>(() => {
+     if (typeof window !== 'undefined') {
+@@ -2407,7 +2412,8 @@ function PlayPageClient() {
+         const excludedSources = sourcesInfo.filter(s => s.source === 'openlist' || s.source === 'emby');
+ 
+         if (sourcesToTest.length > 0) {
+-          detailData = await preferBestSource(sourcesToTest);
++          detailData = await sourceRanker.preferBestSource(sourcesInfo);
++          setPrecomputedVideoInfo(sourceRanker.precomputedVideoInfo);
+         } else if (excludedSources.length > 0) {
+           // 如果只有 openlist/emby 源，直接使用第一个
+           detailData = excludedSources[0];
+@@ -5776,10 +5782,12 @@ function PlayPageClient() {
+             </div>
+ 
+             {/* 加载消息 */}
+-            <div className='space-y-2'>
++            <div className='space-y-3'>
+               <p className='text-xl font-semibold text-gray-800 dark:text-gray-200 animate-pulse'>
+                 {loadingMessage}
+               </p>
++              {/* 测速进度显示 */}
++              {sourceRanker.speedTestProgressDisplay}
+             </div>
+           </div>
+         </div>

@@ -44,7 +44,7 @@ build_app() {
                 case "$pf" in
                     *.patch)
                         echo -e "\n[I] Applying patch file: ${WORKDIR}/patches/$pf"
-                        patch -p1 -i "${WORKDIR}/patches/$pf" -d "$buildir" 2>&1 || exit 3
+                        patch -p1 -l -i "${WORKDIR}/patches/$pf" -d "$buildir" 2>&1 || exit 3
                         ;;
                     *.patch.sh)
                         echo -e "\n[I] Running patch script file: ${WORKDIR}/patches/$pf"

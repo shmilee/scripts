@@ -27,9 +27,9 @@ class VodAPI(object):
         self.api_json = {}
         if data:
             try:
-                data = json.loads(data)
-                if data.get('list', None) and len(data['list']) > 0:
-                    self.api_json = data
+                jdata = json.loads(data)
+                if jdata.get('list', None) and len(jdata['list']) > 0:
+                    self.api_json = jdata
                 else:
                     print(f'({desc}) Invalid response: {data[:320]} ...')
             except Exception:
@@ -84,9 +84,9 @@ class VodAPI(object):
         data, _ = self.fetch_and_decompress(url)
         if data:
             try:
-                data = json.loads(data)
-                if data.get('list', None) and len(data['list']) > 0:
-                    video_detail = data['list'][0]
+                jdata = json.loads(data)
+                if jdata.get('list', None) and len(jdata['list']) > 0:
+                    video_detail = jdata['list'][0]
                     return self.__parse_video_detail(vod_id, video_detail)
             except Exception:
                 pass

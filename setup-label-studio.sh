@@ -3,6 +3,15 @@
 
 studio_path=~/label-studio
 
+PYTHON_VERSION=3.12.12
+export PYENV_ROOT="$HOME/.pyenv"
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init - zsh)"
+if ! pyenv versions | grep $PYTHON_VERSION 2>&1 >/dev/null; then
+    pyenv install $PYTHON_VERSION || exit 12
+fi
+pyenv shell $PYTHON_VERSION
+
 # install for ~user
 python3 -m venv "$studio_path" --prompt LABEL
 sed -e "/PS1=.*(LABEL)/ s/PS1/#PS1/" \

@@ -3,11 +3,14 @@
 
 pdf2zh_path=~/PDFMathTranslate
 
-# pdf2zh 1.9.0 w/ python 3.12.8
+PYTHON_VERSION=3.12.12
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init - zsh)"
-pyenv shell 3.12.8
+if ! pyenv versions | grep $PYTHON_VERSION 2>&1 >/dev/null; then
+    pyenv install $PYTHON_VERSION || exit 12
+fi
+pyenv shell $PYTHON_VERSION
 
 # install for ~user
 python3 -m venv "$pdf2zh_path" --prompt pdf2zh

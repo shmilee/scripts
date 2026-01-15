@@ -38,8 +38,9 @@ if [ -f "$buildir/$tsfile" ]; then
 fi
 tsfile="src/app/api/favorites/route.ts"
 if [ -f "$buildir/$tsfile" ]; then
-    if grep "性能良好.*的收藏查询耗时" "$buildir/$tsfile" >/dev/null; then
-        echo "[I] //comment log 性能良好.*的收藏查询耗时 ... in $tsfile"
+    if grep "性能良好.*的收藏查询耗时" "$buildir/$tsfile" >/dev/null || \
+       grep '\[收藏性能\].*用户.*收藏数.*耗时' "$buildir/$tsfile" >/dev/null; then
+        echo "[I] //comment log 收藏,性能良好.*收藏, 耗时 ... in $tsfile"
         mv -v "$buildir/$tsfile" "$buildir/$tsfile".orig
         # 三行缓冲区
         awk '
@@ -51,7 +52,8 @@ if [ -f "$buildir/$tsfile" ]; then
             }
             in_block && /^\s*\);/ {
               buffer=buffer "\n" $0
-              if (buffer ~ /性能良好.*收藏查询耗时/) {
+              if (buffer ~ /性能良好.*收藏查询耗时/ ||
+                  buffer ~ /\[收藏性能\].*用户.*收藏数.*耗时/) {
                 gsub(/\n   /, "\n //", buffer)
                 print " //" buffer
               } else {

@@ -1,5 +1,5 @@
 diff --git a/src/lib/live.ts b/src/lib/live.ts
-index fa4a5e9..8477d0b 100644
+index fa4a5e9..ff675e9 100644
 --- a/src/lib/live.ts
 +++ b/src/lib/live.ts
 @@ -2,6 +2,7 @@
@@ -19,3 +19,12 @@ index fa4a5e9..8477d0b 100644
      headers: {
        'User-Agent': ua,
      },
+@@ -95,7 +96,7 @@ async function parseEpg(epgUrl: string, ua: string, tvgIds: string[]): Promise<{
+   const result: { [key: string]: { start: string; end: string; title: string }[] } = {};
+ 
+   try {
+-    const response = await fetch(epgUrl, {
++    const response = await fetch(completeCollectionPath(epgUrl, null), {
+       headers: {
+         'User-Agent': ua,
+       },

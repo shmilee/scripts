@@ -1,0 +1,35 @@
+diff --color -Nur next16-org/next.config.js next16-fix/next.config.js
+--- next16-org/next.config.js	2025-12-29 14:25:36.000000000 +0800
++++ next16-fix/next.config.js	2025-12-29 22:56:03.265544692 +0800
+@@ -3,8 +3,7 @@
+ 
+ const nextConfig = {
+   // 生产环境始终使用 standalone 模式（Vercel/Docker/Zeabur）
+-  // 本地开发时（NODE_ENV !== 'production'）不使用 standalone
+-  ...(process.env.NODE_ENV === 'production' ? { output: 'standalone' } : {}),
++  ...(process.env.LOCAL_DEV ? {} : { output: 'standalone' }),
+ 
+   reactStrictMode: false,
+ 
+@@ -17,6 +16,16 @@
+         as: '*.js',
+       },
+     },
++    // fix: Error: Turbopack Module not found: Can't resolve 'xx'
++    // ref: https://github.com/vercel/next.js/discussions/84809
++    resolveAlias: {
++      'net': {
++        browser: './src/lib/empty.ts'
++      },
++      'tls': {
++        browser: './src/lib/empty.ts'
++      }
++    }
+   },
+ 
+   // Uncoment to add domain whitelist
+diff --color -Nur next16-org/src/lib/empty.ts next16-fix/src/lib/empty.ts
+--- next16-org/src/lib/empty.ts	1970-01-01 08:00:00.000000000 +0800
++++ next16-fix/src/lib/empty.ts	2025-12-29 23:00:36.509539799 +0800
+@@ -0,0 +1 @@
++//

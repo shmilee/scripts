@@ -1,0 +1,39 @@
+diff --git a/src/lib/live.ts b/src/lib/live.ts
+index fa4a5e9..8477d0b 100644
+--- a/src/lib/live.ts
++++ b/src/lib/live.ts
+@@ -3,6 +3,7 @@
+ 
+ import { getConfig } from "@/lib/config";
+ import { db } from "@/lib/db";
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ const defaultUA = 'AptvPlayer/1.4.10';
+ const TVBOX_UA = 'okhttp/4.1.0';
+@@ -99,7 +100,7 @@ export async function refreshLiveChannel
+   try {
+     // 第一次 Fetch
+     console.log(`[Live] Fetching URL: ${liveInfo.url} with UA: ${isTvBox ? TVBOX_UA : ua}`);
+-    const response = await fetch(liveInfo.url, {
++    const response = await fetch(completeCollectionPath(liveInfo.url, null), {
+       headers: {
+         'User-Agent': isTvBox ? TVBOX_UA : ua,
+       },
+@@ -263,7 +264,7 @@ async function processTvBoxContent(conte
+       const liveUa = firstLive.ua || TVBOX_UA;
+ 
+       try {
+-        const response = await fetch(firstLive.url, {
++        const response = await fetch(completeCollectionPath(firstLive.url, null), {
+           headers: {
+             'User-Agent': liveUa
+           }
+@@ -449,7 +450,7 @@ async function parseEpg(
+   const epgChannelIdToLogo = new Map<string, string>();
+ 
+   try {
+-    const response = await fetch(epgUrl, {
++    const response = await fetch(completeCollectionPath(epgUrl, null), {
+       headers: { 'User-Agent': ua },
+     });
+     if (!response.ok) return { epgs: {}, logos: {} };

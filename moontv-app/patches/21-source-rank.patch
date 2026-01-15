@@ -1,9 +1,9 @@
 diff --git a/src/components/SourceRankManager.tsx b/src/components/SourceRankManager.tsx
 new file mode 100644
-index 0000000..fe439d7
+index 0000000..b15f58e
 --- /dev/null
 +++ b/src/components/SourceRankManager.tsx
-@@ -0,0 +1,700 @@
+@@ -0,0 +1,728 @@
 +/* eslint-disable no-console */
 +/* Copyright (c) 2025 shmilee */
 +
@@ -28,6 +28,7 @@ index 0000000..fe439d7
 +  quality: string;   // 分辨率，如720p、1080p等
 +  loadSpeed: string; // 速率，自动转换为KB/s或MB/s
 +  pingTime: number;  // 网络延迟（毫秒）
++  bitrate: string;   // 码率（待用）
 +}
 +
 +interface SourceTestInfo {
@@ -167,7 +168,7 @@ index 0000000..fe439d7
 +        signal: AbortSignal.timeout(getSpeedTestConfig(testType).timeout)
 +      });
 +      const pingTime = Math.round(performance.now() - startTime);
-+      return { quality: '未知', loadSpeed: '未知', pingTime };
++      return { quality: '未知', loadSpeed: '未知', pingTime, bitrate: '未知' };
 +    } catch (error) {
 +      throw new Error(
 +        `Ping: ${error instanceof Error ? error.message : String(error)}`
@@ -241,6 +242,21 @@ index 0000000..fe439d7
 +    }
 +    return null;
 +  };
++  // 从分片估算码率
++  // eslint-disable-next-line @typescript-eslint/no-explicit-any
++  const calculateFragmentBitrate = (data: any): string | null => {
++    if (!data || !data.payload || !data.frag) return null;
++    const duration = data.frag.duration; // 分片时长（秒）
++    const size = data.payload.byteLength || 0;
++    if (duration > 0 && size > 0) {
++      // 码率 = (分片大小 × 8 bits) / 分片时长
++      const bitrate = size * 8 / duration;
++      return bitrate >= 1000000
++        ? `${(bitrate / 1000000).toFixed(1)} Mbps`
++        : `${(bitrate / 1000).toFixed(1)} Kbps`;
++    }
++    return null;
++  };
 +  // 清理资源
 +  const cleanupResources = (hls: Hls, video: HTMLVideoElement, timeoutId?: NodeJS.Timeout): void => {
 +    if (timeoutId) clearTimeout(timeoutId);
@@ -295,6 +311,7 @@ index 0000000..fe439d7
 +    }, getSpeedTestConfig(testType).timeout);
 +
 +    let actualLoadSpeed = '未知';
++    let estimatedBitrate = '未知'; // 估算的码率
 +    let hasSpeedCalculated = false;
 +    let hasMetadataLoaded = false;
 +    let fragmentStartTime = 0;
@@ -311,6 +328,7 @@ index 0000000..fe439d7
 +          quality,
 +          loadSpeed: actualLoadSpeed,
 +          pingTime: Math.round(pingTime),
++          bitrate: estimatedBitrate,
 +        });
 +      }
 +    };
@@ -326,6 +344,10 @@ index 0000000..fe439d7
 +    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 +    hls.on(Hls.Events.FRAG_LOADED, (event: any, data: any) => {
 +      if (!hasSpeedCalculated) {
++        const bitrate = calculateFragmentBitrate(data);
++        if (bitrate) {
++            estimatedBitrate = bitrate;
++        }
 +        const speed = calculateFragmentSpeed(fragmentStartTime, data);
 +        if (speed) {
 +          actualLoadSpeed = speed;
@@ -580,7 +602,10 @@ index 0000000..fe439d7
 +        batch.map(async (sourceInfo) => {
 +          const result: SourceTestInfo = {
 +            sourceInfo, available: false,
-+            testInfo: { quality: '未知', loadSpeed: '未知', pingTime: -9999 },
++            testInfo: {
++              quality: '未知', loadSpeed: '未知', pingTime: -9999,
++              bitrate: '未知'
++            },
 +          };
 +
 +          let testext = '';
@@ -597,6 +622,9 @@ index 0000000..fe439d7
 +              result.available = true;
 +              if (testType !== 'Ping') { // 完整
 +                testext = `${info.quality} | ${info.loadSpeed} | ${info.pingTime}ms`;
++                if (info.bitrate && info.bitrate !== '未知') {
++                    testext = `${testext} | ${info.bitrate}`;
++                }
 +              } else {
 +                testext = `${result.testInfo.pingTime}ms`;
 +              }

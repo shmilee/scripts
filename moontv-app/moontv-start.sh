@@ -49,7 +49,7 @@ EOF
     for name in ${AppNames[@]}; do
         local appsquashfs="${WORKDIR}/$(get_appdir $name).squashfs"
         local modsquashfs="${WORKDIR}/$(get_nodemodsquashfs $name)"
-        printf "  - %-4s: %-23s of %-12s (%s + %s)\n" \
+        printf "  - %-4s: %-23s of %-12s (%04s + %04s)\n" \
             "$name" "$(get_appver $name)" "$(get_showrepo $name)" \
             "$(du -h $appsquashfs 2>/dev/null | awk '/squashfs/{print $1}')" \
             "$(du -h $modsquashfs 2>/dev/null | awk '/squashfs/{print $1}')"

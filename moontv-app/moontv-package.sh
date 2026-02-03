@@ -20,7 +20,7 @@ package_app() {
         cp -v "$WORKDIR/dist/$modsqfs0" "$WORKDIR/pkg/"
     else
         echo "[$name] 1) node_modules link to: $modsqfs1"
-        ln -sv "$modsqfs1" "$WORKDIR/pkg/$modsqfs0"
+        ln -sfv "$modsqfs1" "$WORKDIR/pkg/$modsqfs0"
     fi
     echo "[$name] 2) app: $appsqfs"
     cp -v "$WORKDIR/dist/$appsqfs" "$WORKDIR/pkg/"

@@ -1,17 +1,18 @@
 diff --color -Nur next16-org/next.config.js next16-fix/next.config.js
 --- next16-org/next.config.js	2025-12-29 14:25:36.000000000 +0800
 +++ next16-fix/next.config.js	2025-12-29 22:56:03.265544692 +0800
-@@ -3,8 +3,7 @@
- 
+@@ -4,9 +4,7 @@
  const nextConfig = {
    // 根据环境自动选择输出模式：Vercel自动处理，Docker使用standalone
--  // 本地开发时不使用 standalone 避免 Windows 符号链接权限问题
--  ...(process.env.VERCEL || process.env.DOCKER_BUILD ? { output: 'standalone' } : {}),
-+  ...(process.env.VERCEL ? {} : { output: 'standalone' }),
+   // 本地开发时不使用 standalone 避免 Windows 符号链接权限问题
+-  ...(process.env.VERCEL || process.env.DOCKER_BUILD
+-    ? { output: 'standalone' }
+-    : {}),
++  ...(process.env.LOCAL_DEV ? {} : { output: 'standalone' }),
  
    reactStrictMode: false,
  
-@@ -17,6 +16,16 @@
+@@ -19,6 +17,16 @@
          as: '*.js',
        },
      },

@@ -1,0 +1,52 @@
+diff --git a/start.js b/start.js
+index 5561a53..4cec5ed 100644
+--- a/start.js
++++ b/start.js
+@@ -41,12 +41,12 @@ const intervalId = setInterval(() => {
+ 
+       setTimeout(() => {
+         // 服务器启动后，立即执行一次 cron 任务
+-        executeCronJob();
++        executeAllCronJob();
+       }, 3000);
+ 
+       // 然后设置每小时执行一次 cron 任务
+       setInterval(() => {
+-        executeCronJob();
++        executeAllCronJob();
+       }, 60 * 60 * 1000); // 每小时执行一次
+     }
+   });
+@@ -88,3 +88,32 @@ function executeCronJob() {
+     req.destroy();
+   });
+ }
++
++// 执行新的 cron 任务的函数
++let runInitial = true;
++let runHours = 0; // 运行时长
++const miguGen = path.join(__dirname, 'scripts', 'migu', 'generate.mjs');
++function executeAllCronJob() {
++  if (runInitial) {
++    runInitial = false;
++  } else {
++    runHours += 1;
++    console.log(`\n当前已运行 ${runHours} 小时\n`);
++  }
++  if (['TV', 'PE', 'TV+PE'].includes(process.env.MIGU_UPDATE)) {
++    import(miguGen)
++      .then(genMod => {
++        // 必须有 return, 更新结束后 then 原有 cron 任务
++        return genMod.generateMiguLive(runHours); // 更新生成 migu 文件
++      })
++      .then(() => {
++        executeCronJob(); // 继续执行原有 cron 任务
++      })
++      .catch(error => {
++        console.error('❌ Error calling scripts/migu/generate.mjs:', error);
++        executeCronJob(); // 继续执行原有 cron 任务
++      });
++  } else {
++    executeCronJob(); // 执行原有 cron 任务
++  }
++}

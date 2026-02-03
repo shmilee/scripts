@@ -1,0 +1,93 @@
+diff --git a/src/app/api/admin/config_subscription/fetch/route.ts b/src/app/api/admin/config_subscription/fetch/route.ts
+index 1480691..738fc25 100644
+--- a/src/app/api/admin/config_subscription/fetch/route.ts
++++ b/src/app/api/admin/config_subscription/fetch/route.ts
+@@ -3,6 +3,7 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ 
+ import { verifyApiAuth } from '@/lib/auth';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
+     }
+ 
+     // 直接 fetch URL 获取配置内容
+-    const response = await fetch(url);
++    const response = await fetch(completeCollectionPath(url, request));
+ 
+     if (!response.ok) {
+       return NextResponse.json(
+diff --git a/src/app/api/live/sources/route.ts b/src/app/api/live/sources/route.ts
+index 1bd17b8..ed92948 100644
+--- a/src/app/api/live/sources/route.ts
++++ b/src/app/api/live/sources/route.ts
+@@ -3,6 +3,7 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ 
+ import { getConfig } from '@/lib/config';
++import { completeCollectionPath } from '@/lib/config.collections';
+ 
+ export const runtime = 'nodejs';
+ 
+@@ -18,7 +19,12 @@ export async function GET(request: NextRequest) {
+     // 过滤出所有非 disabled 的直播源
+     const liveSources = (config.LiveConfig || []).filter(
+       (source) => !source.disabled,
+-    );
++    ).map(source => ({
++      ...source,
++      url: completeCollectionPath(source.url, request)
++    }));
++    //console.log('=> config.LiveConfig:', config.LiveConfig);
++    //console.log('=> liveSources:', liveSources);
+ 
+     return NextResponse.json({
+       success: true,
+diff --git a/src/lib/config.collections.ts b/src/lib/config.collections.ts
+new file mode 100644
+index 0000000..bb7f9f8
+--- /dev/null
++++ b/src/lib/config.collections.ts
+@@ -0,0 +1,28 @@
++/* eslint-disable no-console */
++
++import { NextRequest } from 'next/server';
++
++export function completeCollectionPath(path: string, request: NextRequest | null): string {
++    const pathPattern = /^\/config-collections\//;
++    // const fullUrlPattern = /^(http:\/\/|https:\/\/)[^\s/$.?#].[^\s]*$/i;
++    if (pathPattern.test(path)) {  // 用 server address 补全
++        let protocol = 'http';
++        let baseUrl = `http://${process.env.HOSTNAME || 'localhost'}:${process.env.PORT || 3000}`;
++        if (request) {
++            //console.log('=> request:', request);
++            if (request.url && request.url.startsWith('https://')) {
++                protocol = 'https';
++            }
++            const host = request.headers?.get('host');
++            if (host) {
++                baseUrl = `${protocol}://${host}`;
++            }
++        }
++        const fullUrl = new URL(path, baseUrl).toString();
++        console.log(`Get config-collection URL:`, fullUrl);
++        return fullUrl;
++    } else {  // do nothing
++        console.log(`Get URL:`, path);        
++        return path;
++    }
++}
+diff --git a/src/middleware.ts b/src/middleware.ts
+index b672d79..2227851 100644
+--- a/src/middleware.ts
++++ b/src/middleware.ts
+@@ -122,6 +122,7 @@ function shouldSkipAuth(pathname: string): boolean {
+     '/favicon.ico',
+     '/robots.txt',
+     '/manifest.json',
++    '/config-collections/',
+     '/icons/',
+     '/logo.png',
+     '/screenshot.png',

@@ -10,16 +10,16 @@ index fa4a5e9..8477d0b 100644
  
  const defaultUA = 'AptvPlayer/1.4.10';
  const TVBOX_UA = 'okhttp/4.1.0';
-@@ -99,7 +100,7 @@ export async function refreshLiveChannel
+@@ -135,7 +136,7 @@ export async function refreshLiveChannel
    try {
-     // 第一次 Fetch
+     // 第一次 Fetch - 使用超时控制
      console.log(`[Live] Fetching URL: ${liveInfo.url} with UA: ${isTvBox ? TVBOX_UA : ua}`);
--    const response = await fetch(liveInfo.url, {
-+    const response = await fetch(completeCollectionPath(liveInfo.url, null), {
+-    const response = await fetchWithTimeout(liveInfo.url, {
++    const response = await fetchWithTimeout(completeCollectionPath(liveInfo.url, null), {
        headers: {
          'User-Agent': isTvBox ? TVBOX_UA : ua,
        },
-@@ -263,7 +264,7 @@ async function processTvBoxContent(conte
+@@ -299,7 +300,7 @@ async function processTvBoxContent(conte
        const liveUa = firstLive.ua || TVBOX_UA;
  
        try {
@@ -28,12 +28,12 @@ index fa4a5e9..8477d0b 100644
            headers: {
              'User-Agent': liveUa
            }
-@@ -449,7 +450,7 @@ async function parseEpg(
-   const epgChannelIdToLogo = new Map<string, string>();
- 
+@@ -494,7 +495,7 @@ async function parseEpg(
    try {
--    const response = await fetch(epgUrl, {
-+    const response = await fetch(completeCollectionPath(epgUrl, null), {
+     // 🚀 优化：使用超时控制
+     console.log(`[Live] Fetching EPG from ${epgUrl} with ${FETCH_TIMEOUT}ms timeout...`);
+-    const response = await fetchWithTimeout(epgUrl, {
++    const response = await fetchWithTimeout(completeCollectionPath(epgUrl, null), {
        headers: { 'User-Agent': ua },
-     });
-     if (!response.ok) return { epgs: {}, logos: {} };
+     }, FETCH_TIMEOUT);
+ 

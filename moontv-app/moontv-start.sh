@@ -1,23 +1,27 @@
 #!/bin/bash
-# Copyright (C) 2025 shmilee
+# Copyright (C) 2025-2026 shmilee
 #
-# depends: nodejs squashfuse fusermount3 valkey(redis) curl
+# depends:
+#   nodejs valkey(redis) curl
+# squashfs-depends:
+#   .BY. squashfuse fusermount3
+#   .OR. squashfs-tools
+#       - `unsquashfs -d <path>`, https://github.com/plougher/squashfs-tools
+#   .OR. squashfs-tools-ng
+#      - https://github.com/termux/termux-packages/issues/6537
+#      - `rdsquashfs -p <path>`, https://github.com/AgentD/squashfs-tools-ng
 
 set -e
 
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
+set -o allexport  # 或 set -a
 if [ -f "$WORKDIR/env.conf" ]; then
-    set -o allexport  # 或 set -a
     source "$WORKDIR/env.conf"
-    set +o allexport  # 或 set +a
+else
+    source "$WORKDIR/env-example.conf"
 fi
-
-export NODE_ENV=production
-export ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-export PASSWORD=${PASSWORD:-admin_password}
-export PORT=${PORT:-3000}
-export NEXT_PUBLIC_STORAGE_TYPE=${NEXT_PUBLIC_STORAGE_TYPE:-upstash}
+set +o allexport  # 或 set +a
 
 in_array() {
     local s
@@ -31,18 +35,9 @@ usage() {
     cat <<EOF
 usage: [env_vars] $(basename "$0") [versions | /app/path[/xx.js]]
 
-env-variables:
-  - ADMIN_USERNAME=admin
-  - PASSWORD=admin_password
-  - PORT=3000
-  - NEXT_PUBLIC_STORAGE_TYPE=upstash; kvrocks; redis;
-        or valkey: local redis replacement server
-  - UPSTASH_URL=Your HTTPS ENDPOINT
-  - UPSTASH_TOKEN=Your TOKEN
-  - and NEXT_PUBLIC_SITE_NAME, KVROCKS_URL, REDIS_URL,
-        VALKEY_SRVCMD=valkey-server, VALKEY_CLICMD=valkey-cli,
-        VALKEY_PORT=16379 etc.
-  - UPDATE_COLLECTIONS=0
+env-variable-file:
+  - app  default: env-example.conf
+  - user default: env.conf
 
 versions:
 EOF
@@ -200,7 +195,7 @@ if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]; then
     fi
 fi
 
-if [ "${UPDATE_COLLECTIONS:-0}" == "1" ]; then
+if [ "${UPDATE_COLLECTIONS:-false}" == "true" ]; then
     for conf in ${!ConfigCollections[@]}; do
         echo "=> Updating $conf from ${ConfigCollections[$conf]} ..."
         $CURLCMD -o "$WORKDIR/config-collections/$conf" \

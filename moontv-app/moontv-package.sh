@@ -31,8 +31,11 @@ package_app() {
 for name in ${AppNames[@]}; do
     echo && package_app "$name"
 done
-cp -v "${WORKDIR}/github-repos.conf" "${WORKDIR}/pkg/"
-cp -v "${WORKDIR}/moontv-start.sh" "${WORKDIR}/pkg/"
+cp -v "${WORKDIR}"/{github-repos.conf,env-example.conf,moontv-start.sh} \
+    "${WORKDIR}/pkg/"
+if [ -f "$WORKDIR/env.conf" ]; then
+    cp -v "${WORKDIR}/env.conf" "${WORKDIR}/pkg/"
+fi
 cp -rv "$WORKDIR/dist/config-collections" "${WORKDIR}/pkg/"
 cp -rv "$WORKDIR/dist/next-cache" "${WORKDIR}/pkg/"
 echo && ls -lh "$WORKDIR/pkg/"

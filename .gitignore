@@ -16,4 +16,5 @@ moontv-app/download/
 moontv-app/build/
 moontv-app/dist/
 moontv-app/pkg/
+moontv-app/env.conf
 moontv-app/api-configs/

@@ -3,15 +3,18 @@
 #
 # depends:
 #   nodejs valkey(redis) curl
-# squashfs-depends:
-#   .BY. squashfuse fusermount3
+# depends for squashfs:
+#   .BY. squashfuse fusermount
 #   .OR. squashfs-tools
 #       - `unsquashfs -d <path>`, https://github.com/plougher/squashfs-tools
-#   .OR. squashfs-tools-ng
-#      - https://github.com/termux/termux-packages/issues/6537
+#   .OR. squashfs-tools-ng in Termux & internal storage
 #      - `rdsquashfs -p <path>`, https://github.com/AgentD/squashfs-tools-ng
+#      - https://github.com/termux/termux-packages/issues/6537
+#      - about special files such as symlinks:
+#          + https://www.reddit.com/r/termux/comments/152dstc
+#          + https://wiki.termux.com/wiki/Internal_and_external_storage
 
-set -e
+#set -e
 
 WORKDIR="$(dirname $(readlink -f "$0"))"
 source "$WORKDIR/github-repos.conf"
@@ -51,21 +54,62 @@ EOF
     done
 }
 
-try_umount_dir() {
-    if mountpoint -q "$1"; then
-        echo "[!] umount $1 ..." && fusermount3 -u "$1"
+# how to mount / extract squashfs file
+FUSERMOUNT_CMD=$(command -v fusermount3 || command -v fusermount)
+if [ -n "$FUSERMOUNT_CMD" ] && command -v squashfuse &>/dev/null; then
+    SQUASHFS_MODE='MOUNT'
+else
+    SQUASHFS_MODE='EXTRACT'
+    if command -v unsquashfs &>/dev/null; then
+        EXTRACT_SQUASHFS='unsquashfs -d'  # $1=dir $2=squashfs-file
+    elif command -v rdsquashfs &>/dev/null; then
+        EXTRACT_SQUASHFS='rdsquashfs -u / -p' # $1=dir $2=squashfs-file
+    else
+        echo "[E] No SquashFS processing tool found!"
+        echo "[E] Requires one of the following combinations:"
+        echo "[E]   1. squashfuse + fusermount/fusermount3"
+        echo "[E]   2. unsquashfs"
+        echo "[E]   3. rdsquashfs"
+        exit 2
     fi
-    if [ -d "$1" ]; then
-        rmdir "$1"
+fi
+
+try_umount_dir() {
+    # $1=dir
+    if [[ "$SQUASHFS_MODE" == "MOUNT" ]]; then
+        if mountpoint -q "$1"; then
+            echo "[!] umount $1 ..." && $FUSERMOUNT_CMD -u "$1"
+        fi
+        if [ -d "$1" ]; then
+            rmdir "$1"
+        fi
+    elif [[ "$SQUASHFS_MODE" == "EXTRACT" ]]; then
+        if [ -d "$1"  -a ! -L "$1/MOON-EXTRACTED-SQUASHFS" ]; then
+            rm -rv "$1/"
+        fi
     fi
 }
 
 try_mount_squashfs() {
-    try_umount_dir "$2" && mkdir -pv "$2" && squashfuse "$1" "$2"
+    # $1=squashfs-file, $2=dir
+    if [[ "$SQUASHFS_MODE" == "MOUNT" ]]; then
+        try_umount_dir "$2" && mkdir -pv "$2" && squashfuse "$1" "$2"
+    elif [[ "$SQUASHFS_MODE" == "EXTRACT" ]]; then
+        if [ -L "$2/MOON-EXTRACTED-SQUASHFS" ]; then
+            : # do nothing
+        else
+            try_umount_dir "$2" && $EXTRACT_SQUASHFS "$2" "$1" && {
+                # test special file: symlink
+                echo "$(basename "$1")" >"$2/.MOON-EXTRACTED-SQUASHFS"
+                ln -sv .MOON-EXTRACTED-SQUASHFS "$2/MOON-EXTRACTED-SQUASHFS" \
+                    || exit 2
+            }
+        fi
+    fi
 }
 
 # when NEXT_PUBLIC_STORAGE_TYPE=valkey -> redis
-VALKEYDIR="${WORKDIR}"
+VALKEYDIR="${WORKDIR}" # default
 VALKEY_SRVCMD="${VALKEY_SRVCMD:-valkey-server}" # or redis-server
 _VALKEY="${VALKEY_SRVCMD/%-server/}" # valkey or redis
 VALKEY_CLICMD="${VALKEY_CLICMD:-${_VALKEY}-cli}" # valkey-cli or redis-cli
@@ -111,10 +155,11 @@ dbfilename $vkdbfile
     #echo "  - connect: PING <-> $(${VALKEY_CLICMD} -u $REDIS_URL ping)"
 }
 
-
+# start
 if in_array "$1" ${AppNames[@]}; then
     Name="$1"
     Appdir="$(get_appdir $Name)"
+    echo "[I] Using SquashFS mode: $SQUASHFS_MODE"
     # main squashfs
     Appsquashfs="${WORKDIR}/${Appdir}.squashfs"
     if [ ! -f "$Appsquashfs" ]; then
@@ -160,7 +205,7 @@ elif [ -f "$1" -o -d "$1" ]; then
     Name="$(basename "$AppPath")"
     StartJS="$AppPath/start.js"
     umount_squashf() { :; }
-    if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]; then
+    if [[ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]]; then
         VALKEYDIR="$AppPath"
     fi
 else
@@ -172,7 +217,7 @@ else
 fi
 
 trap "echo; umount_squashf" EXIT # exit 0-255
-if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]; then
+if [[ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]]; then
     start_valkey_server $Name
     stop_valkey_server() {
         valkey_pid="$(cat ${VALKEYDIR}/${_VALKEY}-$Name.pid)"
@@ -185,7 +230,7 @@ if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "valkey" ]; then
     trap "echo; stop_valkey_server; umount_squashf" EXIT # exit 0-255
 fi
 
-if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]; then
+if [[ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]]; then
     pong="$(${VALKEY_CLICMD} -u "$REDIS_URL" ping)"
     if [ -n "$pong" ]; then
         echo "$REDIS_URL connection: PING <-> $pong"
@@ -195,7 +240,7 @@ if [ "$NEXT_PUBLIC_STORAGE_TYPE" == "redis" ]; then
     fi
 fi
 
-if [ "${UPDATE_COLLECTIONS:-false}" == "true" ]; then
+if [[ "${UPDATE_COLLECTIONS:-false}" == "true" ]]; then
     for conf in ${!ConfigCollections[@]}; do
         echo "=> Updating $conf from ${ConfigCollections[$conf]} ..."
         $CURLCMD -o "$WORKDIR/config-collections/$conf" \

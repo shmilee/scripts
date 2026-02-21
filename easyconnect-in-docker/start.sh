@@ -1,71 +1,103 @@
 #!/bin/bash
-# Copyright (C) 2021 shmilee
+# Copyright (C) 2021-2026 shmilee
 
 # image tag
-TAG="${TAG:-210306}"
+TAG="${TAG:-260221}"
 # X11, VNC, CLI
-USEUI="${USEUI:-X11}"
+UI="${UI:-X11}"
+HOSTDIR="$(dirname $(realpath $0))"
 
 if [ x"$1" = x"-h" -o  x"$1" = x"--help" ]; then
     cat <<EOF
 >> Usage:
     $0 <params>
-    TAG=<image tag> USEUI=<X11,VNC,CLI> $0 <params>
+    TAG=<image tag> UI=<X11,VNC,CLI> $0 <params>
 >> default TAG: ${TAG}
->> default USEUI: ${USEUI}
+>> default  UI: ${UI}
 >> params example:
-# iptable   :  -e IPTABLES=1 -e IPTABLES_LEGACY=1
-# danted    :  -e NODANTED=1 OR -p 127.0.0.1:1080:1080
-# USEUI=VNC :  -e PASSWORD=x -e ECPASSWORD= -p 127.0.0.1:5901:5901
-# sshd      :  -e SSHD=1 -e ROOTPASSWD=x1 -p 127.0.0.1:2222:22
-# USEUI=CLI :  -e ECADDRESS=x:p -e ECUSER= -e ECPASSWORD=
+# iptable :  -e IPTABLES=1 -e IPTABLES_LEGACY=1
+# danted  :  -e NODANTED=1 OR -p 127.0.0.1:1080:1080
+# sshd    :  -e SSHD=1 -e ROOTPASSWD=x1 -p 127.0.0.1:2222:22
+# UI=VNC  :  -e PASSWORD=x -e ECPASSWORD=xx -p 127.0.0.1:5901:5901
+# UI=CLI for EasyConnect :  -e ECADDRESS=x:p -e ECUSER= -e ECPASSWORD=xx
 EOF
     exit 0
 fi
 
-EasyConnectDir=/usr/share/sangfor/EasyConnect
-HOSTECDIR="$(dirname $(realpath $0))"
-echo ">>> Host Dir to mount: ${HOSTECDIR}"
+if echo "$(basename $HOSTDIR)" | grep EasyConnect >/dev/null 2>&1; then
+    VPN=EasyConnect
+    VPN_DIR=/usr/share/sangfor/EasyConnect
+elif echo "$(basename $HOSTDIR)" | grep aTrust >/dev/null 2>&1; then
+    VPN=aTrust
+    VPN_DIR=/usr/share/sangfor/aTrust
+else
+    echo "!!! can't set VPN: EasyConnect or aTrust!"
+    exit 1
+fi
 
-watch_url() {
-    echo "Start watching url."
-    echo >"${HOSTECDIR}"/tmp-url
-    while true; do
-        tail -n 0 -f "${HOSTECDIR}"/tmp-url | grep 'NEWURL:' -m1 >/dev/null
-        if grep '#BREAK#' "${HOSTECDIR}"/tmp-url >/dev/null; then
-            break
-        fi
-        xdg-open "$(tail -n1 ${HOSTECDIR}/tmp-url)"
-    done
-    echo "Stop watching url."
-    rm "${HOSTECDIR}"/tmp-url
-}
+echo ">>> $VPN Host Dir to mount: ${HOSTDIR}"
 
 common_opts="--rm --device /dev/net/tun \
     --cap-add NET_ADMIN \
+    --hostname e666181fe505 \
     --ulimit nofile=65535:65535 \
-    -v ${HOSTECDIR}:${EasyConnectDir}"
+    -v ${HOSTDIR}:${VPN_DIR} \
+    -e VPN=$VPN -e UI=$UI"
+
 # params, like -p, -e etc.
-params="-e USEUI=$USEUI ${@}"
-if [ x"$USEUI" = xVNC ]; then
-    watch_url &
-    docker run $common_opts $params -t \
-        shmilee/easyconnect:$TAG
-    echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url
-elif [ x"$USEUI" = xCLI ]; then
-    docker run $common_opts $params -i -t \
-        shmilee/easyconnect:$TAG
-else
-    # default USEUI=X11
-    watch_url &
-    xhost +LOCAL:
-    docker run $common_opts $params \
+params="${@}"
+if [ x"$UI" = xVNC ]; then
+    if echo "$params" | grep "5901:5901" >/dev/null 2>&1; then
+        params="$params -p 127.0.0.1:5901:5901"
+    fi
+fi
+if [ x"$UI" = xX11 ]; then
+    params="$params \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
         -v $HOME/.Xauthority:/root/.Xauthority \
-        -e DISPLAY=$DISPLAY \
-        shmilee/easyconnect:$TAG
-    xhost -LOCAL:
-    echo 'NEWURL: #BREAK#' >>"${HOSTECDIR}"/tmp-url
+        -e DISPLAY=$DISPLAY"
 fi
 
+watch_url() {
+    echo "Start watching url."
+    echo >"${HOSTDIR}"/tmp-url
+    while true; do
+        tail -n 0 -f "${HOSTDIR}"/tmp-url | grep 'NEWURL:' -m1 >/dev/null
+        if grep '#BREAK#' "${HOSTDIR}"/tmp-url >/dev/null; then
+            break
+        fi
+        xdg-open "$(tail -n1 ${HOSTDIR}/tmp-url)"
+    done
+    echo "Stop watching url."
+    rm "${HOSTDIR}"/tmp-url
+}
+
+case "$VPN" in
+    EasyConnect)
+        if [ x"$UI" = xCLI ]; then
+            docker run $common_opts $params -i -t shmilee/sangfor:$TAG
+        elif [ x"$UI" = xVNC ]; then
+            watch_url &
+            docker run $common_opts $params -t shmilee/sangfor:$TAG
+            echo 'NEWURL: #BREAK#' >>"${HOSTDIR}"/tmp-url
+        else
+            # default UI=X11
+            watch_url &
+            xhost +LOCAL:
+            docker run $common_opts $params shmilee/sangfor:$TAG
+            xhost -LOCAL:
+            echo 'NEWURL: #BREAK#' >>"${HOSTDIR}"/tmp-url
+        fi
+        ;;
+    aTrust)
+        if [ x"$UI" = xVNC ]; then
+            docker run $common_opts $params -t shmilee/sangfor:$TAG
+        else
+            # default UI=X11
+            xhost +LOCAL:
+            docker run $common_opts $params shmilee/sangfor:$TAG
+            xhost -LOCAL:
+        fi
+        ;;
+esac
 exit 0

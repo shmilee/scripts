@@ -5,7 +5,7 @@
 VERSIONa="${1:-7.6.3}"
 VERSIONb="${2:-7.6.7}"
 # EC data repo dir
-DATAREPO="${3:-./ECDATA}"
+DATAREPO="${3:-./sangfor}"
 
 HOSTECDIRa="${DATAREPO}/EasyConnect_x64_v$VERSIONa"
 HOSTECDIRb="${DATAREPO}/EasyConnect_x64_v$VERSIONb"

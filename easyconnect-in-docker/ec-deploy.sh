@@ -4,7 +4,7 @@
 # EC version to run, 7.6.3, 7.6.7
 VERSION="${1:-7.6.3}"
 # EC data repo dir
-DATAREPO="${2:-./ECDATA}"
+DATAREPO="${2:-./sangfor}"
 
 EasyConnectDir=/usr/share/sangfor/EasyConnect
 HOSTECDIR="${DATAREPO}/EasyConnect_x64_v$VERSION"
@@ -52,12 +52,11 @@ deploy_data() {
     fi
     # misc files
     echo -n $VERSION >"${HOSTECDIR}/ecversion"
-    if [ ! -f "${HOSTECDIR}/hook_script.sh" ]; then
-        cp -v ./hook_script.sh "${HOSTECDIR}/hook_script.sh"
-    fi
-    if [ ! -f "${HOSTECDIR}/start.sh" ]; then
-        cp -v ./start.sh "${HOSTECDIR}/start.sh"
-    fi
+    for fsh in hook_EasyConnect.sh hook_common.sh start.sh; do
+        if [ ! -f "${HOSTECDIR}/$fsh" ]; then
+            cp -v ./$fsh "${HOSTECDIR}/"
+        fi
+    done
     if [ ! -x "${HOSTECDIR}/start.sh" ]; then
         chmod +x "${HOSTECDIR}/start.sh"
     fi

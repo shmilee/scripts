@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=AT{{VERSION}}
+Comment=aTrust {{VERSION}}
+# edit options, like tag, port
+Exec="{{HOSTATDIR}}/start.sh" -p 127.0.0.1:3600:1080
+Icon={{HOSTATDIR}}/resources/aTrust.png
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Network;

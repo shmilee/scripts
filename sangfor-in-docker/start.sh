@@ -6,6 +6,8 @@ TAG="${TAG:-260221}"
 # X11, VNC, CLI
 UI="${UI:-X11}"
 HOSTDIR="$(dirname $(realpath $0))"
+SHOSTNAME=${SHOSTNAME:-e666181fe505}
+SMACADDR=${SMACADDR:-9a:9d:df:f8:06:33}
 
 if [ x"$1" = x"-h" -o  x"$1" = x"--help" ]; then
     cat <<EOF
@@ -14,6 +16,8 @@ if [ x"$1" = x"-h" -o  x"$1" = x"--help" ]; then
     TAG=<image tag> UI=<X11,VNC,CLI> $0 <params>
 >> default TAG: ${TAG}
 >> default  UI: ${UI}
+>> default SHOSTNAME: ${SHOSTNAME}
+>> default  SMACADDR: ${SMACADDR}
 >> params example:
 # iptable :  -e IPTABLES=1 -e IPTABLES_LEGACY=1
 # danted  :  -e NODANTED=1 OR -p 127.0.0.1:1080:1080
@@ -39,7 +43,7 @@ echo ">>> $VPN Host Dir to mount: ${HOSTDIR}"
 
 common_opts="--rm --device /dev/net/tun \
     --cap-add NET_ADMIN \
-    --hostname e666181fe505 \
+    --hostname ${SHOSTNAME} --mac-address ${SMACADDR} \
     --ulimit nofile=65535:65535 \
     -v ${HOSTDIR}:${VPN_DIR} \
     -e VPN=$VPN -e UI=$UI"
@@ -90,6 +94,8 @@ case "$VPN" in
         fi
         ;;
     aTrust)
+        ROOT_DATADIR="$(dirname $HOSTDIR)/atrust-root-data"
+        params="$params -v $ROOT_DATADIR:/root"
         if [ x"$UI" = xVNC ]; then
             docker run $common_opts $params -t shmilee/sangfor:$TAG
         else

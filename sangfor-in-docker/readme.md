@@ -1,117 +1,82 @@
 # 参考致谢
-https://github.com/Hagb/docker-easyconnect
 
-# build or pull
+* https://github.com/docker-easyconnect/docker-easyconnect
+* https://github.com/Hagb/docker-easyconnect
+
+# build image
 
 ```bash
 export TAG=$(date +%y%m%d)
-docker build --rm -t shmilee/easyconnect:$TAG -f Dockerfile .
+docker build --rm -t shmilee/sangfor:$TAG -f Dockerfile .
 ```
 
 ```bash
-export TAG=210306
-docker pull shmilee/easyconnect:$TAG
+$ docker images
+IMAGE                           ID             DISK USAGE
+debian:bookworm-20260202-slim   91c6d3bae450       74.8MB   
+shmilee/sangfor:260221          4af479d74ca6        429MB
 ```
 
 # run
 
 ## package files
 
-* [7.6.3](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_01/EasyConnect_x64.deb)
-* [7.6.7](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_767/EasyConnect_x64_7_6_7_3.deb)
-* [7.6.8 CLI](https://github.com/shmilee/scripts/releases/download/v0.0.1/easyconn_7.6.8.2-ubuntu_amd64.deb)
+* [EasyConnect 7.6.3](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_01/EasyConnect_x64.deb)
+* [EasyConnect 7.6.7](http://download.sangfor.com.cn/download/product/sslvpn/pkg/linux_767/EasyConnect_x64_7_6_7_3.deb)
+* [EasyConnect 7.6.8 CLI](https://github.com/shmilee/scripts/releases/download/v0.0.1/easyconn_7.6.8.2-ubuntu_amd64.deb)
   extract cli data files for `7.6.3`, `7.6.7`
+
+* [aTrust 2.5.16.20](https://atrustcdn.sangfor.com/standard/linux/2.5.16.20/uos/amd64/aTrustInstaller_amd64.deb)
 
 ## deploy
 
 ```bash
-./deploy.sh <ec version> <ec data repo>
+./ec-deploy.sh <EasyConnect-version> <sangfor-dataDir>
+./at-deploy.sh <aTrust-version> <sangfor-dataDir>
 
-./deploy.sh # default 7.6.3 ./ECDATA
+./ec-deploy.sh # default 7.6.3 to ./sangfor
 
-./deploy.sh 7.6.3 $HOME/.ECDATA # example
-./deploy.sh 7.6.7 $HOME/.ECDATA
-./slim_ecdata.sh 7.6.3 7.6.7 $HOME/.ECDATA # ln file 3 <- 7 if md5 equal
+./ec-deploy.sh 7.6.3 $HOME/.sangfor # example
+./ec-deploy.sh 7.6.7 $HOME/.sangfor
+./ec-slimdata.sh 7.6.3 7.6.7 $HOME/.sangfor # ln file 3 <- 7 if md5 equal
+
+./at-deploy.sh 2.5.16.20 ~/.sangfor
 ```
 
-## start 7.6.3
+## start aTrust 2.5.16.20
+
+* Only UI=X11,VNC supported for aTrust.
 
 ```bash
-TAG=<image tag> USEUI=<X11,VNC,CLI> path/to/ECrepo/ECdata_vVersion/start.sh <params>
+TAG=<image tag> UI=<X11,VNC> SHOSTNAME=newname SMACADDR=aa:bb:cc:dd:ee:ff \
+    ~/.sangfor/aTrust_amd64_v2.5.16.20/start.sh --help <params>
 
-cd ./ECDATA/EasyConnect_x64_v7.6.3/
+cd ~/.sangfor/aTrust_amd64_v2.5.16.20/
 
-# 1. show help, default: TAG=210306 USEUI=X11
+# 1. show help, default: TAG=260221 UI=X11
 ./start.sh -h
 
 # 2. default: use X11, enable danted port
 ./start.sh -p 127.0.0.1:1080:1080
 
 # 3. use VNC instead of X11
-USEUI=VNC ./start.sh -p 127.0.0.1:1080:1080 \
+UI=VNC ./start.sh -p 127.0.0.1:1080:1080 \
     -e PASSWORD=vncpasswd -p 5901:5901
 
 # 4. disable danted, enable iptables, enable sshd
 ./start.sh -e NODANTED=1 \
     -e IPTABLES=1 -e IPTABLES_LEGACY=1 \
     -e SSHD=1 -p 127.0.0.1:2222:22 -e ROOTPASSWD=w123q234
-# 4. output
->>> Host Dir to mount: /home/xxxxx/ECDATA/EasyConnect_x64_v7.6.3
-Start watching url.
-non-network local connections being added to access control list
-source hook_script.sh ...
-Running hook main ...
-Run hook_resources_bin
-removed '/usr/share/sangfor/EasyConnect/resources/bin'
-'/usr/share/sangfor/EasyConnect/resources/bin' -> 'bin-orig'
-Run hook_iptables
-update-alternatives: using /usr/sbin/iptables-legacy to provide /usr/sbin/iptables (iptables) in manual mode
-update-alternatives: using /usr/sbin/ip6tables-legacy to provide /usr/sbin/ip6tables (ip6tables) in manual mode
-Run hook_sshd
-mkdir: created directory '/run/sshd'
-Run hook_fix763_login
-Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor 
-Start EasyMonitor success!
-Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
-(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
-(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
-[2021-02-24 02:28:48][E][  49][ 114][Register]cms client connect failed.
-Starting CSClient svpnservice ...
-Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/CSClient 
-Start CSClient success!
-Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/svpnservice -h /usr/share/sangfor/EasyConnect/resources/
-Start svpnservice success!
-(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
-(node:7) DeprecationWarning: Calling an asynchronous function without callback is deprecated.
-non-network local connections being removed from access control list
-Stop watching url.
 ```
 
-## start 7.6.7
+## start EasyConnect 7.6.3 or 7.6.7
+
+* UI=X11,VNC in new image `shmilee/sangfor:260221`, get `Segmentation fault (core dumped)`.
+* Only CLI login supported in new image.
+* Old UI=X11,VNC support needs old image `shmilee/easyconnect:210306` and `start.sh, hook_script.sh`.
 
 ```bash
-TAG=210306 USEUI=X11 $HOME/.ECDATA/EasyConnect_x64_v7.6.7/start.sh -p 3600:1080
-# output
->>> Host Dir to mount: /home/xxx/.ECDATA/EasyConnect_x64_v7.6.7
-Start watching url.
-non-network local connections being added to access control list
-source hook_script.sh ...
-Running hook main ...
-Run hook_resources_bin
-removed '/usr/share/sangfor/EasyConnect/resources/bin'
-'/usr/share/sangfor/EasyConnect/resources/bin' -> 'bin-orig'
-Run hook_danted
-Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/EasyMonitor 
-Start EasyMonitor success!
-Run CMD: /usr/share/sangfor/EasyConnect/EasyConnect --enable-transparent-visuals --disable-gpu
-non-network local connections being removed from access control list
-Stop watching url.
-```
-
-* cli login
-
-```bash
-USEUI=CLI $HOME/.ECDATA/EasyConnect_x64_v7.6.7/start.sh -p 3600:1080
+UI=CLI $HOME/.sangfor/EasyConnect_x64_v7.6.7/start.sh -p 3600:1080
 # output
 >>> Host Dir to mount: /home/xxx/.ECDATA/EasyConnect_cli_x64_v7.6.8
 source hook_script.sh ...
@@ -162,23 +127,21 @@ user "xxxx" is already logged out!
 
 ## desktop file
 
-* edit `Exec` options in `ec-7.6.x.desktop`
+* edit `Exec` options in `ec-7.6.x.desktop`, `at-example.desktop`
 
 ```bash
-ls .ECDATA/
-# output
-easyconn_7.6.8.2-ubuntu_amd64.deb  EasyConnect_x64_v7.6.3.deb  EasyConnect_x64_v7.6.7.deb  ec-7.6.7.desktop
-EasyConnect_x64_v7.6.3             EasyConnect_x64_v7.6.7      ec-7.6.3.desktop
+$ ls ~/.sangfor/
+at-2.5.16.20.desktop         atrust-root-data                   EasyConnect_x64_v7.6.3.deb  ec-7.6.3.desktop
+aTrust_amd64_v2.5.16.20      easyconn_7.6.8.2-ubuntu_amd64.deb  EasyConnect_x64_v7.6.7      ec-7.6.7.desktop
+aTrust_amd64_v2.5.16.20.deb  EasyConnect_x64_v7.6.3             EasyConnect_x64_v7.6.7.deb
 
-du -d2 -h .ECDATA/
-# output
-421K    .ECDATA/EasyConnect_x64_v7.6.3/locales
-46M     .ECDATA/EasyConnect_x64_v7.6.3/resources
-168M    .ECDATA/EasyConnect_x64_v7.6.3
-421K    .ECDATA/EasyConnect_x64_v7.6.7/locales
-19M     .ECDATA/EasyConnect_x64_v7.6.7/resources
-20M     .ECDATA/EasyConnect_x64_v7.6.7
-317M    .ECDATA/
+$ du -d1 -h ~/.sangfor/
+178M	~/.sangfor/EasyConnect_x64_v7.6.3
+55M	    ~/.sangfor/EasyConnect_x64_v7.6.7
+553M	~/.sangfor/aTrust_amd64_v2.5.16.20
+4.0M	~/.sangfor/atrust-root-data
+1.1G	~/.sangfor/
+1.1G	总计
 ```
 
 ## issues
@@ -186,3 +149,4 @@ du -d2 -h .ECDATA/
 1. EasyConnect, 在登陆后产生一到两个僵尸进程, 所以镜像中最好包含 `tini`.
    `ps -A -ostat,ppid | grep -e '[zZ]'| awk '{ print $2 }' | uniq | xargs ps -p`
 2. Host 浏览器未设置EC代理时, 打开 EC 相关 URL 卡圈.
+3. 舍弃 EasyConnect GUI 使用方式。

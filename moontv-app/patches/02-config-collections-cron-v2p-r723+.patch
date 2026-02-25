@@ -19,12 +19,13 @@ index 93db66a..d36122a 100644
  
        if (!response.ok) {
          throw new Error(`请求失败: ${response.status} ${response.statusText}`);
-@@ -137,7 +138,7 @@ async function refreshRecordAndFavorites() {
+@@ -206,7 +207,8 @@ async function refreshRecordAndFavorites() {
              return detail;
            })
            .catch((err) => {
 -            console.error(`获取视频详情失败 (${source}+${id}):`, err);
-+            console.error(`获取视频详情失败 ${fallbackTitle} (${source}+${id}):`, err);
++            console.error(`获取视频详情失败 ${fallbackTitle} (${source}+${id}): ${err}`,
++                          err instanceof Error && err.cause ? `\n  [cause]: ${err.cause}` : '');
+             // 失败时从缓存中移除，下次可以重试
+             detailCache.delete(key);
              return null;
-           });
-       }

@@ -79,10 +79,10 @@ index 0000000..bb7f9f8
 +        return path;
 +    }
 +}
-diff --git a/src/middleware.ts b/src/middleware.ts
+diff --git a/src/proxy.ts b/src/proxy.ts
 index b672d79..2227851 100644
---- a/src/middleware.ts
-+++ b/src/middleware.ts
+--- a/src/proxy.ts
++++ b/src/proxy.ts
 @@ -122,6 +122,7 @@ function shouldSkipAuth(pathname: string): boolean {
      '/favicon.ico',
      '/robots.txt',

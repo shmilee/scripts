@@ -17,12 +17,13 @@
          signal: controller.signal,
          headers: {
            'User-Agent': 'LunaTV-ConfigFetcher/1.0'
-@@ -203,7 +203,7 @@
+@@ -203,7 +204,8 @@
              return detail;
            })
            .catch((err) => {
 -            console.error(`获取视频详情失败 (${source}+${id}):`, err);
-+            console.error(`获取视频详情失败 ${fallbackTitle} (${source}+${id}):`, err);
++            console.error(`获取视频详情失败 ${fallbackTitle} (${source}+${id}): ${err}`,
++                          err instanceof Error && err.cause ? `\n  [cause]: ${err.cause}` : '');
              return null;
            });
        }

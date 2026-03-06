@@ -57,7 +57,7 @@ class APISpeed(APIConfig):
                     "size": [data-size,...],
                     "speed": [int-KB/s,,...],
                 },
-                "status": "ok" or "fail-1" or "fail-2" or "fail-3",
+                "status": "ok" or "fail-[1,2,3,4]",
             },
             # more test results
             ...,
@@ -65,11 +65,14 @@ class APISpeed(APIConfig):
     '''
     __moon_sign__ = APIConfig.__moon_sign__
 
-    def __init__(self, backup: str, logfile: str, ispdetector: IspDetector):
+    def __init__(self, backup: str, logfile: str, ispdetector: IspDetector,
+                 max_log_records: int = 20, summary_records: int = 20):
         super().__init__(backup)
         self.addrisp = ispdetector.addrisp
         self.logs = {}
         self.logfile = logfile
+        self.max_log_records = max_log_records
+        self.summary_records = summary_records
         if logfile and os.path.isfile(logfile):
             self.load_json_logs(logfile)
         self.proxy_apis = self._get_proxy_apis()
@@ -92,6 +95,19 @@ class APISpeed(APIConfig):
             print("Error: invalid json logs!")
             return
         self.logs.update(logs['speedlogs'])
+        self._trim_logs()
+
+    def _trim_logs(self):
+        '''
+        For each API, only latest *max_log_records* records saved.
+        Auto-skip records started with "__summary__".
+        '''
+        for key in list(self.logs.keys()):
+            if key.startswith('__summary__'):
+                continue
+            if (isinstance(self.logs[key], list)
+                    and len(self.logs[key]) > self.max_log_records):
+                self.logs[key] = self.logs[key][-self.max_log_records:]
 
     def _get_proxy_apis(self):
         '''Return apis which need proxy when fetching vod_api.'''
@@ -117,6 +133,7 @@ class APISpeed(APIConfig):
 
     def save_json_logs(self, file=None, indent_limit=10, **json_kwargs):
         file = file or self.logfile
+        self._trim_logs()
         obj = dict(
             __moon_sign__=self.__moon_sign__, version=1,
             count=self.count, date=time.asctime(),
@@ -128,7 +145,7 @@ class APISpeed(APIConfig):
     def _test_worker(self, api, desc, detail, fallback_proxy,
                      api_timeout, m3u8_timeout,
                      ts_time_limit, ts_count_limit, ts_size_limit):
-        '''Return vod_api_log, m3u8_log, m3u8_ts_log'''
+        '''Return vod_api_log, m3u8_log, m3u8_ts_log, final_status'''
         # 1. get vod_api_log & m3u8_url
         vod_api_log = dict(proxy=None)
         vod = VodAPI(api, desc, detail=detail, timeout=api_timeout)
@@ -138,25 +155,33 @@ class APISpeed(APIConfig):
             vod = VodAPI(proxy+api, desc, detail=detail, timeout=api_timeout)
             vod_api_log['proxy'] = proxy
             vod_api_log.update(vod.api_speed)
+        if not vod.api_json:
+            print("(%s) No vod response for speed test!" % desc)
+            return vod_api_log, {}, {}, dict(
+                status='fail-1', reason='no vod response',
+            )
         m3u8_url, title, eptitle = None, '', ''
         if vod.api_json:
-            vod_id = vod.random_vod_id()
-            vod_detail = vod.getDetail(vod_id)
-            if vod_detail:
-                episodes = vod_detail.get('episodes', [])
-                title = vod_detail.get('title', '')
-                eptitles = vod_detail.get('episodes_titles', [])
-                if episodes:
-                    idx = random.randint(0, len(episodes)-1)
-                    m3u8_url = episodes[idx]
-                    if len(eptitles) > idx:
-                        eptitle = eptitles[idx]
+            for vod_id in set(vod.random_vod_id() for i in range(3)):
+                vod_detail = vod.getDetail(vod_id)
+                if vod_detail:
+                    episodes = vod_detail.get('episodes', [])
+                    title = vod_detail.get('title', '')
+                    eptitles = vod_detail.get('episodes_titles', [])
+                    if episodes:
+                        idx = random.randint(0, len(episodes)-1)
+                        m3u8_url = episodes[idx]
+                        if len(eptitles) > idx:
+                            eptitle = eptitles[idx]
+                        break
         if m3u8_url:
             print("(%s) choosing %s-%s %s ..."
                   % (desc, title, eptitle, m3u8_url))
         else:
             print("(%s) No m3u8 url found for speed test!" % desc)
-            return vod_api_log, {}, {}
+            return vod_api_log, {}, {}, dict(
+                status='fail-2', reason='no m3u8 url',
+            )
         # 2. m3u8_url
         tester = SpeedTest(timeout=m3u8_timeout)
         url_playlist, speed_info = tester.fetch_m3u8_playlist(m3u8_url, desc)
@@ -166,7 +191,9 @@ class APISpeed(APIConfig):
             playlist = None
         m3u8_log = dict(url=m3u8_url, **speed_info)
         if not playlist:
-            return vod_api_log, m3u8_log, {}
+            return vod_api_log, m3u8_log, {}, dict(
+                status='fail-3', reason='no playlist',
+            )
         # 3. m3u8_ts
         uri_segments, ts_speed_info = tester.fetch_m3u8_segments(
             playlist, desc,
@@ -179,9 +206,20 @@ class APISpeed(APIConfig):
             m3u8_ts_log = dict(
                 count=count,  # uri=[us[0] for us in uri_segments],
                 **ts_speed_info)
-            return vod_api_log, m3u8_log, m3u8_ts_log
+            ts_status = m3u8_ts_log.get('status', [])
+            ts_not20x = [s for s in ts_status if s not in [200, 206]]
+            if not ts_not20x:
+                final_status = dict(status='ok', reason='nice')
+            elif (len(ts_not20x) <= 3  # 占比较少的非 20X
+                  and len(ts_not20x)/len(ts_status) < 0.25):
+                final_status = dict(status='ok', reason='good')
+            else:
+                final_status = dict(status='fail-5', reason='many !20X ts')
+            return vod_api_log, m3u8_log, m3u8_ts_log, final_status
         else:
-            return vod_api_log, m3u8_log, {}
+            return vod_api_log, m3u8_log, {}, dict(
+                status='fail-4', reason='no segments',
+            )
 
     def test_speed(self, fallback_proxy='default',
                    m3u8_timeout=(8, 29),  # connect, read timeout
@@ -209,41 +247,26 @@ class APISpeed(APIConfig):
         testpool.close()
         testpool.join()
         for api, res in result:
-            vod_api_log, m3u8_log, m3u8_ts_log = res.get()
-            api_status = vod_api_log.get('status', None)
-            m3u8_status = m3u8_log.get('status', None)
-            ts_status = m3u8_ts_log.get('status', [])
-            ts_not20x = [s for s in ts_status if s not in [200, 206]]
-            if ts_status:
-                if not ts_not20x:
-                    final_status = "ok"
-                elif (len(ts_not20x) <= 3  # 占比较少的非 20X
-                      and len(ts_not20x)/len(ts_status) < 0.25):
-                    final_status = "ok"
-                else:
-                    final_status = "fail-3"
-            else:
-                if m3u8_status and m3u8_status == 200:
-                    final_status = "fail-3"
-                elif api_status and api_status == 200:
-                    final_status = "fail-2"
-                else:
-                    final_status = "fail-1"
+            vod_api_log, m3u8_log, m3u8_ts_log, final_status = res.get()
             speed_log = dict(
                 addrisp=self.addrisp,
                 vod_api=vod_api_log,
                 m3u8=m3u8_log,
                 m3u8_ts=m3u8_ts_log,
-                status=final_status,
             )
+            speed_log.update(final_status)
             if api in self.logs:
                 self.logs[api].append(speed_log)
+                if len(self.logs[api]) > self.max_log_records:
+                    # trim this api
+                    self.logs[api] = self.logs[api][-self.max_log_records:]
             else:
                 self.logs[api] = [speed_log]
             # update summary: 可用率 rate, 平均 speed etc.
             key = f"__summary__{api}"
             summary = self._speed_summary(api, self.logs[api], addrisp='ALL')
             self.logs[key] = summary
+        self._trim_logs()  # re-trim all
         # update proxy_apis
         self.proxy_apis = self._get_proxy_apis()
         print('==> 已测试 \033[32m%d\033[0m 个 API!' % len(result))
@@ -260,9 +283,9 @@ class APISpeed(APIConfig):
             if N == 0:
                 print('==> Warn: %s \033[33m无测速数据\033[0m!' % api)
                 return dict(ok=0, fail=0, rate=0, speed=0)
-        if len(speed_logs) > 100:  # 仅用最近 100 次测试
-            speed_logs = speed_logs[-100:]
-            N = 100
+        if len(speed_logs) > self.summary_records:  # 仅用最近 n 次测试
+            speed_logs = speed_logs[-self.summary_records:]
+            N = self.summary_records
         success = [sl for sl in speed_logs if sl['status'] == "ok"]
         ok = len(success)
         fail = N - ok

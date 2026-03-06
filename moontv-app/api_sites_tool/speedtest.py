@@ -4,6 +4,7 @@
 
 import re
 import time
+import random
 import requests
 from urllib.parse import urlparse
 from contextlib import closing
@@ -141,8 +142,15 @@ class SpeedTest(object):
         if not isinstance(m3u8_playlist, m3u8.M3U8):
             print('(%s) Invalid m3u8 playlist!' % desc)
             return [], info
-        #  beginning ts, or NOT-TODO: random ts
-        segments = m3u8_playlist.segments[:count_limit]
+        # beginning ts
+        # segments = m3u8_playlist.segments[:count_limit]
+        # or random ts in order
+        Nseg = len(m3u8_playlist.segments)
+        if Nseg > count_limit:
+            sample = sorted(random.sample(range(Nseg), count_limit))
+            segments = [m3u8_playlist.segments[i] for i in sample]
+        else:
+            segments = m3u8_playlist.segments
         base_timeout = self.timeout
         rqkwargs = self._get_rqkwargs(m3u8_playlist.base_uri)
         head1 = rqkwargs.pop('headers', {})

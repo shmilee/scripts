@@ -2,8 +2,9 @@
 # Contributor: slbtty <shenlebantongying@gmail.com>
 
 pkgname=goldendict-ng
-pkgver=25.10.2
-true_ver=${pkgver}-Release.673d1b90
+pkgver=26.3.0
+tagged_ver_suffix=fce2b872
+tagged_ver=${pkgver}-Release.${tagged_ver_suffix}
 pkgrel=2
 pkgdesc='The Next Generation GoldenDict (supports Qt WebEngine & Qt6)'
 arch=('i686' 'x86_64' 'aarch64')
@@ -35,8 +36,8 @@ conflicts=('goldendict' 'goldendict-git' 'goldendict-ng-git' 'goldendict-svn' 'g
 provides=('goldendict')
 replaces=('goldendict-svn' 'goldendict-git-opt' 'goldendict-webengine-git')
 options=(!debug !strip)
-source=("${pkgname}-${pkgver}.tar.gz::https://github.com/xiaoyifang/goldendict-ng/archive/refs/tags/v${true_ver}.tar.gz")
-sha256sums=('0cdfacec1a8fbe9ed84dec88a9bc92d5c152172c9e5af264ded26fbfd5f1be0e')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/xiaoyifang/goldendict-ng/archive/refs/tags/v${tagged_ver}.tar.gz")
+sha256sums=('1620aa15f2d2d4fcf1b33772dd781d8387841c4d30266ed75f416ff13239a46c')
 
 prepare() {
   # This flag leads to crashes around Oct 2022; remove this in future.
@@ -44,7 +45,7 @@ prepare() {
 }
 
 build(){
-  cd "$srcdir/$pkgname-${true_ver}"
+  cd "$srcdir/$pkgname-${tagged_ver}"
   cmake -B build_dir -S . -G Ninja \
     -DCMAKE_INSTALL_PREFIX='/usr' \
     -DUSE_SYSTEM_FMT=ON \
@@ -56,6 +57,6 @@ build(){
 }
 
 package() {
-  cd "$srcdir/$pkgname-${true_ver}"
+  cd "$srcdir/$pkgname-${tagged_ver}"
   DESTDIR="$pkgdir" cmake --install ./build_dir/
 }

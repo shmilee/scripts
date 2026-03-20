@@ -100,7 +100,8 @@ class IspDetector(object):
                 '电信', 'chinatelecom', 'china telecom', 'chinanet']):
             return '电信'
         elif any(keyword in isp_lower for keyword in [
-                '移动', 'chinamobile', 'china mobile', 'cmcc']):
+                '移动', 'chinamobile', 'china mobile',
+                'mobile communications', 'cmcc']):
             return '移动'
         elif any(keyword in isp_lower for keyword in [
                 '联通', 'chinaunicom', 'china unicom']):

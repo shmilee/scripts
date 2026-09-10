@@ -47,8 +47,7 @@ class APIConfig(object):
         (?P<api>https?://[\w\./]+)$  # real api url
     ''', re.VERBOSE)
     Prefer_Proxies = OrderedDict({
-        'default': 'https://pz.168188.dpdns.org/?url=',
-        'v88qzz': 'https://pz.v88.qzz.io/?url=',
+        'default': 'https://pz.v88.qzz.io/?url=',
     })
     __moon_sign__ = '100.586ab2a'
 

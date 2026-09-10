@@ -115,8 +115,9 @@ hook_vnc() { #{{{
     mkdir /tmp
 
     # $PASSWORD 不为空时，更新 vnc 密码
+    mkdir -p ~/.vnc
     [ -e ~/.vnc/passwd ] || {
-        mkdir -p ~/.vnc && { echo password | tigervncpasswd -f > ~/.vnc/passwd }
+        echo password | tigervncpasswd -f > ~/.vnc/passwd
     }
     [ -n "$PASSWORD" ] && printf %s "$PASSWORD" | tigervncpasswd -f > ~/.vnc/passwd
 

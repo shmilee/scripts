@@ -2,12 +2,26 @@
 # Copyright (C) 2021-2026 shmilee
 
 # image tag
-TAG="${TAG:-260221}"
+TAG="${TAG:-260911}"
 # X11, VNC, CLI
 UI="${UI:-X11}"
 HOSTDIR="$(dirname $(realpath $0))"
+
+# read SHOSTNAME SMACADDR TOPUUID
+set -o allexport  # 或 set -a
+if [ -f "$HOSTDIR/env.conf" ]; then
+    echo ""
+    echo ">>> $VPN Host Dir to mount: ${HOSTDIR}"
+    source "$HOSTDIR/env.conf"
+fi
+if [ -f "$(dirname $HOSTDIR)/env.conf" ]; then
+    source "$(dirname $HOSTDIR)/env.conf"
+fi
+set +o allexport  # 或 set +a
+
 SHOSTNAME=${SHOSTNAME:-e666181fe505}
 SMACADDR=${SMACADDR:-9a:9d:df:f8:06:33}
+TOPUUID=${TOPUUID:-9bbc5a1e-8f47-48ef-a00e-76dd4f7cad10}
 
 if [ x"$1" = x"-h" -o  x"$1" = x"--help" ]; then
     cat <<EOF
@@ -18,12 +32,14 @@ if [ x"$1" = x"-h" -o  x"$1" = x"--help" ]; then
 >> default  UI: ${UI}
 >> default SHOSTNAME: ${SHOSTNAME}
 >> default  SMACADDR: ${SMACADDR}
+>> default   TOPUUID: ${TOPUUID}
 >> params example:
 # iptable :  -e IPTABLES=1 -e IPTABLES_LEGACY=1
 # danted  :  -e NODANTED=1 OR -p 127.0.0.1:1080:1080
 # sshd    :  -e SSHD=1 -e ROOTPASSWD=x1 -p 127.0.0.1:2222:22
 # UI=VNC  :  -e PASSWORD=x -e ECPASSWORD=xx -p 127.0.0.1:5901:5901
 # UI=CLI for EasyConnect :  -e ECADDRESS=x:p -e ECUSER= -e ECPASSWORD=xx
+# TopSAP (GUI login) :  UI=X11 $0 -p 127.0.0.1:1080:1080   # use the built image TAG
 EOF
     exit 0
 fi
@@ -34,8 +50,11 @@ if echo "$(basename $HOSTDIR)" | grep EasyConnect >/dev/null 2>&1; then
 elif echo "$(basename $HOSTDIR)" | grep aTrust >/dev/null 2>&1; then
     VPN=aTrust
     VPN_DIR=/usr/share/sangfor/aTrust
+elif echo "$(basename $HOSTDIR)" | grep TopSAP >/dev/null 2>&1; then
+    VPN=TopSAP
+    VPN_DIR=/opt/TopSAP
 else
-    echo "!!! can't set VPN: EasyConnect or aTrust!"
+    echo "!!! can't set VPN: EasyConnect, aTrust or TopSAP!"
     exit 1
 fi
 
@@ -96,6 +115,23 @@ case "$VPN" in
     aTrust)
         ROOT_DATADIR="$(dirname $HOSTDIR)/atrust-root-data"
         params="$params -v $ROOT_DATADIR:/root"
+        if [ x"$UI" = xVNC ]; then
+            docker run $common_opts $params -t shmilee/sangfor:$TAG
+        else
+            # default UI=X11
+            xhost +LOCAL:
+            docker run $common_opts $params shmilee/sangfor:$TAG
+            xhost -LOCAL:
+        fi
+        ;;
+    TopSAP)
+        # TopSAP 3.6.3.17.2 is GUI-only (no CLI login): needs X11 or VNC.
+        # Mount a fixed product_uuid so the "machine id" is stable across runs.
+        ROOT_DATADIR="$(dirname $HOSTDIR)/TopSAP-root-data"
+        mkdir -pv $ROOT_DATADIR
+        echo $TOPUUID > $ROOT_DATADIR/sys-product_uuid
+        params="$params -v $ROOT_DATADIR:/root \
+            -v $ROOT_DATADIR/sys-product_uuid:/sys/class/dmi/id/product_uuid"
         if [ x"$UI" = xVNC ]; then
             docker run $common_opts $params -t shmilee/sangfor:$TAG
         else

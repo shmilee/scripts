@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=TS{{VERSION}}
+Comment=TopSAP {{VERSION}}
+# edit options, like tag, port
+Exec="{{HOSTTSAPDIR}}/start.sh" -p 127.0.0.1:3600:1080
+Icon={{HOSTTSAPDIR}}/topsec.png
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Network;

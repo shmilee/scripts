@@ -14,7 +14,7 @@ docker build --rm -t shmilee/sangfor:$TAG -f Dockerfile .
 $ docker images
 IMAGE                           ID             DISK USAGE
 debian:bookworm-20260202-slim   91c6d3bae450       74.8MB   
-shmilee/sangfor:260221          4af479d74ca6        429MB
+shmilee/sangfor:260911          ca135810cb13        611MB
 ```
 
 # run
@@ -28,19 +28,22 @@ shmilee/sangfor:260221          4af479d74ca6        429MB
 
 * [aTrust 2.5.16.20](https://atrustcdn.sangfor.com/standard/linux/2.5.16.20/uos/amd64/aTrustInstaller_amd64.deb)
 
+* [TopSAP 3.6.3.17.2](https://app.topsec.com.cn/linux/general/x86_64/deb/TopSAP-3.6.3.17.2-x86_64.deb)
+
 ## deploy
 
 ```bash
 ./ec-deploy.sh <EasyConnect-version> <sangfor-dataDir>
-./at-deploy.sh <aTrust-version> <sangfor-dataDir>
-
 ./ec-deploy.sh # default 7.6.3 to ./sangfor
-
 ./ec-deploy.sh 7.6.3 $HOME/.sangfor # example
 ./ec-deploy.sh 7.6.7 $HOME/.sangfor
 ./ec-slimdata.sh 7.6.3 7.6.7 $HOME/.sangfor # ln file 3 <- 7 if md5 equal
 
+./at-deploy.sh <aTrust-version> <sangfor-dataDir>
 ./at-deploy.sh 2.5.16.20 ~/.sangfor
+
+./ts-deploy.sh <TopSAP-version> <sangfor-dataDir>
+./ts-deploy.sh 3.6.3.17.2 ~/.sangfor
 ```
 
 ## start aTrust 2.5.16.20
@@ -53,7 +56,7 @@ TAG=<image tag> UI=<X11,VNC> SHOSTNAME=newname SMACADDR=aa:bb:cc:dd:ee:ff \
 
 cd ~/.sangfor/aTrust_amd64_v2.5.16.20/
 
-# 1. show help, default: TAG=260221 UI=X11
+# 1. show help, default: TAG=260911 UI=X11
 ./start.sh -h
 
 # 2. default: use X11, enable danted port
@@ -71,7 +74,7 @@ UI=VNC ./start.sh -p 127.0.0.1:1080:1080 \
 
 ## start EasyConnect 7.6.3 or 7.6.7
 
-* UI=X11,VNC in new image `shmilee/sangfor:260221`, get `Segmentation fault (core dumped)`.
+* UI=X11,VNC in new image `shmilee/sangfor:260911`, get `Segmentation fault (core dumped)`.
 * Only CLI login supported in new image.
 * Old UI=X11,VNC support needs old image `shmilee/easyconnect:210306` and `start.sh, hook_script.sh`.
 
@@ -125,6 +128,33 @@ Run CMD: /usr/share/sangfor/EasyConnect/resources/bin/easyconn logout
 user "xxxx" is already logged out!
 ```
 
+## start TopSAP 3.6.3.17.2
+
+* TopSAP 3.6.3.17.2 **无 CLI 登录**，只能 GUI：`UI=X11`（转发宿主显示）或 `UI=VNC`。
+* 挂载固定 `product_uuid` 到 `/sys/class/dmi/id/product_uuid`，保证机器标识稳定。
+* 流程：`sv_websrv`(127.0.0.1:7443) + GUI → 用户登录 → `tun0`(mtu 1300 + MASQUERADE) → danted socks5 :1080。
+* `SHOSTNAME SMACADDR TOPUUID` 三个变量可通过 env.conf 设置，`start.sh` 会自动读取。
+
+```bash
+cd ~/.sangfor/TopSAP_x64_v3.6.3.17.2/
+
+# 1. show help
+./start.sh -h
+
+# 2. default: X11 + danted socks5 proxy   (TAG = 你构建镜像用的 tag)
+TAG=260911 UI=X11 ./start.sh -p 127.0.0.1:1080:1080
+
+# 3. VNC instead of X11
+TAG=260911 UI=VNC ./start.sh -e PASSWORD=vncpasswd \
+    -p 127.0.0.1:5901:5901 -p 127.0.0.1:1080:1080
+
+# 4. iptables full routing (disable danted)
+TAG=260911 UI=X11 ./start.sh -e IPTABLES=1 -e NODANTED=1
+
+# 5. custom product_uuid
+TAG=260911 UI=X11 TOPUUID=xxxx-xxxx ./start.sh -p 127.0.0.1:1080:1080
+```
+
 ## desktop file
 
 * edit `Exec` options in `ec-7.6.x.desktop`, `at-example.desktop`
@@ -150,3 +180,10 @@ $ du -d1 -h ~/.sangfor/
    `ps -A -ostat,ppid | grep -e '[zZ]'| awk '{ print $2 }' | uniq | xargs ps -p`
 2. Host 浏览器未设置EC代理时, 打开 EC 相关 URL 卡圈.
 3. 舍弃 EasyConnect GUI 使用方式。
+4. TopSAP 3.6.3.17.2 无 CLI 登录, 只能 GUI (X11/VNC). GUI 需 `--disable-gpu --disable-dev-shm-usage`,
+   否则 docker 内 GPU 进程初始化偶发 `Trace/breakpoint trap (SIGTRAP)` 崩溃.
+5. TopSAP 登录页对 `https://localhost:7443/api/v1/*` 发请求, 由 `sv_websrv` 服务; 登录成功后才建 `tun0`.
+   `sv_websrv` 用顶层 `/opt/TopSAP/sv_websrv`（cwd=/opt/TopSAP）, 与 GUI 共享 `/tmp/TopSAP_ELE/.BUFF`.
+6. TopSAP 用 `/sys/class/dmi/id/product_uuid` 作机器唯一标识, 多设备登录同一账号可能被服务端禁用,
+   故 `start.sh` 挂载固定 UUID（可用 `TOPUUID=` 覆盖）.
+

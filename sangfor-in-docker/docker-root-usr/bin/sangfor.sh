@@ -14,8 +14,13 @@ case "$VPN" in
         VPN_DIR="/usr/share/sangfor/aTrust" # aTrust deb postinst
         hook_script="hook_aTrust.sh"
         ;;
+    TopSAP|TS)
+        VPN="TopSAP"
+        VPN_DIR="/opt/TopSAP" # TopSAP deb postinst
+        hook_script="hook_TopSAP.sh"
+        ;;
     *)
-        echo "Error: Unknown VPN type '$VPN'. Please set VPN to EasyConnect/EC or aTrust/aT." >&2
+        echo "Error: Unknown VPN type '$VPN'. Please set VPN to EasyConnect/EC, aTrust/aT or TopSAP/TS." >&2
         exit 1
         ;;
 esac

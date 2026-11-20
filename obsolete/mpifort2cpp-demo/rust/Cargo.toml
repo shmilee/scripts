@@ -1,0 +1,7 @@
+[package]
+name = "jacobi_rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mpi = "0.8.2"
